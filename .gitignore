@@ -104,3 +104,9 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Local reference snapshot of legacy project
+_references/
+
+# Remove after closing Unity: legacy nested project path (Hub created project inside repo)
+/The Next Project/

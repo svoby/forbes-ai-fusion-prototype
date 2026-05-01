@@ -1,0 +1,13 @@
+---
+description: C# style and maintainability rules for Unity scripts
+globs: **/*.cs
+alwaysApply: false
+---
+
+# C# Style
+
+- Use clear names over abbreviations.
+- Keep methods short and focused.
+- Use guard clauses for invalid states.
+- Avoid God classes; split by feature responsibility.
+- Prefer explicit fields/properties for gameplay-critical values.

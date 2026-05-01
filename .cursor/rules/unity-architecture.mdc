@@ -1,0 +1,12 @@
+---
+description: Unity gameplay architecture rules for this project
+alwaysApply: true
+---
+
+# Unity Architecture
+
+- Keep gameplay logic deterministic and in network tick flow.
+- Do not mix UI concerns into network controller classes.
+- Prefer one responsibility per MonoBehaviour.
+- Avoid duplicating SP/MP codepaths; keep a shared gameplay core.
+- Use prefab-driven setup and explicit serialized references.

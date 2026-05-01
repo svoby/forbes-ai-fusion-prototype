@@ -1,0 +1,13 @@
+---
+description: Photon Fusion networking standards and authority rules
+globs: **/*.cs
+alwaysApply: false
+---
+
+# Fusion Networking Rules
+
+- Validate combat and state-changing actions on State Authority.
+- Clients submit input only; never trust client-side damage outcomes.
+- Keep authority checks explicit (`HasInputAuthority`, `HasStateAuthority`).
+- Put simulation in `FixedUpdateNetwork`, not `Update`.
+- Add lightweight debug logs for authority/path issues when needed.
