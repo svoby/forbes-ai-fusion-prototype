@@ -1,9 +1,6 @@
-# This .gitignore file should be placed at the root of your Unity project directory
-#
-# Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
-#
-# Recommended: add any editor/OS/tool-specific ignore rules from the Global/ templates as needed.
-# See: https://github.com/github/gitignore/tree/main/Global
+# Unity + IDE + Build artifact ignores
+# Base Unity rules: https://github.com/github/gitignore/blob/main/Unity.gitignore
+# Extended with common IDE/OS/build patterns for this project.
 #
 .utmp/
 /[Ll]ibrary/
@@ -104,3 +101,49 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── JetBrains Rider ───────────────────────────────────────────────────────────
+.idea/
+*.DotSettings.user
+
+# ── Visual Studio Code ────────────────────────────────────────────────────────
+.vscode/
+
+# ── Visual Studio ─────────────────────────────────────────────────────────────
+.vs/
+*.suo
+*.user
+
+# ── Photon Fusion SDK (unpackaged; re-import from .unitypackage) ──────────────
+/Assets/Plugins/Fusion/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+/Build/
+/Builds/
+*.apk
+*.aab
+*.exe
+*.app
+*.x86_64
+*.x86
+
+# ── Rider/Roslyn generated ────────────────────────────────────────────────────
+*.sln
+*.csproj
+*.pidb
+*.booproj
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.swp
+*~
