@@ -17,7 +17,16 @@ public static class CheckerboardFloor {
 
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
   static void AutoCreate() {
-    if (GameObject.Find(ParentName) != null) return;
+    var existing = GameObject.Find(ParentName);
+
+    // If there is a legacy single-object floor (no children = old Plane/Cube),
+    // destroy it so we can replace it with the checkerboard.
+    if (existing != null && existing.transform.childCount == 0) {
+      Object.Destroy(existing);
+      existing = null;
+    }
+
+    if (existing != null) return; // already the 3×3 checkerboard
     Create();
   }
 
