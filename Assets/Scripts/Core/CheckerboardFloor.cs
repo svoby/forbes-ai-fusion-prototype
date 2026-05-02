@@ -24,6 +24,9 @@ public static class CheckerboardFloor {
   /// <summary>Creates the 3 × 3 checkerboard floor centred at the world origin.</summary>
   public static void Create() {
     var parent = new GameObject(ParentName);
+    // Do NOT set isStatic = true on runtime-created objects: Unity does not rebuild
+    // the static physics broadphase at runtime, so statically-flagged objects won't
+    // be found by Physics.Raycast / OverlapSphere.
 
     var matA = BuildMat(ColorA);
     var matB = BuildMat(ColorB);

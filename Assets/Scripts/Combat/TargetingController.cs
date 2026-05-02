@@ -23,6 +23,7 @@ public class TargetingController : MonoBehaviour {
   static readonly List<Targetable> _tabScratch = new List<Targetable>(16);
 
   ThirdPersonOrbitCamera _camera;
+  NetworkRunner          _runner;
   Targetable             _currentTarget;
 
   public Targetable CurrentTarget  => _currentTarget;
@@ -151,25 +152,39 @@ public class TargetingController : MonoBehaviour {
       return;
     }
 
+    EnsureRunner();
+
     Vector2 screenPos = mouse.position.ReadValue();
     var ray = cam.ScreenPointToRay(screenPos);
 
-    // Broad diagnostic: how many physics colliders exist anywhere near origin?
-    var nearby = Physics.OverlapSphere(Vector3.zero, 200f);
-    Debug.Log($"[TargetingController] Click diag — screen={screenPos} cam.pos={cam.transform.position:F1} ray.origin={ray.origin:F1} ray.dir={ray.direction:F2} | OverlapSphere(200) found {nearby.Length} colliders");
-    if (nearby.Length > 0) {
-      Debug.Log($"[TargetingController]   First nearby collider: '{nearby[0].name}' on '{nearby[0].transform.root.name}'");
+    // Fusion spawns objects into its own PhysicsScene (separate from the Unity default scene).
+    // Use runner.GetPhysicsScene() so Fusion-spawned objects (player, dummy) are included.
+    // Fall back to default Physics if no runner is available (e.g. floor tiles).
+    bool hitSomething = false;
+    RaycastHit hitInfo = default;
+
+    if (_runner != null && _runner.IsRunning) {
+      var fusionScene = _runner.GetPhysicsScene();
+      hitSomething = fusionScene.Raycast(ray.origin, ray.direction, out hitInfo, _maxRaycastDistance);
+
+      if (!hitSomething) {
+        // Also check default scene for non-networked objects (floor, etc.)
+        hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
+      }
+    } else {
+      hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
     }
 
-    if (Physics.Raycast(ray, out var hitInfo, _maxRaycastDistance)) {
+    Debug.Log($"[TargetingController] Raycast screen={screenPos} cam={cam.transform.position:F1} hit={hitSomething} runner={((_runner != null && _runner.IsRunning) ? "OK" : "none")}");
+
+    if (hitSomething) {
       Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
-      Debug.Log($"[TargetingController]   Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}' layer={LayerMask.LayerToName(hitInfo.collider.gameObject.layer)}");
+      Debug.Log($"[TargetingController]   Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}'");
       var hit = hitInfo.collider.GetComponentInParent<Targetable>();
-      Debug.Log($"[TargetingController]   Targetable found: {(hit != null ? hit.DisplayName : "NULL — no Targetable in parent chain")}");
+      Debug.Log($"[TargetingController]   Targetable: {(hit != null ? hit.DisplayName : "NULL")}");
       if (hit != null) {
         SetTarget(hit);
       }
-      // Click on empty geometry: keep current target (WoW classic behaviour).
     } else {
       Debug.DrawRay(ray.origin, ray.direction * _maxRaycastDistance, Color.red, 1f);
       Debug.Log("[TargetingController]   Raycast missed all colliders.");
@@ -195,9 +210,12 @@ public class TargetingController : MonoBehaviour {
   }
 
   void EnsureCamera() {
-    if (_camera != null) {
-      return;
-    }
+    if (_camera != null) return;
     _camera = Object.FindAnyObjectByType<ThirdPersonOrbitCamera>();
+  }
+
+  void EnsureRunner() {
+    if (_runner != null && _runner.IsRunning) return;
+    _runner = Object.FindAnyObjectByType<NetworkRunner>();
   }
 }
