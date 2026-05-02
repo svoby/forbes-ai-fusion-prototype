@@ -22,7 +22,7 @@ public class PlayerMovement : NetworkBehaviour {
   NetworkCombatController  _combat;   // may be null until added to prefab
   bool                     _loggedFirstInput;
 
-  public float PlayerSpeed   = 20f;
+  public float PlayerSpeed   = 40f;
   public float JumpForce     = 5f;
   public float GravityValue  = -9.81f;
 
