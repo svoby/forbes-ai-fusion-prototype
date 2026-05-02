@@ -21,8 +21,8 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
   [SerializeField] bool spawnTrainingDummyInEditor = true;
 
-  [Tooltip("Offset in the local player's space (X=right, Y=up, Z=forward) where the dummy is spawned.")]
-  [SerializeField] Vector3 trainingDummySpawnOffsetLocal = new Vector3(1.5f, 0f, 3.5f);
+  [Tooltip("Offset in the local player's space (X=right, Y=up, Z=forward). Default is straight ahead so FP camera sees the dummy.")]
+  [SerializeField] Vector3 trainingDummySpawnOffsetLocal = new Vector3(0f, 0f, 4f);
 
   NetworkRunner _runner;
   bool _spawnedTrainingDummy;
@@ -100,11 +100,7 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       }
     }
 
-    if (player == runner.LocalPlayer && Application.isEditor && spawnTrainingDummyInEditor && TrainingDummyPrefab != null &&
-        !_trainingDummySpawnStarted) {
-      _trainingDummySpawnStarted = true;
-      StartCoroutine(CoSpawnTrainingDummy(runner));
-    }
+    TryStartEditorTrainingDummySpawn(runner);
   }
 
   public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
@@ -183,8 +179,8 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   /// <summary>
-  /// Waits for <see cref="NetworkRunner.TryGetPlayerObject"/> so spawn does not fail with local player not set yet,
-  /// then spawns in front of the player so the dummy stays in view.
+  /// Spawns in front of the local player; falls back to in front of the main camera.
+  /// Uses <see cref="NetworkSpawnFlags.SharedModeStateAuthLocalPlayer"/> so Shared Mode accepts spawn from the local peer.
   /// </summary>
   IEnumerator CoSpawnTrainingDummy(NetworkRunner runner) {
     if (TrainingDummyPrefab.GetComponent<NetworkObject>() == null) {
@@ -193,35 +189,85 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       yield break;
     }
 
-    float waited = 0f;
-    while (waited < 10f && runner != null && runner.IsRunning && !_spawnedTrainingDummy) {
-      if (Application.isEditor && spawnTrainingDummyInEditor &&
-          runner.TryGetPlayerObject(runner.LocalPlayer, out var playerObj) && playerObj != null) {
-        var worldPos = playerObj.transform.TransformPoint(trainingDummySpawnOffsetLocal);
-        worldPos.y = Mathf.Max(worldPos.y, 0.5f);
-        var rot = playerObj.transform.rotation;
+    var spawnFailures = 0;
+    const int maxFrames = 300;
+    for (var frame = 0; frame < maxFrames && runner != null && runner.IsRunning && !_spawnedTrainingDummy; frame++) {
+      yield return null;
 
-        var spawnedDummy = runner.Spawn(TrainingDummyPrefab, worldPos, rot, PlayerRef.None);
-        if (spawnedDummy != null) {
-          _spawnedTrainingDummy = true;
-          Debug.Log("PlayerSpawner: Training dummy spawned.", spawnedDummy.gameObject);
-        } else {
-          Debug.LogWarning("PlayerSpawner: Training dummy Spawn returned null (prefab / FusionPrefab / spawn rules).");
-          _trainingDummySpawnStarted = false;
-        }
-
+      if (!Application.isEditor || !spawnTrainingDummyInEditor) {
+        _trainingDummySpawnStarted = false;
         yield break;
       }
 
-      waited += Time.unscaledDeltaTime;
-      yield return null;
+      var havePlayer = runner.TryGetPlayerObject(runner.LocalPlayer, out var playerObj) && playerObj != null;
+      if (!havePlayer && frame < 90) {
+        continue;
+      }
+
+      Vector3 worldPos;
+      Quaternion rot;
+      if (havePlayer) {
+        worldPos = playerObj.transform.TransformPoint(trainingDummySpawnOffsetLocal);
+        worldPos.y = Mathf.Max(worldPos.y, 0.5f);
+        rot = playerObj.transform.rotation;
+      } else if (Camera.main != null) {
+        var cam = Camera.main.transform;
+        var flatFwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up);
+        if (flatFwd.sqrMagnitude < 1e-4f) {
+          flatFwd = Vector3.forward;
+        }
+
+        flatFwd.Normalize();
+        worldPos = cam.position + flatFwd * 4f;
+        worldPos.y = Mathf.Max(worldPos.y, 1f);
+        rot = Quaternion.LookRotation(flatFwd);
+      } else {
+        worldPos = new Vector3(4f, 1f, 0f);
+        rot = Quaternion.identity;
+      }
+
+      var spawnedDummy = runner.Spawn(
+        TrainingDummyPrefab,
+        worldPos,
+        rot,
+        PlayerRef.None,
+        null,
+        NetworkSpawnFlags.SharedModeStateAuthLocalPlayer);
+
+      if (spawnedDummy != null) {
+        _spawnedTrainingDummy = true;
+        Debug.Log($"PlayerSpawner: Training dummy spawned at {worldPos}.", spawnedDummy.gameObject);
+        yield break;
+      }
+
+      spawnFailures++;
+      if (spawnFailures >= 12) {
+        Debug.LogError("PlayerSpawner: Training dummy Spawn returned null repeatedly. Check FusionPrefab label on TrainingDummy and Shared Mode spawn rules.");
+        _trainingDummySpawnStarted = false;
+        yield break;
+      }
     }
 
-    Debug.LogWarning("PlayerSpawner: Training dummy not spawned (timeout waiting for local player object).");
+    Debug.LogWarning("PlayerSpawner: Training dummy not spawned (frame budget exhausted).");
     _trainingDummySpawnStarted = false;
   }
 
-  public void OnConnectedToServer(NetworkRunner runner) { }
+  public void OnConnectedToServer(NetworkRunner runner) {
+    TryStartEditorTrainingDummySpawn(runner);
+  }
+
+  void TryStartEditorTrainingDummySpawn(NetworkRunner runner) {
+    if (!Application.isEditor || !spawnTrainingDummyInEditor || TrainingDummyPrefab == null) {
+      return;
+    }
+
+    if (_trainingDummySpawnStarted) {
+      return;
+    }
+
+    _trainingDummySpawnStarted = true;
+    StartCoroutine(CoSpawnTrainingDummy(runner));
+  }
 
   public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason) { }
 
