@@ -10,7 +10,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class FacingIndicator : MonoBehaviour {
   [SerializeField] Color _color        = new Color(0.1f, 1f, 0.25f);
-  [SerializeField] float _headHeight   = 1.85f;
+  [SerializeField] float _headHeight   = 1.1f;
   [SerializeField] float _shaftLength  = 0.28f;
   [SerializeField] float _shaftRadius  = 0.04f;
   [SerializeField] float _tipRadius    = 0.1f;
