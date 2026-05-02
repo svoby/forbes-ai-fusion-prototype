@@ -2,23 +2,23 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Reads keyboard and mouse state every frame; implements <see cref="IInputSource"/>
-/// so <see cref="FusionInputProvider"/> can sample it from Fusion's <c>OnInput</c>.
+/// Reads keyboard and mouse state every frame and implements <see cref="IInputSource"/>
+/// so <see cref="FusionInputProvider"/> can sample it from Fusion's OnInput.
 /// <para>
-/// WoW mouse-mode rules:
+/// Control scheme:
 /// <list type="bullet">
-///   <item>No mouse: A/D turn the camera/character; character does not strafe.</item>
-///   <item>LMB held: camera orbits; A/D still turn; <see cref="AlwaysFaceYaw"/> stays false.</item>
-///   <item>RMB held: camera + character rotate together; A/D strafe; <see cref="AlwaysFaceYaw"/> = true.</item>
-///   <item>Both held: same as RMB + <see cref="MoveAxes"/>.y forced to 1 (auto-forward).</item>
+///   <item>W / S / Up / Down — forward / back.</item>
+///   <item>A / D            — lateral strafe (always, regardless of mouse mode).</item>
+///   <item>Q / E / ← / →   — rotate camera (and character, since AlwaysFaceYaw = true).</item>
+///   <item>LMB held         — orbit camera freely; A / D still strafe.</item>
+///   <item>RMB held         — free-look; combined with strafe and keyboard rotation.</item>
+///   <item>Both held        — auto-forward + free-look.</item>
 /// </list>
 /// </para>
-/// Edge button presses are latched and consumed once per Fusion tick via the Consume* methods.
 /// </summary>
 [DisallowMultipleComponent]
 public class KeyboardInputSource : MonoBehaviour, IInputSource {
-  const float TurnRateDegPerSec      = 120f;  // A / D keys
-  const float ArrowTurnRateDegPerSec = 60f;   // ← → arrow keys (50 % slower)
+  const float TurnRateDegPerSec = 120f;
 
   bool _pendingJump;
   bool _pendingSpell1;
@@ -29,8 +29,8 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
   ThirdPersonOrbitCamera _camera;
 
   // ---- IInputSource ----
-  public Vector2 MoveAxes     { get; private set; }
-  public float   LookYaw      { get; private set; }
+  public Vector2 MoveAxes      { get; private set; }
+  public float   LookYaw       { get; private set; }
   public bool    AlwaysFaceYaw { get; private set; }
 
   public bool ConsumeJump()           => Consume(ref _pendingJump);
@@ -40,9 +40,7 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
   public bool ConsumeRandomizeColor() => Consume(ref _pendingColor);
 
   static bool Consume(ref bool flag) {
-    if (!flag) {
-      return false;
-    }
+    if (!flag) return false;
     flag = false;
     return true;
   }
@@ -50,22 +48,18 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
   int _missingCameraWarnFrame = -1;
 
   void EnsureCamera() {
-    if (_camera != null) {
-      return;
-    }
+    if (_camera != null) return;
 
     _camera = Object.FindAnyObjectByType<ThirdPersonOrbitCamera>();
-
     if (_camera != null) {
       LookYaw = _camera.Yaw;
       Debug.Log("[KeyboardInputSource] ThirdPersonOrbitCamera found.");
       return;
     }
 
-    // Warn once per second (not every frame) so console stays readable.
     if (Time.frameCount != _missingCameraWarnFrame && Time.frameCount % 60 == 0) {
       _missingCameraWarnFrame = Time.frameCount;
-      Debug.LogWarning("[KeyboardInputSource] ThirdPersonOrbitCamera not found — LookYaw=0, A/D turn disabled. Run 'Tools/Fusion/Scene/Apply Full Combat Setup'.");
+      Debug.LogWarning("[KeyboardInputSource] ThirdPersonOrbitCamera not found — LookYaw=0. Run 'Tools/Fusion/Scene/Apply Full Combat Setup'.");
     }
   }
 
@@ -73,63 +67,41 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
     EnsureCamera();
 
     var kb = Keyboard.current;
-    if (kb == null) {
-      return;
-    }
+    if (kb == null) return;
 
-    // -- Edge presses: latched until consumed by FusionInputProvider --
+    // -- Edge presses (latched until consumed by FusionInputProvider) --
     if (kb.spaceKey.wasPressedThisFrame)  { _pendingJump   = true; }
     if (kb.digit1Key.wasPressedThisFrame) { _pendingSpell1 = true; }
     if (kb.digit2Key.wasPressedThisFrame) { _pendingSpell2 = true; }
     if (kb.digit3Key.wasPressedThisFrame) { _pendingSpell3 = true; }
-    if (kb.eKey.wasPressedThisFrame)      { _pendingColor  = true; }
+    if (kb.rKey.wasPressedThisFrame)      { _pendingColor  = true; } // R = randomise colour
 
-    // -- Mouse mode from camera --
-    bool rmb  = _camera != null && (_camera.MouseMode == CameraMouseMode.Right || _camera.MouseMode == CameraMouseMode.Both);
+    // -- Auto-forward when both mouse buttons held --
     bool both = _camera != null && _camera.MouseMode == CameraMouseMode.Both;
 
-    // -- Movement axes --
-    bool wFwd      = kb.wKey.isPressed || kb.upArrowKey.isPressed;
-    bool sBack     = kb.sKey.isPressed || kb.downArrowKey.isPressed;
-    bool aKey      = kb.aKey.isPressed;
-    bool leftArrow = kb.leftArrowKey.isPressed;
-    bool dKey      = kb.dKey.isPressed;
-    bool rightArrow = kb.rightArrowKey.isPressed;
-    bool aLeft     = aKey || leftArrow;
-    bool dRight    = dKey || rightArrow;
-
+    // -- Forward / back: W / S / Up / Down --
+    bool wFwd  = kb.wKey.isPressed || kb.upArrowKey.isPressed;
+    bool sBack = kb.sKey.isPressed || kb.downArrowKey.isPressed;
     float moveY = (wFwd ? 1f : 0f) - (sBack ? 1f : 0f);
-    if (both) {
-      moveY = Mathf.Max(moveY, 1f); // auto-forward when both buttons held
-    }
+    if (both) moveY = Mathf.Max(moveY, 1f);
 
-    float moveX;
-    if (rmb) {
-      // RMB/Both: A/D + arrows = lateral strafe, character faces camera direction.
-      moveX = (dRight ? 1f : 0f) - (aLeft ? 1f : 0f);
-      AlwaysFaceYaw = true;
-    } else {
-      // No mouse / LMB only: A/D + arrows = turn camera (character follows camera yaw).
-      // Arrow keys turn at half the rate of A/D for finer control.
-      moveX = 0f;
-      AlwaysFaceYaw = false;
-      if (_camera != null) {
-        if (aLeft) {
-          float rate = (!aKey && leftArrow) ? ArrowTurnRateDegPerSec : TurnRateDegPerSec;
-          _camera.AddYaw(-rate * Time.deltaTime);
-        }
-        if (dRight) {
-          float rate = (!dKey && rightArrow) ? ArrowTurnRateDegPerSec : TurnRateDegPerSec;
-          _camera.AddYaw(rate * Time.deltaTime);
-        }
-      }
-    }
+    // -- Strafe: A / D always strafe regardless of mouse mode --
+    float moveX = (kb.dKey.isPressed ? 1f : 0f) - (kb.aKey.isPressed ? 1f : 0f);
 
     MoveAxes = new Vector2(moveX, moveY);
 
-    // LookYaw always mirrors the camera's current yaw.
+    // -- Rotate camera: Q / E and ← / → arrow keys --
+    bool turnLeft  = kb.qKey.isPressed || kb.leftArrowKey.isPressed;
+    bool turnRight = kb.eKey.isPressed || kb.rightArrowKey.isPressed;
     if (_camera != null) {
-      LookYaw = _camera.Yaw;
+      if (turnLeft)  _camera.AddYaw(-TurnRateDegPerSec * Time.deltaTime);
+      if (turnRight) _camera.AddYaw( TurnRateDegPerSec * Time.deltaTime);
     }
+
+    // LookYaw mirrors the camera's current yaw.
+    if (_camera != null) LookYaw = _camera.Yaw;
+
+    // Character always faces the camera look direction (strafes sideways, never rotates sideways).
+    AlwaysFaceYaw = true;
   }
 }
