@@ -15,7 +15,15 @@ using UnityEngine.InputSystem;
 public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   [SerializeField] GameObject PlayerPrefab;
 
+  [Tooltip("Editor / solo test: static target with Health (no input). Spawned once by Shared Mode master.")]
+  [SerializeField] GameObject TrainingDummyPrefab;
+
+  [SerializeField] bool spawnTrainingDummyInEditor = true;
+
+  [SerializeField] float trainingDummySpawnOffsetX = 4f;
+
   NetworkRunner _runner;
+  bool _spawnedTrainingDummy;
 
   void Awake() {
     _runner = GetComponent<NetworkRunner>();
@@ -41,6 +49,8 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
         runner.SetPlayerObject(player, spawned);
       }
     }
+
+    TrySpawnEditorTrainingDummy(runner, player);
   }
 
   public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
@@ -105,7 +115,33 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     input.Set(new GameplayInput());
   }
 
-  public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) { }
+  public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) {
+    _spawnedTrainingDummy = false;
+  }
+
+  /// <summary>
+  /// One non-input capsule in the room for Tab / spell tests. Prefer a single runner in the editor:
+  /// multiple peers share one keyboard, so use Peer count 1 plus this dummy instead.
+  /// </summary>
+  void TrySpawnEditorTrainingDummy(NetworkRunner runner, PlayerRef player) {
+    if (!Application.isEditor || !spawnTrainingDummyInEditor || TrainingDummyPrefab == null) {
+      return;
+    }
+
+    if (player != runner.LocalPlayer || _spawnedTrainingDummy) {
+      return;
+    }
+
+    if (!runner.IsSharedModeMasterClient) {
+      return;
+    }
+
+    var pos = new Vector3(trainingDummySpawnOffsetX, 1f, 0f);
+    var spawnedDummy = runner.Spawn(TrainingDummyPrefab, pos, Quaternion.identity, PlayerRef.None);
+    if (spawnedDummy != null) {
+      _spawnedTrainingDummy = true;
+    }
+  }
 
   public void OnConnectedToServer(NetworkRunner runner) { }
 

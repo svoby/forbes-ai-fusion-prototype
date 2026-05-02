@@ -12,6 +12,7 @@ using UnityEngine;
 public static class ForbesFusionSharedSceneSetup {
   const string FloorName = "Floor";
   const string PlayerPrefabPath = "Assets/PlayerCharacter.prefab";
+  const string TrainingDummyPrefabPath = "Assets/TrainingDummy.prefab";
 
   /// <summary>Listed under Tools/Fusion so it appears next to Photon's own Fusion scene tools.</summary>
   [MenuItem("Tools/Fusion/Scene/Setup + Floor + Player Spawner (tutorial 2)", false, 105)]
@@ -56,6 +57,13 @@ public static class ForbesFusionSharedSceneSetup {
 
     var so = new SerializedObject(spawner);
     so.FindProperty("PlayerPrefab").objectReferenceValue = prefab;
+    var dummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrainingDummyPrefabPath);
+    if (dummyPrefab != null) {
+      so.FindProperty("TrainingDummyPrefab").objectReferenceValue = dummyPrefab;
+    } else {
+      Debug.LogWarning($"ForbesFusionSharedSceneSetup: Missing training dummy at {TrainingDummyPrefabPath}");
+    }
+
     so.ApplyModifiedPropertiesWithoutUndo();
     EditorUtility.SetDirty(spawner);
   }
