@@ -513,7 +513,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpawner
   PlayerPrefab: {fileID: 7272019710335391474, guid: 461b851c3f112174589bf35a67518d91, type: 3}
-  TrainingDummyPrefab: {fileID: 991001001001, guid: a2b3c4d5e6f7485960718293a4b5c6d, type: 3}
+  TrainingDummyPrefab: {fileID: 991001001001, guid: c8e7f6a5b4c3d2e1f0a9b8c7d6e5f403, type: 3}
   spawnTrainingDummyInEditor: 1
   trainingDummySpawnOffsetLocal: {x: 0, y: 0, z: 4}
 --- !u!114 &1260076949
