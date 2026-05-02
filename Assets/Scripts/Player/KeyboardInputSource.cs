@@ -17,7 +17,8 @@ using UnityEngine.InputSystem;
 /// </summary>
 [DisallowMultipleComponent]
 public class KeyboardInputSource : MonoBehaviour, IInputSource {
-  const float TurnRateDegPerSec = 120f;
+  const float TurnRateDegPerSec      = 120f;  // A / D keys
+  const float ArrowTurnRateDegPerSec = 60f;   // ← → arrow keys (50 % slower)
 
   bool _pendingJump;
   bool _pendingSpell1;
@@ -88,10 +89,14 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
     bool both = _camera != null && _camera.MouseMode == CameraMouseMode.Both;
 
     // -- Movement axes --
-    bool wFwd  = kb.wKey.isPressed || kb.upArrowKey.isPressed;
-    bool sBack = kb.sKey.isPressed || kb.downArrowKey.isPressed;
-    bool aLeft = kb.aKey.isPressed || kb.leftArrowKey.isPressed;
-    bool dRight = kb.dKey.isPressed || kb.rightArrowKey.isPressed;
+    bool wFwd      = kb.wKey.isPressed || kb.upArrowKey.isPressed;
+    bool sBack     = kb.sKey.isPressed || kb.downArrowKey.isPressed;
+    bool aKey      = kb.aKey.isPressed;
+    bool leftArrow = kb.leftArrowKey.isPressed;
+    bool dKey      = kb.dKey.isPressed;
+    bool rightArrow = kb.rightArrowKey.isPressed;
+    bool aLeft     = aKey || leftArrow;
+    bool dRight    = dKey || rightArrow;
 
     float moveY = (wFwd ? 1f : 0f) - (sBack ? 1f : 0f);
     if (both) {
@@ -100,16 +105,23 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
 
     float moveX;
     if (rmb) {
-      // RMB/Both: A/D = lateral strafe, character faces camera direction.
+      // RMB/Both: A/D + arrows = lateral strafe, character faces camera direction.
       moveX = (dRight ? 1f : 0f) - (aLeft ? 1f : 0f);
       AlwaysFaceYaw = true;
     } else {
-      // No mouse / LMB only: A/D = turn camera (and character follows camera yaw).
+      // No mouse / LMB only: A/D + arrows = turn camera (character follows camera yaw).
+      // Arrow keys turn at half the rate of A/D for finer control.
       moveX = 0f;
       AlwaysFaceYaw = false;
       if (_camera != null) {
-        if (aLeft)  { _camera.AddYaw(-TurnRateDegPerSec * Time.deltaTime); }
-        if (dRight) { _camera.AddYaw(TurnRateDegPerSec  * Time.deltaTime); }
+        if (aLeft) {
+          float rate = (!aKey && leftArrow) ? ArrowTurnRateDegPerSec : TurnRateDegPerSec;
+          _camera.AddYaw(-rate * Time.deltaTime);
+        }
+        if (dRight) {
+          float rate = (!dKey && rightArrow) ? ArrowTurnRateDegPerSec : TurnRateDegPerSec;
+          _camera.AddYaw(rate * Time.deltaTime);
+        }
       }
     }
 

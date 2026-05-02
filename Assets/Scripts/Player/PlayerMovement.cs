@@ -22,7 +22,7 @@ public class PlayerMovement : NetworkBehaviour {
   NetworkCombatController  _combat;   // may be null until added to prefab
   bool                     _loggedFirstInput;
 
-  public float PlayerSpeed   = 2f;
+  public float PlayerSpeed   = 5f;
   public float JumpForce     = 5f;
   public float GravityValue  = -9.81f;
 
@@ -33,6 +33,10 @@ public class PlayerMovement : NetworkBehaviour {
 
     if (_controller == null) {
       Debug.LogError($"[PlayerMovement] CharacterController missing on '{name}' — movement will not work.", this);
+    }
+
+    if (GetComponent<FacingIndicator>() == null) {
+      gameObject.AddComponent<FacingIndicator>();
     }
   }
 
