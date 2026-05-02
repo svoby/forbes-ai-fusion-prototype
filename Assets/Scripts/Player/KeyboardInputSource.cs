@@ -101,7 +101,15 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
     // LookYaw mirrors the camera's current yaw.
     if (_camera != null) LookYaw = _camera.Yaw;
 
-    // Character always faces the camera look direction (strafes sideways, never rotates sideways).
-    AlwaysFaceYaw = true;
+    // AlwaysFaceYaw rules:
+    //   RMB held          → character locks to camera yaw (free-look rotates both)
+    //   Q / E / ← / →    → keyboard rotation, character follows camera
+    //   A / D strafe      → character must face forward while side-stepping
+    //   LMB orbit only    → camera orbits freely; character keeps its own facing
+    //   No input          → character keeps its own facing
+    bool rmb = _camera != null &&
+               (_camera.MouseMode == CameraMouseMode.Right ||
+                _camera.MouseMode == CameraMouseMode.Both);
+    AlwaysFaceYaw = rmb || turnLeft || turnRight || (moveX != 0f);
   }
 }

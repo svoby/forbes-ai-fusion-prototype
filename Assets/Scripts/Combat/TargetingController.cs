@@ -156,6 +156,7 @@ public class TargetingController : MonoBehaviour {
     Debug.Log($"[TargetingController] Raycast from screen={screenPos} lockState={UnityEngine.Cursor.lockState}");
 
     if (Physics.Raycast(ray, out var hitInfo, _maxRaycastDistance)) {
+      Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
       Debug.Log($"[TargetingController]   Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}' layer={LayerMask.LayerToName(hitInfo.collider.gameObject.layer)}");
       var hit = hitInfo.collider.GetComponentInParent<Targetable>();
       Debug.Log($"[TargetingController]   Targetable found: {(hit != null ? hit.DisplayName : "NULL — no Targetable in parent chain")}");
@@ -164,6 +165,7 @@ public class TargetingController : MonoBehaviour {
       }
       // Click on empty geometry: keep current target (WoW classic behaviour).
     } else {
+      Debug.DrawRay(ray.origin, ray.direction * _maxRaycastDistance, Color.red, 1f);
       Debug.Log("[TargetingController]   Raycast missed all colliders.");
     }
   }
