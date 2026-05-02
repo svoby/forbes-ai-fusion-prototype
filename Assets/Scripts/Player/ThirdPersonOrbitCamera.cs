@@ -118,7 +118,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     //   RMB free-look — cursor hides+locks, but only once the mouse has actually moved
     //                   past the drag threshold (a quick RMB click won't hide it).
     //   Release    — always restore cursor.
-    ManageCursor(IsRmbDragging);
+    ManageCursor(IsRmbDragging || IsLmbDragging);
 
     // Orbit when any button held.
     if (lmb || rmb) {

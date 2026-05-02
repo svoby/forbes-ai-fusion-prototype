@@ -153,7 +153,13 @@ public class TargetingController : MonoBehaviour {
 
     Vector2 screenPos = mouse.position.ReadValue();
     var ray = cam.ScreenPointToRay(screenPos);
-    Debug.Log($"[TargetingController] Raycast from screen={screenPos} lockState={UnityEngine.Cursor.lockState}");
+
+    // Broad diagnostic: how many physics colliders exist anywhere near origin?
+    var nearby = Physics.OverlapSphere(Vector3.zero, 200f);
+    Debug.Log($"[TargetingController] Click diag — screen={screenPos} cam.pos={cam.transform.position:F1} ray.origin={ray.origin:F1} ray.dir={ray.direction:F2} | OverlapSphere(200) found {nearby.Length} colliders");
+    if (nearby.Length > 0) {
+      Debug.Log($"[TargetingController]   First nearby collider: '{nearby[0].name}' on '{nearby[0].transform.root.name}'");
+    }
 
     if (Physics.Raycast(ray, out var hitInfo, _maxRaycastDistance)) {
       Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
