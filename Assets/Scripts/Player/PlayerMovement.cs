@@ -23,7 +23,7 @@ public class PlayerMovement : NetworkBehaviour {
   bool                     _loggedFirstInput;
 
   // Constants — not serialized so code value always wins regardless of prefab-saved data.
-  const float PlayerSpeed  = 30f;
+  const float PlayerSpeed  = 10f;
   const float JumpForce    = 5f;
   const float GravityValue = -9.81f;
 
