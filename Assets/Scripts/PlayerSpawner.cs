@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using Fusion;
 using Fusion.Sockets;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// Spawns the local player prefab when this client joins the session (Fusion Shared Mode basics tutorial).
@@ -19,6 +22,10 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     if (_runner != null) {
       _runner.AddCallbacks(this);
     }
+
+    if (GetComponent<CombatHud>() == null) {
+      gameObject.AddComponent<CombatHud>();
+    }
   }
 
   void OnDestroy() {
@@ -29,7 +36,10 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
   public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) {
     if (player == runner.LocalPlayer && PlayerPrefab != null) {
-      runner.Spawn(PlayerPrefab, new Vector3(0f, 1f, 0f), Quaternion.identity);
+      var spawned = runner.Spawn(PlayerPrefab, new Vector3(0f, 1f, 0f), Quaternion.identity, player);
+      if (spawned != null) {
+        runner.SetPlayerObject(player, spawned);
+      }
     }
   }
 
@@ -41,9 +51,59 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
   public void OnPlayerLeft(NetworkRunner runner, PlayerRef player) { }
 
-  public void OnInput(NetworkRunner runner, NetworkInput input) { }
+  public void OnInput(NetworkRunner runner, NetworkInput input) {
+    var gi = new GameplayInput();
 
-  public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
+#if ENABLE_INPUT_SYSTEM
+    var kb = Keyboard.current;
+    if (kb != null) {
+      float x = (kb.dKey.isPressed || kb.rightArrowKey.isPressed ? 1f : 0f)
+                - (kb.aKey.isPressed || kb.leftArrowKey.isPressed ? 1f : 0f);
+      float y = (kb.wKey.isPressed || kb.upArrowKey.isPressed ? 1f : 0f)
+                - (kb.sKey.isPressed || kb.downArrowKey.isPressed ? 1f : 0f);
+      gi.Move = new Vector2(x, y);
+
+      if (kb.spaceKey.wasPressedThisFrame) {
+        gi.Buttons.SetDown((int)GameplayButtons.Jump);
+      }
+
+      if (kb.tabKey.wasPressedThisFrame) {
+        gi.Buttons.SetDown((int)GameplayButtons.TabTarget);
+      }
+
+      if (kb.digit1Key.wasPressedThisFrame) {
+        gi.Buttons.SetDown((int)GameplayButtons.SpellPrimary);
+      }
+
+      if (kb.eKey.wasPressedThisFrame) {
+        gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
+      }
+    }
+#else
+    gi.Move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+    if (Input.GetButtonDown("Jump")) {
+      gi.Buttons.SetDown((int)GameplayButtons.Jump);
+    }
+
+    if (Input.GetKeyDown(KeyCode.Tab)) {
+      gi.Buttons.SetDown((int)GameplayButtons.TabTarget);
+    }
+
+    if (Input.GetKeyDown(KeyCode.Alpha1)) {
+      gi.Buttons.SetDown((int)GameplayButtons.SpellPrimary);
+    }
+
+    if (Input.GetKeyDown(KeyCode.E)) {
+      gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
+    }
+#endif
+
+    input.Set(gi);
+  }
+
+  public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) {
+    input.Set(new GameplayInput());
+  }
 
   public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) { }
 

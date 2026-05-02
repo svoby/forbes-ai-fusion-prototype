@@ -11,6 +11,7 @@
 /[Oo]bj/
 /[Bb]uild/
 /[Bb]uilds/
+_build/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 *.log
@@ -70,12 +71,35 @@ sysinfo.txt
 # Mono auto generated files
 mono_crash.*
 
-# Builds
+# Builds & packaged players (local / CI output — not source)
 *.apk
 *.aab
+*.ipa
 *.unitypackage
 *.unitypackage.meta
 *.app
+# Root or common export folder names (Build/Builds already listed above)
+/[Oo]ut/
+/[Dd]ist/
+/[Pp]ublish/
+/[Aa]rtifacts/
+/[Ee]xports/
+/[Oo]utput/
+/[Dd]elivery/
+# IL2CPP backup folder created next to a Windows player build
+*_BackUpThisFolder_ButDontShipItWithYourGame/
+# Code coverage / test output
+/[Tt]est[Rr]esults/
+*.coverage
+*.opencover.xml
+# OS noise (not project source)
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
 
 # Crashlytics generated file
 crashlytics-build.properties
@@ -110,3 +134,4 @@ _references/
 
 # Remove after closing Unity: legacy nested project path (Hub created project inside repo)
 /The Next Project/
+_build/

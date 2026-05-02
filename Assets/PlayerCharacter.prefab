@@ -14,6 +14,10 @@ GameObject:
   - component: {fileID: 702132529205918170}
   - component: {fileID: 3461557113846365698}
   - component: {fileID: 2775181344058920921}
+  - component: {fileID: 451230010}
+  - component: {fileID: 451230011}
+  - component: {fileID: 451230012}
+  - component: {fileID: 451230013}
   m_Layer: 0
   m_Name: PlayerCharacter
   m_TagString: Untagged
@@ -111,6 +115,10 @@ MonoBehaviour:
   NestedObjects: []
   NetworkedBehaviours:
   - {fileID: 2775181344058920921}
+  - {fileID: 451230010}
+  - {fileID: 451230011}
+  - {fileID: 451230012}
+  - {fileID: 451230013}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &3461557113846365698
 CharacterController:
@@ -154,3 +162,60 @@ MonoBehaviour:
   SyncParent: 0
   _autoAOIOverride: 1
   DisableSharedModeInterpolation: 0
+--- !u!114 &451230010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 856e4624138640389f5f4219f8d0a3e5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  PlayerSpeed: 2
+  JumpForce: 5
+  GravityValue: -9.81
+  ViewCamera: {fileID: 0}
+--- !u!114 &451230011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44336ac09e704a47b6a36971d342ea5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  MeshRenderer: {fileID: 6851675763452951295}
+--- !u!114 &451230012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 498bba355bb64694818d68379b9e20f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  StartingHealth: 100
+  RespawnDelaySeconds: 3
+--- !u!114 &451230013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7d8e9f0a1b243c58697a8b9c0d1e2f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  SpellDamage: 15
+  SpellRange: 12
