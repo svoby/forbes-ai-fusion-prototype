@@ -21,11 +21,18 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
   [SerializeField] bool spawnTrainingDummyInEditor = true;
 
-  [SerializeField] float trainingDummySpawnOffsetX = 4f;
+  [Tooltip("Offset in the local player's space (X=right, Y=up, Z=forward) where the dummy is spawned.")]
+  [SerializeField] Vector3 trainingDummySpawnOffsetLocal = new Vector3(1.5f, 0f, 3.5f);
 
   NetworkRunner _runner;
   bool _spawnedTrainingDummy;
   bool _trainingDummySpawnStarted;
+
+  // Fusion calls OnInput on a different timing than Unity's wasPressedThisFrame; latch edges in Update (Photon manual).
+  bool _pendingJump;
+  bool _pendingTab;
+  bool _pendingSpell;
+  bool _pendingColor;
 
   void Awake() {
     _runner = GetComponent<NetworkRunner>();
@@ -42,6 +49,47 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     if (_runner != null) {
       _runner.RemoveCallbacks(this);
     }
+  }
+
+  void Update() {
+#if ENABLE_INPUT_SYSTEM
+    var kb = Keyboard.current;
+    if (kb == null) {
+      return;
+    }
+
+    if (kb.spaceKey.wasPressedThisFrame) {
+      _pendingJump = true;
+    }
+
+    if (kb.tabKey.wasPressedThisFrame) {
+      _pendingTab = true;
+    }
+
+    if (kb.digit1Key.wasPressedThisFrame) {
+      _pendingSpell = true;
+    }
+
+    if (kb.eKey.wasPressedThisFrame) {
+      _pendingColor = true;
+    }
+#else
+    if (Input.GetButtonDown("Jump")) {
+      _pendingJump = true;
+    }
+
+    if (Input.GetKeyDown(KeyCode.Tab)) {
+      _pendingTab = true;
+    }
+
+    if (Input.GetKeyDown(KeyCode.Alpha1)) {
+      _pendingSpell = true;
+    }
+
+    if (Input.GetKeyDown(KeyCode.E)) {
+      _pendingColor = true;
+    }
+#endif
   }
 
   public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) {
@@ -79,38 +127,46 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
                 - (kb.sKey.isPressed || kb.downArrowKey.isPressed ? 1f : 0f);
       gi.Move = new Vector2(x, y);
 
-      if (kb.spaceKey.wasPressedThisFrame) {
+      if (_pendingJump) {
         gi.Buttons.SetDown((int)GameplayButtons.Jump);
+        _pendingJump = false;
       }
 
-      if (kb.tabKey.wasPressedThisFrame) {
+      if (_pendingTab) {
         gi.Buttons.SetDown((int)GameplayButtons.TabTarget);
+        _pendingTab = false;
       }
 
-      if (kb.digit1Key.wasPressedThisFrame) {
+      if (_pendingSpell) {
         gi.Buttons.SetDown((int)GameplayButtons.SpellPrimary);
+        _pendingSpell = false;
       }
 
-      if (kb.eKey.wasPressedThisFrame) {
+      if (_pendingColor) {
         gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
+        _pendingColor = false;
       }
     }
 #else
     gi.Move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-    if (Input.GetButtonDown("Jump")) {
+    if (_pendingJump) {
       gi.Buttons.SetDown((int)GameplayButtons.Jump);
+      _pendingJump = false;
     }
 
-    if (Input.GetKeyDown(KeyCode.Tab)) {
+    if (_pendingTab) {
       gi.Buttons.SetDown((int)GameplayButtons.TabTarget);
+      _pendingTab = false;
     }
 
-    if (Input.GetKeyDown(KeyCode.Alpha1)) {
+    if (_pendingSpell) {
       gi.Buttons.SetDown((int)GameplayButtons.SpellPrimary);
+      _pendingSpell = false;
     }
 
-    if (Input.GetKeyDown(KeyCode.E)) {
+    if (_pendingColor) {
       gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
+      _pendingColor = false;
     }
 #endif
 
@@ -127,26 +183,42 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   /// <summary>
-  /// Spawns after a short delay so Shared Mode session is ready (master checks were unreliable here).
+  /// Waits for <see cref="NetworkRunner.TryGetPlayerObject"/> so spawn does not fail with local player not set yet,
+  /// then spawns in front of the player so the dummy stays in view.
   /// </summary>
   IEnumerator CoSpawnTrainingDummy(NetworkRunner runner) {
-    yield return null;
-    yield return null;
-    if (!Application.isEditor || !spawnTrainingDummyInEditor || TrainingDummyPrefab == null || _spawnedTrainingDummy) {
+    if (TrainingDummyPrefab.GetComponent<NetworkObject>() == null) {
+      Debug.LogError("PlayerSpawner: TrainingDummyPrefab must be a root object with a NetworkObject.");
+      _trainingDummySpawnStarted = false;
       yield break;
     }
 
-    if (runner == null || !runner.IsRunning) {
-      yield break;
+    float waited = 0f;
+    while (waited < 10f && runner != null && runner.IsRunning && !_spawnedTrainingDummy) {
+      if (Application.isEditor && spawnTrainingDummyInEditor &&
+          runner.TryGetPlayerObject(runner.LocalPlayer, out var playerObj) && playerObj != null) {
+        var worldPos = playerObj.transform.TransformPoint(trainingDummySpawnOffsetLocal);
+        worldPos.y = Mathf.Max(worldPos.y, 0.5f);
+        var rot = playerObj.transform.rotation;
+
+        var spawnedDummy = runner.Spawn(TrainingDummyPrefab, worldPos, rot, PlayerRef.None);
+        if (spawnedDummy != null) {
+          _spawnedTrainingDummy = true;
+          Debug.Log("PlayerSpawner: Training dummy spawned.", spawnedDummy.gameObject);
+        } else {
+          Debug.LogWarning("PlayerSpawner: Training dummy Spawn returned null (prefab / FusionPrefab / spawn rules).");
+          _trainingDummySpawnStarted = false;
+        }
+
+        yield break;
+      }
+
+      waited += Time.unscaledDeltaTime;
+      yield return null;
     }
 
-    var pos = new Vector3(trainingDummySpawnOffsetX, 1f, 0f);
-    var spawnedDummy = runner.Spawn(TrainingDummyPrefab, pos, Quaternion.identity, PlayerRef.None);
-    if (spawnedDummy != null) {
-      _spawnedTrainingDummy = true;
-    } else {
-      Debug.LogWarning("PlayerSpawner: TrainingDummy spawn returned null. Check FusionPrefab label on TrainingDummy.prefab and NetworkProjectConfig.");
-    }
+    Debug.LogWarning("PlayerSpawner: Training dummy not spawned (timeout waiting for local player object).");
+    _trainingDummySpawnStarted = false;
   }
 
   public void OnConnectedToServer(NetworkRunner runner) { }
