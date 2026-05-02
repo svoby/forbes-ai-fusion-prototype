@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Fusion;
 using Fusion.Sockets;
@@ -15,7 +16,7 @@ using UnityEngine.InputSystem;
 public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   [SerializeField] GameObject PlayerPrefab;
 
-  [Tooltip("Editor / solo test: static target with Health (no input). Spawned once by Shared Mode master.")]
+  [Tooltip("Editor / solo test: static target with Health (no input). Spawned once after local player joins.")]
   [SerializeField] GameObject TrainingDummyPrefab;
 
   [SerializeField] bool spawnTrainingDummyInEditor = true;
@@ -24,6 +25,7 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
   NetworkRunner _runner;
   bool _spawnedTrainingDummy;
+  bool _trainingDummySpawnStarted;
 
   void Awake() {
     _runner = GetComponent<NetworkRunner>();
@@ -50,7 +52,11 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       }
     }
 
-    TrySpawnEditorTrainingDummy(runner, player);
+    if (player == runner.LocalPlayer && Application.isEditor && spawnTrainingDummyInEditor && TrainingDummyPrefab != null &&
+        !_trainingDummySpawnStarted) {
+      _trainingDummySpawnStarted = true;
+      StartCoroutine(CoSpawnTrainingDummy(runner));
+    }
   }
 
   public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
@@ -117,29 +123,29 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
   public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) {
     _spawnedTrainingDummy = false;
+    _trainingDummySpawnStarted = false;
   }
 
   /// <summary>
-  /// One non-input capsule in the room for Tab / spell tests. Prefer a single runner in the editor:
-  /// multiple peers share one keyboard, so use Peer count 1 plus this dummy instead.
+  /// Spawns after a short delay so Shared Mode session is ready (master checks were unreliable here).
   /// </summary>
-  void TrySpawnEditorTrainingDummy(NetworkRunner runner, PlayerRef player) {
-    if (!Application.isEditor || !spawnTrainingDummyInEditor || TrainingDummyPrefab == null) {
-      return;
+  IEnumerator CoSpawnTrainingDummy(NetworkRunner runner) {
+    yield return null;
+    yield return null;
+    if (!Application.isEditor || !spawnTrainingDummyInEditor || TrainingDummyPrefab == null || _spawnedTrainingDummy) {
+      yield break;
     }
 
-    if (player != runner.LocalPlayer || _spawnedTrainingDummy) {
-      return;
-    }
-
-    if (!runner.IsSharedModeMasterClient) {
-      return;
+    if (runner == null || !runner.IsRunning) {
+      yield break;
     }
 
     var pos = new Vector3(trainingDummySpawnOffsetX, 1f, 0f);
     var spawnedDummy = runner.Spawn(TrainingDummyPrefab, pos, Quaternion.identity, PlayerRef.None);
     if (spawnedDummy != null) {
       _spawnedTrainingDummy = true;
+    } else {
+      Debug.LogWarning("PlayerSpawner: TrainingDummy spawn returned null. Check FusionPrefab label on TrainingDummy.prefab and NetworkProjectConfig.");
     }
   }
 
