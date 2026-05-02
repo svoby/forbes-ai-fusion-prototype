@@ -21,13 +21,13 @@ EditorSettings:
   m_ProjectGenerationRootNamespace: 
   m_EnableTextureStreamingInEditMode: 1
   m_EnableTextureStreamingInPlayMode: 1
-  m_EnableEditorAsyncCPUTextureLoading: 0
+  m_EnableEditorAsyncCPUTextureLoading: 1
   m_AsyncShaderCompilation: 1
   m_BlockShaders: 0
   m_UnlockBlockShaders: 0
   m_PrefabModeAllowAutoSave: 1
   m_EnterPlayModeOptionsEnabled: 1
-  m_EnterPlayModeOptions: 0
+  m_EnterPlayModeOptions: 1
   m_GameObjectNamingDigits: 1
   m_GameObjectNamingScheme: 0
   m_AssetNamingUsesSpace: 1
@@ -48,5 +48,5 @@ EditorSettings:
   m_CacheServerDownloadBatchSize: 128
   m_EnableEnlightenBakedGI: 0
   m_ReferencedClipsExactNaming: 1
-  m_ForceAssetUnloadAndGCOnSceneLoad: 1
+  m_ForceAssetUnloadAndGCOnSceneLoad: 0
   m_HideBuildProfileClassicPlatforms: 0
