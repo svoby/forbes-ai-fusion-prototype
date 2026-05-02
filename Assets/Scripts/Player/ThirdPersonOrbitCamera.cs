@@ -35,6 +35,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   float _pitch = 15f;
   float _distance;
   float _lmbDragAccum;
+  float _rmbDragAccum;
 
   /// <summary>Camera's current horizontal orbit angle in world-space degrees.</summary>
   public float Yaw => _yaw;
@@ -44,6 +45,9 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 
   /// <summary>True once the LMB has been dragged past the pixel threshold; resets on release.</summary>
   public bool IsLmbDragging { get; private set; }
+
+  /// <summary>True once the RMB has moved past the drag threshold this press (used for cursor locking).</summary>
+  bool IsRmbDragging { get; set; }
 
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
   static void AutoAddToMainCamera() {
@@ -86,15 +90,21 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
       _lmbDragAccum = 0f;
       IsLmbDragging = false;
     }
-
     if (lmb) {
       _lmbDragAccum += mouse.delta.ReadValue().magnitude;
-      if (_lmbDragAccum > _dragThresholdPixels) {
-        IsLmbDragging = true;
-      }
+      if (_lmbDragAccum > _dragThresholdPixels) IsLmbDragging = true;
     }
 
-    // IsLmbDragging is cleared next frame via the wasPressedThisFrame branch on the next press.
+    // Track RMB drag to know when to lock the cursor (only while actually rotating, not on a quick click).
+    if (mouse.rightButton.wasPressedThisFrame) {
+      _rmbDragAccum = 0f;
+      IsRmbDragging = false;
+    }
+    if (rmb) {
+      _rmbDragAccum += mouse.delta.ReadValue().magnitude;
+      if (_rmbDragAccum > _dragThresholdPixels) IsRmbDragging = true;
+    }
+    if (mouse.rightButton.wasReleasedThisFrame) IsRmbDragging = false;
 
     MouseMode = (lmb, rmb) switch {
       (true, true)   => CameraMouseMode.Both,
@@ -103,14 +113,12 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
       _              => CameraMouseMode.None,
     };
 
-    // Cursor: hide and lock whenever any rotation button is held so the cursor does not
-    // drift across the screen while the camera is moving.  On release the cursor is
-    // restored to its pre-press position via CursorLockMode.None.
-    // mouse.delta continues to report raw movement even while locked, so camera math
-    // is unaffected.  TargetingController's LMB-click raycast fires from screen-centre
-    // when the cursor is locked, which matches the camera look direction — natural for
-    // a quick non-drag click.
-    ManageCursor(lmb || rmb);
+    // Cursor rules (WoW-style):
+    //   LMB orbit  — cursor stays VISIBLE so click-targeting still works on release.
+    //   RMB free-look — cursor hides+locks, but only once the mouse has actually moved
+    //                   past the drag threshold (a quick RMB click won't hide it).
+    //   Release    — always restore cursor.
+    ManageCursor(IsRmbDragging);
 
     // Orbit when any button held.
     if (lmb || rmb) {
