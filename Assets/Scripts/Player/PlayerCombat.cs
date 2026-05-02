@@ -31,7 +31,7 @@ public class PlayerCombat : NetworkBehaviour {
     PruneInvalidTarget();
 
     if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.TabTarget)) {
-      CycleTarget();
+      TargetId = CombatTargetSelector.SelectNextAfter(Object, TargetId, _targetsScratch);
     }
 
     if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.SpellPrimary)) {
@@ -49,39 +49,6 @@ public class PlayerCombat : NetworkBehaviour {
     if (!Runner.TryFindObject(TargetId, out var obj) || !obj.TryGetComponent(out Health h) || h.IsDead || h.Object == Object) {
       TargetId = default;
     }
-  }
-
-  void CollectAliveOthers(List<Health> into) {
-    into.Clear();
-    foreach (var h in UnityEngine.Object.FindObjectsByType<Health>(FindObjectsSortMode.None)) {
-      if (h.Object == null || h.Object == Object || h.IsDead) {
-        continue;
-      }
-
-      into.Add(h);
-    }
-
-    into.Sort(static (a, b) => a.Object.Id.Raw.CompareTo(b.Object.Id.Raw));
-  }
-
-  void CycleTarget() {
-    CollectAliveOthers(_targetsScratch);
-    if (_targetsScratch.Count == 0) {
-      TargetId = default;
-      return;
-    }
-
-    int idx = 0;
-    if (TargetId.IsValid) {
-      idx = _targetsScratch.FindIndex(h => h.Object.Id == TargetId);
-      if (idx < 0) {
-        idx = 0;
-      } else {
-        idx = (idx + 1) % _targetsScratch.Count;
-      }
-    }
-
-    TargetId = _targetsScratch[idx].Object.Id;
   }
 
   void TryCastSpell() {

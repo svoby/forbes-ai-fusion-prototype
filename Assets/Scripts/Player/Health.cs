@@ -85,9 +85,6 @@ public class Health : NetworkBehaviour {
   [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
   public void DealDamageRpc(float damage) {
     if (!HasStateAuthority || IsDead) {
-#if FORBES_HEALTH_LOG
-      Debug.Log($"[ForbesHealth] DealDamageRpc ignored auth={HasStateAuthority} dead={IsDead} dmg={damage} obj={name}", this);
-#endif
       return;
     }
 

@@ -10,3 +10,4 @@ alwaysApply: true
 - Prefer one responsibility per MonoBehaviour.
 - Avoid duplicating SP/MP codepaths; keep a shared gameplay core.
 - Use prefab-driven setup and explicit serialized references.
+- Prefer feature folders under `Assets/Scripts` (see `docs/UnityCSharp-CodeOrganization.md`); split large behaviours instead of growing god classes.

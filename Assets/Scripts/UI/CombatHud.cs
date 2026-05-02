@@ -11,9 +11,6 @@ public class CombatHud : MonoBehaviour {
 
   void Awake() {
     _runner = GetComponent<NetworkRunner>();
-    if (_runner == null) {
-      _runner = FindAnyObjectByType<NetworkRunner>();
-    }
   }
 
   void Update() {
@@ -47,14 +44,5 @@ public class CombatHud : MonoBehaviour {
 
     GUI.Label(new Rect(pad, pad, 900f, 28f), _line1, style);
     GUI.Label(new Rect(pad, pad + 22f, 900f, 28f), _line2, style);
-
-#if UNITY_EDITOR
-    if (Application.isPlaying && _runner != null && _runner.IsRunning &&
-        NetworkProjectConfig.Global.PeerMode == NetworkProjectConfig.PeerModes.Multiple) {
-      GUI.Label(new Rect(pad, pad + 46f, 1100f, 26f),
-        "Editor: u Multi-peer nech Client Count = 1 (jedna klávesnice). Tréninkový panák = druhý cíl.",
-        style);
-    }
-#endif
   }
 }

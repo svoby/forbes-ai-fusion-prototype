@@ -7,11 +7,9 @@ using System.Collections.Generic;
 using Fusion;
 using Fusion.Sockets;
 using UnityEngine;
+using UnityEngine.InputSystem;
 #if UNITY_EDITOR
 using UnityEditor;
-#endif
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
 #endif
 
 /// <summary>
@@ -79,7 +77,6 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   void Update() {
-#if ENABLE_INPUT_SYSTEM
     var kb = Keyboard.current;
     if (kb == null) {
       return;
@@ -100,23 +97,6 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     if (kb.eKey.wasPressedThisFrame) {
       _pendingColor = true;
     }
-#else
-    if (Input.GetButtonDown("Jump")) {
-      _pendingJump = true;
-    }
-
-    if (Input.GetKeyDown(KeyCode.Tab)) {
-      _pendingTab = true;
-    }
-
-    if (Input.GetKeyDown(KeyCode.Alpha1)) {
-      _pendingSpell = true;
-    }
-
-    if (Input.GetKeyDown(KeyCode.E)) {
-      _pendingColor = true;
-    }
-#endif
   }
 
   public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) {
@@ -145,7 +125,6 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   public void OnInput(NetworkRunner runner, NetworkInput input) {
     var gi = new GameplayInput();
 
-#if ENABLE_INPUT_SYSTEM
     var kb = Keyboard.current;
     if (kb != null) {
       float x = (kb.dKey.isPressed || kb.rightArrowKey.isPressed ? 1f : 0f)
@@ -153,29 +132,8 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       float y = (kb.wKey.isPressed || kb.upArrowKey.isPressed ? 1f : 0f)
                 - (kb.sKey.isPressed || kb.downArrowKey.isPressed ? 1f : 0f);
       gi.Move = new Vector2(x, y);
-
-      if (_pendingJump) {
-        gi.Buttons.SetDown((int)GameplayButtons.Jump);
-        _pendingJump = false;
-      }
-
-      if (_pendingTab) {
-        gi.Buttons.SetDown((int)GameplayButtons.TabTarget);
-        _pendingTab = false;
-      }
-
-      if (_pendingSpell) {
-        gi.Buttons.SetDown((int)GameplayButtons.SpellPrimary);
-        _pendingSpell = false;
-      }
-
-      if (_pendingColor) {
-        gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
-        _pendingColor = false;
-      }
     }
-#else
-    gi.Move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+
     if (_pendingJump) {
       gi.Buttons.SetDown((int)GameplayButtons.Jump);
       _pendingJump = false;
@@ -195,7 +153,6 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
       _pendingColor = false;
     }
-#endif
 
     input.Set(gi);
   }
@@ -211,7 +168,7 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   /// <summary>
-  /// Spawns in front of the local player; falls back to in front of the main camera.
+  /// Spawns in front of the local player after <see cref="NetworkRunner.SetPlayerObject"/>.
   /// Uses <see cref="NetworkSpawnFlags.SharedModeStateAuthLocalPlayer"/> so Shared Mode accepts spawn from the local peer.
   /// </summary>
   IEnumerator CoSpawnTrainingDummy(NetworkRunner runner) {
@@ -223,53 +180,25 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       yield break;
     }
 
-    var spawnFailures = 0;
-    const int maxFrames = 300;
-    for (var frame = 0; frame < maxFrames && runner != null && runner.IsRunning && !_spawnedTrainingDummy; frame++) {
+    const int maxWaitFrames = 32;
+    for (var frame = 0; frame < maxWaitFrames; frame++) {
       yield return null;
 
-      if (!Application.isEditor || !spawnTrainingDummyInEditor) {
-        NetLog("CoSpawnTrainingDummy aborted (not editor or spawn disabled)");
+      if (!Application.isEditor || !spawnTrainingDummyInEditor || runner == null || !runner.IsRunning) {
+        NetLog("CoSpawnTrainingDummy aborted (not editor, disabled, or runner stopped)");
         _trainingDummySpawnStarted = false;
         yield break;
       }
 
-      var havePlayer = runner.TryGetPlayerObject(runner.LocalPlayer, out var playerObj) && playerObj != null;
-      if (!havePlayer && frame < 90) {
-        if (frame == 0 || frame == 30 || frame == 60) {
-          NetLog($"CoSpawnTrainingDummy frame={frame} waiting for local player object…");
-        }
-
+      if (!runner.TryGetPlayerObject(runner.LocalPlayer, out var playerObj) || playerObj == null) {
         continue;
       }
 
-      Vector3 worldPos;
-      Quaternion rot;
-      string mode;
-      if (havePlayer) {
-        worldPos = playerObj.transform.TransformPoint(trainingDummySpawnOffsetLocal);
-        worldPos.y = Mathf.Max(worldPos.y, 0.5f);
-        rot = playerObj.transform.rotation;
-        mode = "player-relative";
-      } else if (Camera.main != null) {
-        var cam = Camera.main.transform;
-        var flatFwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up);
-        if (flatFwd.sqrMagnitude < 1e-4f) {
-          flatFwd = Vector3.forward;
-        }
+      var worldPos = playerObj.transform.TransformPoint(trainingDummySpawnOffsetLocal);
+      worldPos.y = Mathf.Max(worldPos.y, 0.5f);
+      var rot = playerObj.transform.rotation;
 
-        flatFwd.Normalize();
-        worldPos = cam.position + flatFwd * 4f;
-        worldPos.y = Mathf.Max(worldPos.y, 1f);
-        rot = Quaternion.LookRotation(flatFwd);
-        mode = "camera-fallback";
-      } else {
-        worldPos = new Vector3(4f, 1f, 0f);
-        rot = Quaternion.identity;
-        mode = "fixed-fallback";
-      }
-
-      NetLog($"CoSpawnTrainingDummy frame={frame} mode={mode} pos={worldPos} havePlayer={havePlayer}");
+      NetLog($"CoSpawnTrainingDummy frame={frame} pos={worldPos}");
 
       var spawnedDummy = runner.Spawn(
         TrainingDummyPrefab,
@@ -281,26 +210,21 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
       if (spawnedDummy != null) {
         _spawnedTrainingDummy = true;
-        NetLog($"Training dummy spawned name={spawnedDummy.name} id={spawnedDummy.Id} at {worldPos}");
+        NetLog($"Training dummy spawned name={spawnedDummy.name} id={spawnedDummy.Id}");
         yield break;
       }
 
-      NetLog($"Training dummy Spawn returned null (attempt {spawnFailures + 1})");
-      spawnFailures++;
-      if (spawnFailures >= 12) {
-        Debug.LogError("PlayerSpawner: Training dummy Spawn returned null repeatedly. Check FusionPrefab label on TrainingDummy and Shared Mode spawn rules.");
-        _trainingDummySpawnStarted = false;
-        yield break;
-      }
+      Debug.LogError("PlayerSpawner: Training dummy Spawn returned null. Check FusionPrefab label on TrainingDummy and Shared Mode spawn rules.");
+      _trainingDummySpawnStarted = false;
+      yield break;
     }
 
-    Debug.LogWarning("PlayerSpawner: Training dummy not spawned (frame budget exhausted).");
+    Debug.LogWarning("PlayerSpawner: Training dummy not spawned (local player object not ready in time).");
     _trainingDummySpawnStarted = false;
   }
 
   public void OnConnectedToServer(NetworkRunner runner) {
     NetLog("OnConnectedToServer");
-    TryStartEditorTrainingDummySpawn(runner);
   }
 
   void TryStartEditorTrainingDummySpawn(NetworkRunner runner) {
@@ -314,18 +238,12 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       return;
     }
 
-#if UNITY_EDITOR
-    if (TrainingDummyPrefab == null) {
-      TrainingDummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrainingDummyPrefabAssetPath);
-      if (TrainingDummyPrefab != null) {
-        EditorUtility.SetDirty(this);
-        NetLog($"TryStartDummy: loaded TrainingDummyPrefab from {TrainingDummyPrefabAssetPath}");
-      }
-    }
-#endif
-
     if (TrainingDummyPrefab == null) {
       NetLog("TryStartDummy skip: TrainingDummyPrefab is NULL (assign in scene or keep Assets/TrainingDummy.prefab)");
+      return;
+    }
+
+    if (_spawnedTrainingDummy) {
       return;
     }
 

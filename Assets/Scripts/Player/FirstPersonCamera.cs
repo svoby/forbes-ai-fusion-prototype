@@ -1,7 +1,5 @@
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
-#endif
 
 /// <summary>
 /// Shared Mode Basics tutorial — simple first-person look on the main camera.
@@ -24,7 +22,6 @@ public class FirstPersonCamera : MonoBehaviour {
       return;
     }
 
-#if ENABLE_INPUT_SYSTEM
     var mouse = Mouse.current;
     if (mouse == null) {
       return;
@@ -33,10 +30,6 @@ public class FirstPersonCamera : MonoBehaviour {
     float scale = 0.05f * (MouseSensitivity / 10f);
     float mouseX = mouse.delta.x.ReadValue() * scale;
     float mouseY = mouse.delta.y.ReadValue() * scale;
-#else
-    float mouseX = Input.GetAxis("Mouse X");
-    float mouseY = Input.GetAxis("Mouse Y");
-#endif
 
     _verticalRotation -= mouseY * MouseSensitivity;
     _verticalRotation = Mathf.Clamp(_verticalRotation, -70f, 70f);
