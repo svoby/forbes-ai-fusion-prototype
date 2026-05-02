@@ -107,7 +107,7 @@ MonoBehaviour:
   m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
-  SortKey: 801195929
+  SortKey: 2825506509
   ObjectInterest: 1
   Flags: 262145
   NestedObjects: []
@@ -171,6 +171,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   StartingHealth: 500
   RespawnDelaySeconds: 3
+  _NetworkedHealth: 0
+  _IsDead:
+    _value: 0
+  _RespawnAtTick: 0
+  _SpawnPosition: {x: 0, y: 0, z: 0}
 --- !u!114 &991001001009
 MonoBehaviour:
   m_ObjectHideFlags: 0

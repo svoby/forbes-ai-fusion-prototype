@@ -1,9 +1,15 @@
+// Verbose Fusion/editor logs — delete this line (and FORBES_NET_LOG usages compile out).
+#define FORBES_NET_LOG
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using Fusion;
 using Fusion.Sockets;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -14,6 +20,15 @@ using UnityEngine.InputSystem;
 /// </summary>
 [DisallowMultipleComponent]
 public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
+#if UNITY_EDITOR
+  const string TrainingDummyPrefabAssetPath = "Assets/TrainingDummy.prefab";
+#endif
+
+  [System.Diagnostics.Conditional("FORBES_NET_LOG")]
+  static void NetLog(string message) {
+    UnityEngine.Debug.Log("[ForbesNet] " + message);
+  }
+
   [SerializeField] GameObject PlayerPrefab;
 
   [Tooltip("Editor / solo test: static target with Health (no input). Spawned once after local player joins.")]
@@ -39,6 +54,18 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     if (_runner != null) {
       _runner.AddCallbacks(this);
     }
+
+#if UNITY_EDITOR
+    if (Application.isEditor && TrainingDummyPrefab == null) {
+      TrainingDummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrainingDummyPrefabAssetPath);
+      if (TrainingDummyPrefab != null) {
+        EditorUtility.SetDirty(this);
+        NetLog($"Awake: restored TrainingDummyPrefab from {TrainingDummyPrefabAssetPath} (scene reference was missing).");
+      }
+    }
+#endif
+
+    NetLog($"Awake runner={(_runner != null)}, TrainingDummyPrefab={(TrainingDummyPrefab != null ? TrainingDummyPrefab.name : "NULL")}, spawnDummy={spawnTrainingDummyInEditor}");
 
     if (GetComponent<CombatHud>() == null) {
       gameObject.AddComponent<CombatHud>();
@@ -93,10 +120,14 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) {
+    NetLog($"OnPlayerJoined player={player} local={runner.LocalPlayer} running={runner.IsRunning}");
+
     if (player == runner.LocalPlayer && PlayerPrefab != null) {
       var spawned = runner.Spawn(PlayerPrefab, new Vector3(0f, 1f, 0f), Quaternion.identity, player);
+      NetLog($"Spawn local player -> {(spawned != null ? spawned.name : "NULL")}");
       if (spawned != null) {
         runner.SetPlayerObject(player, spawned);
+        NetLog($"SetPlayerObject local={runner.LocalPlayer} ok={runner.TryGetPlayerObject(runner.LocalPlayer, out _)}");
       }
     }
 
@@ -174,6 +205,7 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) {
+    NetLog($"OnShutdown reason={shutdownReason}");
     _spawnedTrainingDummy = false;
     _trainingDummySpawnStarted = false;
   }
@@ -183,6 +215,8 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   /// Uses <see cref="NetworkSpawnFlags.SharedModeStateAuthLocalPlayer"/> so Shared Mode accepts spawn from the local peer.
   /// </summary>
   IEnumerator CoSpawnTrainingDummy(NetworkRunner runner) {
+    NetLog("CoSpawnTrainingDummy started");
+
     if (TrainingDummyPrefab.GetComponent<NetworkObject>() == null) {
       Debug.LogError("PlayerSpawner: TrainingDummyPrefab must be a root object with a NetworkObject.");
       _trainingDummySpawnStarted = false;
@@ -195,21 +229,28 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
       yield return null;
 
       if (!Application.isEditor || !spawnTrainingDummyInEditor) {
+        NetLog("CoSpawnTrainingDummy aborted (not editor or spawn disabled)");
         _trainingDummySpawnStarted = false;
         yield break;
       }
 
       var havePlayer = runner.TryGetPlayerObject(runner.LocalPlayer, out var playerObj) && playerObj != null;
       if (!havePlayer && frame < 90) {
+        if (frame == 0 || frame == 30 || frame == 60) {
+          NetLog($"CoSpawnTrainingDummy frame={frame} waiting for local player object…");
+        }
+
         continue;
       }
 
       Vector3 worldPos;
       Quaternion rot;
+      string mode;
       if (havePlayer) {
         worldPos = playerObj.transform.TransformPoint(trainingDummySpawnOffsetLocal);
         worldPos.y = Mathf.Max(worldPos.y, 0.5f);
         rot = playerObj.transform.rotation;
+        mode = "player-relative";
       } else if (Camera.main != null) {
         var cam = Camera.main.transform;
         var flatFwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up);
@@ -221,10 +262,14 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
         worldPos = cam.position + flatFwd * 4f;
         worldPos.y = Mathf.Max(worldPos.y, 1f);
         rot = Quaternion.LookRotation(flatFwd);
+        mode = "camera-fallback";
       } else {
         worldPos = new Vector3(4f, 1f, 0f);
         rot = Quaternion.identity;
+        mode = "fixed-fallback";
       }
+
+      NetLog($"CoSpawnTrainingDummy frame={frame} mode={mode} pos={worldPos} havePlayer={havePlayer}");
 
       var spawnedDummy = runner.Spawn(
         TrainingDummyPrefab,
@@ -236,10 +281,11 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
 
       if (spawnedDummy != null) {
         _spawnedTrainingDummy = true;
-        Debug.Log($"PlayerSpawner: Training dummy spawned at {worldPos}.", spawnedDummy.gameObject);
+        NetLog($"Training dummy spawned name={spawnedDummy.name} id={spawnedDummy.Id} at {worldPos}");
         yield break;
       }
 
+      NetLog($"Training dummy Spawn returned null (attempt {spawnFailures + 1})");
       spawnFailures++;
       if (spawnFailures >= 12) {
         Debug.LogError("PlayerSpawner: Training dummy Spawn returned null repeatedly. Check FusionPrefab label on TrainingDummy and Shared Mode spawn rules.");
@@ -253,18 +299,42 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   public void OnConnectedToServer(NetworkRunner runner) {
+    NetLog("OnConnectedToServer");
     TryStartEditorTrainingDummySpawn(runner);
   }
 
   void TryStartEditorTrainingDummySpawn(NetworkRunner runner) {
-    if (!Application.isEditor || !spawnTrainingDummyInEditor || TrainingDummyPrefab == null) {
+    if (!Application.isEditor) {
+      NetLog("TryStartDummy skip: not editor");
+      return;
+    }
+
+    if (!spawnTrainingDummyInEditor) {
+      NetLog("TryStartDummy skip: spawnTrainingDummyInEditor=false");
+      return;
+    }
+
+#if UNITY_EDITOR
+    if (TrainingDummyPrefab == null) {
+      TrainingDummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrainingDummyPrefabAssetPath);
+      if (TrainingDummyPrefab != null) {
+        EditorUtility.SetDirty(this);
+        NetLog($"TryStartDummy: loaded TrainingDummyPrefab from {TrainingDummyPrefabAssetPath}");
+      }
+    }
+#endif
+
+    if (TrainingDummyPrefab == null) {
+      NetLog("TryStartDummy skip: TrainingDummyPrefab is NULL (assign in scene or keep Assets/TrainingDummy.prefab)");
       return;
     }
 
     if (_trainingDummySpawnStarted) {
+      NetLog("TryStartDummy skip: coroutine already started");
       return;
     }
 
+    NetLog("TryStartDummy: starting CoSpawnTrainingDummy");
     _trainingDummySpawnStarted = true;
     StartCoroutine(CoSpawnTrainingDummy(runner));
   }
