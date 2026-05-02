@@ -94,8 +94,9 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
       _lmbDragAccum += mouse.delta.ReadValue().magnitude;
       if (_lmbDragAccum > _dragThresholdPixels) IsLmbDragging = true;
     }
+    // Reset on release (runs in LateUpdate, AFTER TargetingController.Update read the flag).
+    if (mouse.leftButton.wasReleasedThisFrame) IsLmbDragging = false;
 
-    // Track RMB drag to know when to lock the cursor (only while actually rotating, not on a quick click).
     if (mouse.rightButton.wasPressedThisFrame) {
       _rmbDragAccum = 0f;
       IsRmbDragging = false;

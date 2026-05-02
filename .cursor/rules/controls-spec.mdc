@@ -1,0 +1,54 @@
+# WoW-Style Controls Specification
+
+This file is the source of truth for all input and camera behaviour.
+Do NOT change any of these rules without explicit user approval.
+
+---
+
+## Mouse buttons
+
+| Situation | Camera | Character facing | Cursor |
+|-----------|--------|-----------------|--------|
+| Nothing held | stationary | keeps own facing | visible, free |
+| LMB held + mouse still | stationary | keeps own facing | visible, free |
+| LMB held + mouse moving | orbits freely around character | keeps own facing (character does NOT rotate with camera) | hides while moving, reappears immediately on release |
+| RMB held + mouse still | stationary | keeps own facing | visible |
+| RMB held + mouse moving | rotates; character rotates with it (AlwaysFaceYaw=true) | follows camera yaw | hides while moving, reappears immediately on release |
+| Both LMB+RMB held | same as RMB + auto-forward | follows camera yaw | hides while rotating |
+
+**Cursor hide rule**: cursor hides only when the mouse has moved past the drag threshold (~20 px) while a button is held. It reappears **immediately** when the button is released, not on the next click.
+
+---
+
+## Keyboard
+
+| Key | Action |
+|-----|--------|
+| W / Up arrow | move forward |
+| S / Down arrow | move backward |
+| A | strafe left (always, no mode toggle) |
+| D | strafe right (always, no mode toggle) |
+| Q / Left arrow | rotate camera left; character follows (AlwaysFaceYaw=true) |
+| E / Right arrow | rotate camera right; character follows (AlwaysFaceYaw=true) |
+| Space | jump |
+| 1 / 2 / 3 | cast Spell1 / Spell2 / Spell3 |
+| R | randomise character colour (debug) |
+
+**AlwaysFaceYaw** is set when: RMB held, Q/E/arrows rotating, or A/D strafing.
+It is NOT set when only LMB is held (camera orbits but character keeps own facing).
+
+---
+
+## Target selection
+
+| Action | Result |
+|--------|--------|
+| Tab | cycle through alive Targetable objects (skip local player) |
+| LMB quick click (no drag) on Targetable | select that target |
+| LMB click on empty space / non-targetable | keep current target (WoW classic) |
+| Escape | clear target |
+
+**Implementation notes**:
+- Raycast uses `runner.GetPhysicsScene()` first (Fusion objects), then `Physics.Raycast` fallback (floor etc.)
+- Drag threshold 20 px; if dragged, release does NOT fire the raycast
+- TargetingController.Update reads IsLmbDragging; ThirdPersonOrbitCamera.LateUpdate clears it on release — order guarantees correct read before clear
