@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 451230011}
   - component: {fileID: 451230012}
   - component: {fileID: 451230013}
+  - component: {fileID: 451230020}
   m_Layer: 0
   m_Name: PlayerCharacter
   m_TagString: Untagged
@@ -177,7 +178,6 @@ MonoBehaviour:
   PlayerSpeed: 2
   JumpForce: 5
   GravityValue: -9.81
-  ViewCamera: {fileID: 0}
 --- !u!114 &451230011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -219,3 +219,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   SpellDamage: 15
   SpellRange: 12
+--- !u!114 &451230020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2b3c4d5e6f7890123456789abcdef01, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _renderer: {fileID: 6851675763452951295}

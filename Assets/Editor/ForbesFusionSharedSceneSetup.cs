@@ -7,7 +7,9 @@ using UnityEngine;
 
 /// <summary>
 /// Applies the same scene objects as <c>GameObject/Fusion/Scene/Setup Networking in the Scene</c>,
-/// adds a floor, wires <see cref="PlayerSpawner"/> on the runner, and saves the open scene.
+/// adds a floor, wires <see cref="PlayerSpawner"/>, <see cref="FusionInputProvider"/>,
+/// <see cref="KeyboardInputSource"/>, <see cref="TrainingDummySpawner"/> and the local
+/// <see cref="CombatHud"/> on the runner, then saves the open scene.
 /// </summary>
 public static class ForbesFusionSharedSceneSetup {
   const string FloorName = "Floor";
@@ -20,10 +22,10 @@ public static class ForbesFusionSharedSceneSetup {
   public static void SetupSharedModeScene() {
     FusionSceneSetupAssistants.AddNetworkingToScene();
     EnsureFloor();
-    EnsurePlayerSpawner();
+    EnsureRunnerComponents();
     EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
     EditorSceneManager.SaveOpenScenes();
-    Debug.Log("Forbes: Shared mode scene setup complete (Fusion networking + Floor + PlayerSpawner).");
+    Debug.Log("Forbes: Shared mode scene setup complete (Fusion networking + Floor + spawner/input/HUD).");
   }
 
   static void EnsureFloor() {
@@ -37,35 +39,48 @@ public static class ForbesFusionSharedSceneSetup {
     Undo.RegisterCreatedObjectUndo(plane, "Create Floor");
   }
 
-  static void EnsurePlayerSpawner() {
+  static void EnsureRunnerComponents() {
     var runner = Object.FindAnyObjectByType<NetworkRunner>(FindObjectsInactive.Include);
     if (runner == null) {
       Debug.LogError("ForbesFusionSharedSceneSetup: NetworkRunner not found after Fusion setup.");
       return;
     }
 
-    var spawner = runner.GetComponent<PlayerSpawner>();
-    if (spawner == null) {
-      spawner = Undo.AddComponent<PlayerSpawner>(runner.gameObject);
-    }
+    var go = runner.gameObject;
+    var spawner = EnsureComponent<PlayerSpawner>(go);
+    EnsureComponent<KeyboardInputSource>(go);
+    EnsureComponent<FusionInputProvider>(go);
+    var dummySpawner = EnsureComponent<TrainingDummySpawner>(go);
+    EnsureComponent<CombatHud>(go);
 
-    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
-    if (prefab == null) {
+    var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+    if (playerPrefab == null) {
       Debug.LogError($"ForbesFusionSharedSceneSetup: Missing prefab at {PlayerPrefabPath}");
-      return;
-    }
-
-    var so = new SerializedObject(spawner);
-    so.FindProperty("PlayerPrefab").objectReferenceValue = prefab;
-    var dummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrainingDummyPrefabPath);
-    if (dummyPrefab != null) {
-      so.FindProperty("TrainingDummyPrefab").objectReferenceValue = dummyPrefab;
     } else {
-      Debug.LogWarning($"ForbesFusionSharedSceneSetup: Missing training dummy at {TrainingDummyPrefabPath}");
+      var so = new SerializedObject(spawner);
+      so.FindProperty("PlayerPrefab").objectReferenceValue = playerPrefab;
+      so.ApplyModifiedPropertiesWithoutUndo();
+      EditorUtility.SetDirty(spawner);
     }
 
-    so.ApplyModifiedPropertiesWithoutUndo();
-    EditorUtility.SetDirty(spawner);
+    var dummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TrainingDummyPrefabPath);
+    if (dummyPrefab == null) {
+      Debug.LogWarning($"ForbesFusionSharedSceneSetup: Missing training dummy at {TrainingDummyPrefabPath}");
+    } else {
+      var so = new SerializedObject(dummySpawner);
+      so.FindProperty("TrainingDummyPrefab").objectReferenceValue = dummyPrefab;
+      so.ApplyModifiedPropertiesWithoutUndo();
+      EditorUtility.SetDirty(dummySpawner);
+    }
+  }
+
+  static T EnsureComponent<T>(GameObject go) where T : Component {
+    var c = go.GetComponent<T>();
+    if (c == null) {
+      c = Undo.AddComponent<T>(go);
+    }
+
+    return c;
   }
 }
 #endif

@@ -2,7 +2,10 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Shared Mode Basics tutorial — simple first-person look on the main camera.
+/// Pure render: follow the local player and apply mouse-driven yaw/pitch. Owns
+/// the local view yaw, which is sampled by <see cref="KeyboardInputSource"/> and
+/// shipped into <see cref="GameplayInput.LookYaw"/>. No knowledge of combat or
+/// health state.
 /// </summary>
 public class FirstPersonCamera : MonoBehaviour {
   public Transform Target;
@@ -11,16 +14,18 @@ public class FirstPersonCamera : MonoBehaviour {
   float _verticalRotation;
   float _horizontalRotation;
 
+  /// <summary>Accumulated yaw from mouse deltas, in degrees.</summary>
+  public float Yaw => _horizontalRotation;
+
   void LateUpdate() {
     if (Target == null) {
-      return;
+      TryFindLocalPlayerTarget();
+      if (Target == null) {
+        return;
+      }
     }
 
     transform.position = Target.position;
-
-    if (Target.TryGetComponent(out Health hp) && hp.IsDead) {
-      return;
-    }
 
     var mouse = Mouse.current;
     if (mouse == null) {
@@ -35,5 +40,20 @@ public class FirstPersonCamera : MonoBehaviour {
     _verticalRotation = Mathf.Clamp(_verticalRotation, -70f, 70f);
     _horizontalRotation += mouseX * MouseSensitivity;
     transform.rotation = Quaternion.Euler(_verticalRotation, _horizontalRotation, 0f);
+  }
+
+  /// <summary>
+  /// Finds the PlayerMovement that has input authority on this peer. Works
+  /// correctly even when multiple NetworkRunner instances exist in the editor
+  /// (multi-client simulation), because HasInputAuthority is scoped to each
+  /// runner independently rather than relying on FindAnyObjectByType(Runner).
+  /// </summary>
+  void TryFindLocalPlayerTarget() {
+    foreach (var pm in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude)) {
+      if (pm.HasInputAuthority) {
+        Target = pm.transform;
+        return;
+      }
+    }
   }
 }

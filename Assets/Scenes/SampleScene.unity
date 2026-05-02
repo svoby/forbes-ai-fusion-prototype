@@ -493,6 +493,10 @@ GameObject:
   - component: {fileID: 1260076950}
   - component: {fileID: 1260076949}
   - component: {fileID: 1260076948}
+  - component: {fileID: 1260076960}
+  - component: {fileID: 1260076961}
+  - component: {fileID: 1260076962}
+  - component: {fileID: 1260076963}
   m_Layer: 0
   m_Name: Prototype Runner
   m_TagString: Untagged
@@ -513,9 +517,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpawner
   PlayerPrefab: {fileID: 7272019710335391474, guid: 461b851c3f112174589bf35a67518d91, type: 3}
-  TrainingDummyPrefab: {fileID: 991001001001, guid: c8e7f6a5b4c3d2e1f0a9b8c7d6e5f403, type: 3}
-  spawnTrainingDummyInEditor: 1
-  trainingDummySpawnOffsetLocal: {x: 0, y: 0, z: 4}
 --- !u!114 &1260076949
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -886,6 +887,57 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1260076960
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1260076947}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8b9cadbecfd012345678901abcdef07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FusionInputProvider
+--- !u!114 &1260076961
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1260076947}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6b7c8d9eafb012345678901abcdef05, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KeyboardInputSource
+--- !u!114 &1260076962
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1260076947}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aabbccddeeff012345678901abcdef09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TrainingDummySpawner
+  TrainingDummyPrefab: {fileID: 991001001001, guid: c8e7f6a5b4c3d2e1f0a9b8c7d6e5f403, type: 3}
+  spawnInEditor: 1
+  spawnOffsetLocal: {x: 0, y: 0, z: 4}
+--- !u!114 &1260076963
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1260076947}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a8b9c0d1e2f40a18b2c3d4e5f607182, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CombatHud
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

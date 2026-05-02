@@ -2,7 +2,9 @@ using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// Movement in <see cref="FixedUpdateNetwork"/> on State Authority; reads <see cref="GameplayInput"/> from Fusion input.
+/// Tick-driven movement on State Authority. Reads <see cref="GameplayInput"/>
+/// (including <see cref="GameplayInput.LookYaw"/>) and applies planar movement +
+/// facing without sampling render-time camera state.
 /// </summary>
 public class PlayerMovement : NetworkBehaviour {
   CharacterController _controller;
@@ -12,29 +14,12 @@ public class PlayerMovement : NetworkBehaviour {
   public float PlayerSpeed = 2f;
   public float JumpForce = 5f;
   public float GravityValue = -9.81f;
-  public Camera ViewCamera;
 
   Health _health;
 
   void Awake() {
     _controller = GetComponent<CharacterController>();
     _health = GetComponent<Health>();
-  }
-
-  public override void Spawned() {
-    if (!HasStateAuthority) {
-      return;
-    }
-
-    ViewCamera = Camera.main;
-    if (ViewCamera == null) {
-      return;
-    }
-
-    var fp = ViewCamera.GetComponent<FirstPersonCamera>();
-    if (fp != null) {
-      fp.Target = transform;
-    }
   }
 
   public override void FixedUpdateNetwork() {
@@ -56,13 +41,8 @@ public class PlayerMovement : NetworkBehaviour {
 
     Vector2 axes = input.Move;
     Vector3 planar = new Vector3(axes.x, 0f, axes.y);
-    Vector3 move;
-    if (ViewCamera != null) {
-      var yaw = Quaternion.Euler(0f, ViewCamera.transform.eulerAngles.y, 0f);
-      move = yaw * planar * (Runner.DeltaTime * PlayerSpeed);
-    } else {
-      move = planar * (Runner.DeltaTime * PlayerSpeed);
-    }
+    Quaternion yaw = Quaternion.Euler(0f, input.LookYaw, 0f);
+    Vector3 move = yaw * planar * (Runner.DeltaTime * PlayerSpeed);
 
     _velocity.y += GravityValue * Runner.DeltaTime;
     if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Jump) && _controller.isGrounded) {
@@ -71,9 +51,7 @@ public class PlayerMovement : NetworkBehaviour {
 
     _controller.Move(move + _velocity * Runner.DeltaTime);
 
-    var faceDir = ViewCamera != null
-      ? Quaternion.Euler(0f, ViewCamera.transform.eulerAngles.y, 0f) * planar
-      : planar;
+    Vector3 faceDir = yaw * planar;
     if (faceDir.sqrMagnitude > 1e-6f) {
       transform.forward = faceDir.normalized;
     }

@@ -1,20 +1,20 @@
-// Verbose combat / HP logs — delete this line to silence.
-#define FORBES_HEALTH_LOG
-
+using System;
 using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// Networked HP, damage via RPC to State Authority, death and timed respawn at spawn point.
+/// Networked HP, damage RPC routed to State Authority, death and timed respawn at
+/// the spawn point. Pure state and authority logic; presentation lives in
+/// <see cref="HealthView"/>, which subscribes to <see cref="IsDeadChanged"/>.
 /// </summary>
 public class Health : NetworkBehaviour {
   public float StartingHealth = 100f;
   public float RespawnDelaySeconds = 3f;
 
-  [Networked, OnChangedRender(nameof(HealthChanged))]
+  [Networked]
   public float NetworkedHealth { get; set; }
 
-  [Networked, OnChangedRender(nameof(DeadVisualChanged))]
+  [Networked, OnChangedRender(nameof(OnIsDeadChangedRender))]
   public NetworkBool IsDead { get; set; }
 
   /// <summary>Simulation tick on State Authority when the player should respawn (0 = not scheduled).</summary>
@@ -24,34 +24,29 @@ public class Health : NetworkBehaviour {
   [Networked]
   public Vector3 SpawnPosition { get; set; }
 
+  /// <summary>Render-side notification fired by Fusion when <see cref="IsDead"/> changes.</summary>
+  public event Action<bool> IsDeadChanged;
+
   CharacterController _controller;
-  MeshRenderer _renderer;
 
   void Awake() {
     _controller = GetComponent<CharacterController>();
-    _renderer = GetComponent<MeshRenderer>();
   }
 
-  void HealthChanged() {
-#if FORBES_HEALTH_LOG
-    Debug.Log($"[ForbesHealth] HP={NetworkedHealth:0.#} isDead={IsDead} obj={name}", this);
-#endif
-  }
-
-  void DeadVisualChanged() {
-    if (_renderer != null) {
-      _renderer.enabled = !IsDead;
-    }
+  void OnIsDeadChangedRender() {
+    ForbesLog.Health($"IsDead -> {IsDead} obj={name}", this);
+    IsDeadChanged?.Invoke(IsDead);
   }
 
   public override void Spawned() {
     if (HasStateAuthority) {
       SpawnPosition = transform.position;
       NetworkedHealth = StartingHealth;
-#if FORBES_HEALTH_LOG
-      Debug.Log($"[ForbesHealth] Spawned authority spawnPos={SpawnPosition} startHP={StartingHealth} obj={name}", this);
-#endif
+      ForbesLog.Health($"Spawned authority spawnPos={SpawnPosition} startHP={StartingHealth} obj={name}", this);
     }
+
+    // Networked props are now safe to read; let view subscribers (HealthView) apply the initial value.
+    IsDeadChanged?.Invoke(IsDead);
   }
 
   public override void FixedUpdateNetwork() {
@@ -65,9 +60,8 @@ public class Health : NetworkBehaviour {
   }
 
   void Respawn() {
-#if FORBES_HEALTH_LOG
-    Debug.Log($"[ForbesHealth] Respawn at {SpawnPosition} obj={name}", this);
-#endif
+    ForbesLog.Health($"Respawn at {SpawnPosition} obj={name}", this);
+
     if (_controller != null) {
       _controller.enabled = false;
     }
@@ -88,17 +82,13 @@ public class Health : NetworkBehaviour {
       return;
     }
 
-#if FORBES_HEALTH_LOG
-    Debug.Log($"[ForbesHealth] DealDamageRpc dmg={damage} before={NetworkedHealth} obj={name}", this);
-#endif
+    ForbesLog.Health($"DealDamageRpc dmg={damage} before={NetworkedHealth} obj={name}", this);
     NetworkedHealth = Mathf.Max(0f, NetworkedHealth - damage);
     if (NetworkedHealth <= 0f) {
       IsDead = true;
       int delayTicks = Mathf.CeilToInt(RespawnDelaySeconds * Runner.TickRate);
       RespawnAtTick = Runner.Tick + Mathf.Max(1, delayTicks);
-#if FORBES_HEALTH_LOG
-      Debug.Log($"[ForbesHealth] Killed respawnAtTick={RespawnAtTick} obj={name}", this);
-#endif
+      ForbesLog.Health($"Killed respawnAtTick={RespawnAtTick} obj={name}", this);
     }
   }
 }
