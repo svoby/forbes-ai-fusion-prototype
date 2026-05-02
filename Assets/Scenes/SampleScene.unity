@@ -772,7 +772,7 @@ MonoBehaviour:
   RunnerPrefab: {fileID: 1260076950}
   StartMode: 0
   AutoStartAs: 2
-  AutoHideGUI: 1
+  AutoHideGUI: 0
   AutoClients: 1
   ClientStartDelay: 0.1
   ServerPort: 0
