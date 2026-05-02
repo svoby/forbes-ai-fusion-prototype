@@ -2,47 +2,151 @@ using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// Minimal local HUD: own HP and selected target HP (reads networked state only).
+/// Local debug HUD. Reads networked state from the local player's objects and from
+/// the sibling <see cref="TargetingController"/>. No gameplay logic lives here.
+/// <para>
+/// Displayed info:
+/// <list type="bullet">
+///   <item>Own HP</item>
+///   <item>Selected target name + HP</item>
+///   <item>Cast bar (spell name + progress %)</item>
+///   <item>GCD remaining</item>
+///   <item>Per-spell cooldowns [1] [2] [3]</item>
+///   <item>Last cast failure reason (shown for 2 s)</item>
+/// </list>
+/// </para>
 /// </summary>
 public class CombatHud : MonoBehaviour {
-  NetworkRunner _runner;
-  string _line1 = "";
-  string _line2 = "";
+  NetworkRunner       _runner;
+  TargetingController _targeting;
+
+  string _selfLine   = "";
+  string _targetLine = "";
+  string _castBar    = "";
+  string _gcdLine    = "";
+  string _cdLine     = "";
+  string _failLine   = "";
 
   void Awake() {
-    _runner = GetComponent<NetworkRunner>();
+    _runner   = GetComponent<NetworkRunner>();
+    _targeting = GetComponent<TargetingController>();
   }
 
   void Update() {
     if (_runner == null || !_runner.IsRunning) {
-      _line1 = "";
-      _line2 = "";
+      _selfLine = _targetLine = _castBar = _gcdLine = _cdLine = _failLine = "";
       return;
     }
 
-    if (!_runner.TryGetPlayerObject(_runner.LocalPlayer, out var playerObj) || !playerObj.TryGetComponent(out Health self)) {
-      _line1 = "HP: —";
-      _line2 = "Cíl: —";
+    UpdateSelfLine();
+    UpdateTargetLine();
+    UpdateCombatLines();
+  }
+
+  void UpdateSelfLine() {
+    if (!_runner.TryGetPlayerObject(_runner.LocalPlayer, out var playerObj) ||
+        !playerObj.TryGetComponent(out Health self)) {
+      _selfLine = "HP: —";
       return;
     }
 
-    _line1 = $"HP: {self.NetworkedHealth:0}  (Tab=cíl, 1=kouzlo, E=barva)";
-    if (playerObj.TryGetComponent(out PlayerCombat combat) && combat.TargetId.IsValid &&
-        _runner.TryFindObject(combat.TargetId, out var targetObj) && targetObj.TryGetComponent(out Health targetHp)) {
-      _line2 = $"Cíl HP: {targetHp.NetworkedHealth:0}";
-    } else {
-      _line2 = "Cíl: žádný";
+    _selfLine = $"HP: {self.NetworkedHealth:0}/{self.StartingHealth:0}  (1/2/3=spell  E=color)";
+  }
+
+  void UpdateTargetLine() {
+    var t = _targeting != null ? _targeting.CurrentTarget : null;
+    if (t == null) {
+      _targetLine = "Target: none";
+      return;
+    }
+
+    string hp = "";
+    if (t.TryGetComponent(out Health th)) {
+      hp = $"  HP: {th.NetworkedHealth:0}/{th.StartingHealth:0}";
+    }
+
+    _targetLine = $"Target: {t.DisplayName}{hp}";
+  }
+
+  void UpdateCombatLines() {
+    _castBar = _gcdLine = _cdLine = _failLine = "";
+
+    if (!_runner.TryGetPlayerObject(_runner.LocalPlayer, out var playerObj)) {
+      return;
+    }
+
+    if (!playerObj.TryGetComponent(out NetworkCombatController combat)) {
+      return;
+    }
+
+    // Cast bar.
+    if (combat.IsCasting) {
+      var spell = SpellRegistry.Get(combat.CurrentSpellId);
+      int pct = Mathf.RoundToInt(combat.CastProgress * 100f);
+      _castBar = $"Casting: {spell.Name}  [{pct}%]";
+    }
+
+    // GCD.
+    float gcdRemain = TicksToSecs(combat.GcdEndTick - _runner.Tick);
+    if (gcdRemain > 0f) {
+      _gcdLine = $"GCD: {gcdRemain:0.0}s";
+    }
+
+    // Per-spell cooldowns.
+    float cd1 = TicksToSecs(combat.Cooldown1EndTick - _runner.Tick);
+    float cd2 = TicksToSecs(combat.Cooldown2EndTick - _runner.Tick);
+    float cd3 = TicksToSecs(combat.Cooldown3EndTick - _runner.Tick);
+    _cdLine = $"CD: [1] {FmtCd(cd1)}  [2] {FmtCd(cd2)}  [3] {FmtCd(cd3)}";
+
+    // Fail reason: show for ~2 seconds after it was set.
+    if (combat.LastFailTick > 0 && combat.LastFailReason != 0) {
+      float ageSecs = TicksToSecs(_runner.Tick - combat.LastFailTick);
+      if (ageSecs < 2f) {
+        _failLine = $"! {(CombatFailReason)combat.LastFailReason}";
+      }
     }
   }
 
   void OnGUI() {
-    const float pad = 12f;
+    const float pad  = 12f;
+    const float rowH = 22f;
+
     var style = new GUIStyle(GUI.skin.label) {
-      fontSize = 16,
-      normal = { textColor = Color.white },
+      fontSize = 15,
+      normal   = { textColor = Color.white },
     };
 
-    GUI.Label(new Rect(pad, pad, 900f, 28f), _line1, style);
-    GUI.Label(new Rect(pad, pad + 22f, 900f, 28f), _line2, style);
+    var castStyle = new GUIStyle(style) {
+      normal = { textColor = new Color(1f, 0.9f, 0.3f) },
+    };
+
+    var failStyle = new GUIStyle(style) {
+      normal = { textColor = new Color(1f, 0.3f, 0.3f) },
+    };
+
+    float y = pad;
+    DrawLine(_selfLine,   style,    pad, ref y, rowH);
+    DrawLine(_targetLine, style,    pad, ref y, rowH);
+    DrawLine(_castBar,    castStyle, pad, ref y, rowH);
+    DrawLine(_gcdLine,    style,    pad, ref y, rowH);
+    DrawLine(_cdLine,     style,    pad, ref y, rowH);
+    DrawLine(_failLine,   failStyle, pad, ref y, rowH);
   }
+
+  static void DrawLine(string text, GUIStyle style, float x, ref float y, float rowH) {
+    if (string.IsNullOrEmpty(text)) {
+      return;
+    }
+    GUI.Label(new Rect(x, y, 900f, rowH), text, style);
+    y += rowH;
+  }
+
+  float TicksToSecs(int ticks) {
+    if (ticks <= 0) {
+      return 0f;
+    }
+    return ticks * _runner.DeltaTime;
+  }
+
+  static string FmtCd(float secs) => secs > 0f ? $"{secs:0.0}s" : "ready";
 }

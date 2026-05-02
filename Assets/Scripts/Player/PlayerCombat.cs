@@ -3,17 +3,19 @@ using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// WoW-style slice: Tab cycles hostile targets, key <c>1</c> casts an instant spell in range (authority on target HP).
+/// LEGACY — will be replaced by <see cref="NetworkCombatController"/> in Milestone 3.
+/// Kept temporarily so the PlayerCharacter prefab doesn't lose a component mid-development.
+/// Tab-targeting removed (moved to local <see cref="TargetingController"/>).
 /// </summary>
 public class PlayerCombat : NetworkBehaviour {
   public float SpellDamage = 15f;
-  public float SpellRange = 12f;
+  public float SpellRange  = 12f;
 
   [Networked] public NetworkId TargetId { get; set; }
 
-  Health _health;
+  Health                _health;
   readonly List<Health> _targetsScratch = new List<Health>(8);
-  NetworkButtons _prevButtons;
+  NetworkButtons        _prevButtons;
 
   void Awake() {
     _health = GetComponent<Health>();
@@ -30,11 +32,7 @@ public class PlayerCombat : NetworkBehaviour {
 
     PruneInvalidTarget();
 
-    if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.TabTarget)) {
-      TargetId = CombatTargetSelector.SelectNextAfter(Object, TargetId, _targetsScratch);
-    }
-
-    if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.SpellPrimary)) {
+    if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell1)) {
       TryCastSpell();
     }
 

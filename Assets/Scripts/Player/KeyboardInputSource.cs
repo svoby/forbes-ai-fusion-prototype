@@ -2,87 +2,122 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Reads keyboard movement axes every frame and latches edge presses (Space, Tab,
-/// Digit1, E) so that Fusion's <c>OnInput</c> can sample them once per tick without
-/// missing inputs that fall between ticks. Look yaw is sourced from the local
-/// <see cref="FirstPersonCamera"/> (mouse → camera yaw is the player's look intent).
+/// Reads keyboard and mouse state every frame; implements <see cref="IInputSource"/>
+/// so <see cref="FusionInputProvider"/> can sample it from Fusion's <c>OnInput</c>.
+/// <para>
+/// WoW mouse-mode rules:
+/// <list type="bullet">
+///   <item>No mouse: A/D turn the camera/character; character does not strafe.</item>
+///   <item>LMB held: camera orbits; A/D still turn; <see cref="AlwaysFaceYaw"/> stays false.</item>
+///   <item>RMB held: camera + character rotate together; A/D strafe; <see cref="AlwaysFaceYaw"/> = true.</item>
+///   <item>Both held: same as RMB + <see cref="MoveAxes"/>.y forced to 1 (auto-forward).</item>
+/// </list>
+/// </para>
+/// Edge button presses are latched and consumed once per Fusion tick via the Consume* methods.
 /// </summary>
 [DisallowMultipleComponent]
 public class KeyboardInputSource : MonoBehaviour, IInputSource {
+  const float TurnRateDegPerSec = 120f;
+
   bool _pendingJump;
-  bool _pendingTab;
-  bool _pendingSpell;
+  bool _pendingSpell1;
+  bool _pendingSpell2;
+  bool _pendingSpell3;
   bool _pendingColor;
 
-  FirstPersonCamera _camera;
+  ThirdPersonOrbitCamera _camera;
 
-  public Vector2 MoveAxes {
-    get {
-      var kb = Keyboard.current;
-      if (kb == null) {
-        return Vector2.zero;
-      }
+  // ---- IInputSource ----
+  public Vector2 MoveAxes     { get; private set; }
+  public float   LookYaw      { get; private set; }
+  public bool    AlwaysFaceYaw { get; private set; }
 
-      float x = (kb.dKey.isPressed || kb.rightArrowKey.isPressed ? 1f : 0f)
-                - (kb.aKey.isPressed || kb.leftArrowKey.isPressed ? 1f : 0f);
-      float y = (kb.wKey.isPressed || kb.upArrowKey.isPressed ? 1f : 0f)
-                - (kb.sKey.isPressed || kb.downArrowKey.isPressed ? 1f : 0f);
-      return new Vector2(x, y);
-    }
-  }
-
-  public float LookYaw {
-    get {
-      EnsureCamera();
-      return _camera != null ? _camera.Yaw : 0f;
-    }
-  }
-
-  public bool ConsumeJump() => Consume(ref _pendingJump);
-  public bool ConsumeTabTarget() => Consume(ref _pendingTab);
-  public bool ConsumeSpellPrimary() => Consume(ref _pendingSpell);
+  public bool ConsumeJump()           => Consume(ref _pendingJump);
+  public bool ConsumeSpell1()         => Consume(ref _pendingSpell1);
+  public bool ConsumeSpell2()         => Consume(ref _pendingSpell2);
+  public bool ConsumeSpell3()         => Consume(ref _pendingSpell3);
   public bool ConsumeRandomizeColor() => Consume(ref _pendingColor);
 
   static bool Consume(ref bool flag) {
     if (!flag) {
       return false;
     }
-
     flag = false;
     return true;
   }
+
+  int _missingCameraWarnFrame = -1;
 
   void EnsureCamera() {
     if (_camera != null) {
       return;
     }
 
-    var cam = Camera.main;
-    if (cam != null) {
-      _camera = cam.GetComponent<FirstPersonCamera>();
+    _camera = Object.FindAnyObjectByType<ThirdPersonOrbitCamera>();
+
+    if (_camera != null) {
+      LookYaw = _camera.Yaw;
+      Debug.Log("[KeyboardInputSource] ThirdPersonOrbitCamera found.");
+      return;
+    }
+
+    // Warn once per second (not every frame) so console stays readable.
+    if (Time.frameCount != _missingCameraWarnFrame && Time.frameCount % 60 == 0) {
+      _missingCameraWarnFrame = Time.frameCount;
+      Debug.LogWarning("[KeyboardInputSource] ThirdPersonOrbitCamera not found — LookYaw=0, A/D turn disabled. Run 'Tools/Fusion/Scene/Apply Full Combat Setup'.");
     }
   }
 
   void Update() {
+    EnsureCamera();
+
     var kb = Keyboard.current;
     if (kb == null) {
       return;
     }
 
-    if (kb.spaceKey.wasPressedThisFrame) {
-      _pendingJump = true;
+    // -- Edge presses: latched until consumed by FusionInputProvider --
+    if (kb.spaceKey.wasPressedThisFrame)  { _pendingJump   = true; }
+    if (kb.digit1Key.wasPressedThisFrame) { _pendingSpell1 = true; }
+    if (kb.digit2Key.wasPressedThisFrame) { _pendingSpell2 = true; }
+    if (kb.digit3Key.wasPressedThisFrame) { _pendingSpell3 = true; }
+    if (kb.eKey.wasPressedThisFrame)      { _pendingColor  = true; }
+
+    // -- Mouse mode from camera --
+    bool rmb  = _camera != null && (_camera.MouseMode == CameraMouseMode.Right || _camera.MouseMode == CameraMouseMode.Both);
+    bool both = _camera != null && _camera.MouseMode == CameraMouseMode.Both;
+
+    // -- Movement axes --
+    bool wFwd  = kb.wKey.isPressed || kb.upArrowKey.isPressed;
+    bool sBack = kb.sKey.isPressed || kb.downArrowKey.isPressed;
+    bool aLeft = kb.aKey.isPressed || kb.leftArrowKey.isPressed;
+    bool dRight = kb.dKey.isPressed || kb.rightArrowKey.isPressed;
+
+    float moveY = (wFwd ? 1f : 0f) - (sBack ? 1f : 0f);
+    if (both) {
+      moveY = Mathf.Max(moveY, 1f); // auto-forward when both buttons held
     }
 
-    if (kb.tabKey.wasPressedThisFrame) {
-      _pendingTab = true;
+    float moveX;
+    if (rmb) {
+      // RMB/Both: A/D = lateral strafe, character faces camera direction.
+      moveX = (dRight ? 1f : 0f) - (aLeft ? 1f : 0f);
+      AlwaysFaceYaw = true;
+    } else {
+      // No mouse / LMB only: A/D = turn camera (and character follows camera yaw).
+      moveX = 0f;
+      AlwaysFaceYaw = false;
+      if (_camera != null) {
+        if (aLeft)  { _camera.AddYaw(-TurnRateDegPerSec * Time.deltaTime); }
+        if (dRight) { _camera.AddYaw(TurnRateDegPerSec  * Time.deltaTime); }
+      }
     }
 
-    if (kb.digit1Key.wasPressedThisFrame) {
-      _pendingSpell = true;
-    }
+    MoveAxes = new Vector2(moveX, moveY);
 
-    if (kb.eKey.wasPressedThisFrame) {
-      _pendingColor = true;
+    // LookYaw always mirrors the camera's current yaw.
+    if (_camera != null) {
+      LookYaw = _camera.Yaw;
     }
   }
 }

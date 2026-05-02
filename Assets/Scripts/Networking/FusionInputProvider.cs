@@ -5,18 +5,20 @@ using Fusion.Sockets;
 using UnityEngine;
 
 /// <summary>
-/// Bridges a sibling <see cref="IInputSource"/> to Fusion's per-tick input.
-/// Lives on the same GameObject as <see cref="NetworkRunner"/>; owns only the
-/// input-related <see cref="INetworkRunnerCallbacks"/> entries and ignores the rest.
+/// Bridges a sibling <see cref="IInputSource"/> (and an optional sibling
+/// <see cref="TargetingController"/>) to Fusion's per-tick input struct.
+/// Lives on the same GameObject as <see cref="NetworkRunner"/>.
 /// </summary>
 [DisallowMultipleComponent]
 public class FusionInputProvider : MonoBehaviour, INetworkRunnerCallbacks {
-  NetworkRunner _runner;
-  IInputSource _input;
+  NetworkRunner       _runner;
+  IInputSource        _input;
+  TargetingController _targeting; // may be null until M2 adds it
 
   void Awake() {
-    _runner = GetComponent<NetworkRunner>();
-    _input = GetComponent<IInputSource>();
+    _runner    = GetComponent<NetworkRunner>();
+    _input     = GetComponent<IInputSource>();
+    _targeting = GetComponent<TargetingController>(); // may also be auto-created after Awake; see OnInput
 
     if (_runner != null) {
       _runner.AddCallbacks(this);
@@ -34,27 +36,28 @@ public class FusionInputProvider : MonoBehaviour, INetworkRunnerCallbacks {
   }
 
   public void OnInput(NetworkRunner runner, NetworkInput input) {
+    // TargetingController may have been auto-created after our Awake ran.
+    if (_targeting == null) {
+      _targeting = UnityEngine.Object.FindAnyObjectByType<TargetingController>();
+    }
+
     var gi = new GameplayInput();
 
     if (_input != null) {
-      gi.Move = _input.MoveAxes;
+      gi.Move    = _input.MoveAxes;
       gi.LookYaw = _input.LookYaw;
 
-      if (_input.ConsumeJump()) {
-        gi.Buttons.SetDown((int)GameplayButtons.Jump);
-      }
+      if (_input.AlwaysFaceYaw)       { gi.Buttons.SetDown((int)GameplayButtons.AlwaysFaceYaw); }
+      if (_input.ConsumeJump())        { gi.Buttons.SetDown((int)GameplayButtons.Jump); }
+      if (_input.ConsumeSpell1())      { gi.Buttons.SetDown((int)GameplayButtons.Spell1); }
+      if (_input.ConsumeSpell2())      { gi.Buttons.SetDown((int)GameplayButtons.Spell2); }
+      if (_input.ConsumeSpell3())      { gi.Buttons.SetDown((int)GameplayButtons.Spell3); }
+      if (_input.ConsumeRandomizeColor()) { gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor); }
+    }
 
-      if (_input.ConsumeTabTarget()) {
-        gi.Buttons.SetDown((int)GameplayButtons.TabTarget);
-      }
-
-      if (_input.ConsumeSpellPrimary()) {
-        gi.Buttons.SetDown((int)GameplayButtons.SpellPrimary);
-      }
-
-      if (_input.ConsumeRandomizeColor()) {
-        gi.Buttons.SetDown((int)GameplayButtons.RandomizeColor);
-      }
+    // Include the local target's NetworkId so the state authority can validate it at cast time.
+    if (_targeting != null) {
+      gi.TargetId = _targeting.CurrentTargetId;
     }
 
     input.Set(gi);
