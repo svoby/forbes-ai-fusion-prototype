@@ -79,6 +79,7 @@ public class TargetingController : MonoBehaviour {
     // LMB release without drag: raycast select.
     if (mouse != null && mouse.leftButton.wasReleasedThisFrame) {
       bool dragged = _camera != null && _camera.IsLmbDragging;
+      Debug.Log($"[TargetingController] LMB released. dragged={dragged}  IsLmbDragging={(_camera != null ? _camera.IsLmbDragging.ToString() : "camera=null")}");
       if (!dragged) {
         TrySelectFromScreenRay();
       }
@@ -140,21 +141,30 @@ public class TargetingController : MonoBehaviour {
   void TrySelectFromScreenRay() {
     var cam = Camera.main;
     if (cam == null) {
+      Debug.LogWarning("[TargetingController] TrySelectFromScreenRay: Camera.main is null.");
       return;
     }
 
     var mouse = Mouse.current;
     if (mouse == null) {
+      Debug.LogWarning("[TargetingController] TrySelectFromScreenRay: Mouse.current is null.");
       return;
     }
 
-    var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
+    Vector2 screenPos = mouse.position.ReadValue();
+    var ray = cam.ScreenPointToRay(screenPos);
+    Debug.Log($"[TargetingController] Raycast from screen={screenPos} lockState={UnityEngine.Cursor.lockState}");
+
     if (Physics.Raycast(ray, out var hitInfo, _maxRaycastDistance)) {
+      Debug.Log($"[TargetingController]   Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}' layer={LayerMask.LayerToName(hitInfo.collider.gameObject.layer)}");
       var hit = hitInfo.collider.GetComponentInParent<Targetable>();
+      Debug.Log($"[TargetingController]   Targetable found: {(hit != null ? hit.DisplayName : "NULL — no Targetable in parent chain")}");
       if (hit != null) {
         SetTarget(hit);
       }
       // Click on empty geometry: keep current target (WoW classic behaviour).
+    } else {
+      Debug.Log("[TargetingController]   Raycast missed all colliders.");
     }
   }
 

@@ -28,7 +28,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   /// <summary>Distance change per scroll notch (120 units per notch in the new Input System).</summary>
   [SerializeField] float _zoomSpeed = 0.03f;
   [SerializeField] Vector3 _pivotOffset = new Vector3(0f, 1.5f, 0f);
-  [SerializeField] float _dragThresholdPixels = 5f;
+  [SerializeField] float _dragThresholdPixels = 20f;
 
   Transform _target;
   float _yaw;
