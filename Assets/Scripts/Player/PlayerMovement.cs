@@ -22,9 +22,10 @@ public class PlayerMovement : NetworkBehaviour {
   NetworkCombatController  _combat;   // may be null until added to prefab
   bool                     _loggedFirstInput;
 
-  public float PlayerSpeed   = 120f;
-  public float JumpForce     = 5f;
-  public float GravityValue  = -9.81f;
+  // Constants — not serialized so code value always wins regardless of prefab-saved data.
+  const float PlayerSpeed  = 120f;
+  const float JumpForce    = 5f;
+  const float GravityValue = -9.81f;
 
   void Awake() {
     _controller = GetComponent<CharacterController>();
