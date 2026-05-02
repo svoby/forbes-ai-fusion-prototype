@@ -35,10 +35,6 @@ public class PlayerMovement : NetworkBehaviour {
       Debug.LogError($"[PlayerMovement] CharacterController missing on '{name}' — movement will not work.", this);
     }
 
-    if (GetComponent<FacingIndicator>() == null) {
-      gameObject.AddComponent<FacingIndicator>();
-    }
-
     if (GetComponent<Targetable>() == null) {
       gameObject.AddComponent<Targetable>();
     }
