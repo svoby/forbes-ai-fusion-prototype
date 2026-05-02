@@ -72,10 +72,28 @@ public class PlayerMovement : NetworkBehaviour {
       _velocity = new Vector3(0f, -1f, 0f);
     }
 
-    Vector2 axes  = input.Move;
+    bool alwaysFace = input.Buttons.IsSet((int)GameplayButtons.AlwaysFaceYaw);
+
+    Vector2 axes   = input.Move;
     Vector3 planar = new Vector3(axes.x, 0f, axes.y);
-    Quaternion yaw = Quaternion.Euler(0f, input.LookYaw, 0f);
-    Vector3 move  = yaw * planar * (Runner.DeltaTime * PlayerSpeed);
+    Quaternion cameraYaw = Quaternion.Euler(0f, input.LookYaw, 0f);
+
+    // Movement direction:
+    //   AlwaysFaceYaw (RMB / Q-E / strafe) → move relative to camera yaw.
+    //   LMB orbit only                     → move relative to character's own facing
+    //                                         so the camera can orbit without pushing
+    //                                         the character sideways.
+    Quaternion moveYaw;
+    if (alwaysFace) {
+      moveYaw = cameraYaw;
+    } else {
+      var fwd = new Vector3(transform.forward.x, 0f, transform.forward.z);
+      moveYaw = fwd.sqrMagnitude > 1e-6f
+        ? Quaternion.LookRotation(fwd.normalized)
+        : cameraYaw;
+    }
+
+    Vector3 move = moveYaw * planar * (Runner.DeltaTime * PlayerSpeed);
 
     _velocity.y += GravityValue * Runner.DeltaTime;
     if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Jump) && _controller.isGrounded) {
@@ -84,15 +102,11 @@ public class PlayerMovement : NetworkBehaviour {
 
     _controller.Move(move + _velocity * Runner.DeltaTime);
 
-    // Facing: when AlwaysFaceYaw is set (RMB/Both mode) always face LookYaw so the
-    // character doesn't rotate sideways while strafing. Otherwise only update facing
-    // when there is actual forward/backward movement.
-    bool alwaysFace = input.Buttons.IsSet((int)GameplayButtons.AlwaysFaceYaw);
-    Vector3 faceDir = yaw * planar;
+    // Facing:
+    //   AlwaysFaceYaw → always face camera yaw (RMB free-look, Q/E rotate, A/D strafe).
+    //   LMB orbit     → NEVER change facing; camera orbits around stationary character.
     if (alwaysFace) {
-      transform.forward = (yaw * Vector3.forward).normalized;
-    } else if (faceDir.sqrMagnitude > 1e-6f) {
-      transform.forward = faceDir.normalized;
+      transform.forward = (cameraYaw * Vector3.forward).normalized;
     }
 
     _prevButtons = input.Buttons;
