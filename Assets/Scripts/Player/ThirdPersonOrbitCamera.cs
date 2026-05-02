@@ -94,11 +94,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
       }
     }
 
-    // Reset IsLmbDragging one frame after release so TargetingController can read wasReleasedThisFrame safely.
-    if (mouse.leftButton.wasReleasedThisFrame) {
-      // Defer clear one frame so TargetingController can still read it on the same wasReleased frame.
-      // IsLmbDragging is cleared next frame via the wasPressedThisFrame branch on the next press.
-    }
+    // IsLmbDragging is cleared next frame via the wasPressedThisFrame branch on the next press.
 
     MouseMode = (lmb, rmb) switch {
       (true, true)   => CameraMouseMode.Both,
@@ -107,8 +103,16 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
       _              => CameraMouseMode.None,
     };
 
+    // Cursor: hide and lock whenever any rotation button is held so the cursor does not
+    // drift across the screen while the camera is moving.  On release the cursor is
+    // restored to its pre-press position via CursorLockMode.None.
+    // mouse.delta continues to report raw movement even while locked, so camera math
+    // is unaffected.  TargetingController's LMB-click raycast fires from screen-centre
+    // when the cursor is locked, which matches the camera look direction — natural for
+    // a quick non-drag click.
+    ManageCursor(lmb || rmb);
+
     // Orbit when any button held.
-    // mouse.delta is in screen pixels per frame — multiply by sensitivity (deg/px).
     if (lmb || rmb) {
       var delta = mouse.delta.ReadValue();
       _yaw   += delta.x * _sensitivity;
@@ -128,6 +132,20 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     var rotation = Quaternion.Euler(_pitch, _yaw, 0f);
     transform.position = pivot + rotation * new Vector3(0f, 0f, -_distance);
     transform.LookAt(pivot, Vector3.up);
+  }
+
+  static void ManageCursor(bool anyHeld) {
+    if (anyHeld) {
+      if (Cursor.lockState != CursorLockMode.Locked) {
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible   = false;
+      }
+    } else {
+      if (Cursor.lockState != CursorLockMode.None) {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible   = true;
+      }
+    }
   }
 
   /// <summary>

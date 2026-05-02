@@ -38,6 +38,10 @@ public class PlayerMovement : NetworkBehaviour {
     if (GetComponent<FacingIndicator>() == null) {
       gameObject.AddComponent<FacingIndicator>();
     }
+
+    if (GetComponent<Targetable>() == null) {
+      gameObject.AddComponent<Targetable>();
+    }
   }
 
   public override void FixedUpdateNetwork() {
