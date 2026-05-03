@@ -5,7 +5,6 @@
 
 .NOTES
   Close the Unity Editor for this project first — batchmode cannot open a locked project.
-  Do not pass -nographics: PlayMode tests require a graphics device.
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\tools\run-playmode-tests.ps1
@@ -56,7 +55,7 @@ Write-Host "Log:         $LogFile"
 Write-Host "Assemblies:  $AssemblyNames"
 
 $argsUnity = @(
-  "-batchmode", "-quit",
+  "-batchmode", "-nographics", "-quit",
   "-projectPath", $ProjectPath,
   "-runTests",
   "-testPlatform", "playmode",

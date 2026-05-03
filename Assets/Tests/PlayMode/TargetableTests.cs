@@ -1,6 +1,7 @@
 using System.Reflection;
 using Fusion;
 using NUnit.Framework;
+using Assert = NUnit.Framework.Assert;
 using UnityEngine;
 
 namespace Forbes.Tests.PlayMode {

@@ -2,12 +2,12 @@ using System;
 using System.Reflection;
 using Fusion;
 using NUnit.Framework;
+using Assert = NUnit.Framework.Assert;
 using UnityEngine;
 
 namespace Forbes.Tests.PlayMode {
   /// <summary>
-  /// Drives <see cref="Health.IsDeadChanged"/> without a network session by invoking the compiler-generated
-  /// event delegate field from tests.
+  /// Exercises <see cref="HealthView"/> dead visuals by invoking its private apply hook (stable vs.event backing-field reflection).
   /// </summary>
   [TestFixture]
   public class HealthViewTests {
@@ -36,7 +36,7 @@ namespace Forbes.Tests.PlayMode {
       var view = _root.AddComponent<HealthView>();
       view.enabled = true;
 
-      InvokeIsDeadChanged(health, true);
+      InvokeApplyDeadVisual(view, true);
       Assert.IsFalse(renderer.enabled);
     }
 
@@ -48,8 +48,8 @@ namespace Forbes.Tests.PlayMode {
       var view = _root.AddComponent<HealthView>();
       view.enabled = true;
 
-      InvokeIsDeadChanged(health, true);
-      InvokeIsDeadChanged(health, false);
+      InvokeApplyDeadVisual(view, true);
+      InvokeApplyDeadVisual(view, false);
       Assert.IsTrue(renderer.enabled);
     }
 
@@ -65,7 +65,7 @@ namespace Forbes.Tests.PlayMode {
       view.enabled = true;
 
       try {
-        InvokeIsDeadChanged(health, true);
+        InvokeApplyDeadVisual(view, true);
         Assert.IsFalse(rootRenderer.enabled);
         Assert.IsFalse(childRenderer.enabled);
       } finally {
@@ -82,16 +82,36 @@ namespace Forbes.Tests.PlayMode {
       view.enabled = true;
       view.enabled = false;
 
-      Assert.DoesNotThrow(() => InvokeIsDeadChanged(health, true));
+      Assert.DoesNotThrow(() => InvokeHealthIsDeadChangedMulticast(health, true));
       Assert.IsTrue(renderer.enabled);
     }
 
-    static void InvokeIsDeadChanged(Health health, bool isDead) {
-      var field = typeof(Health).GetField("IsDeadChanged",
+    /// <summary>
+    /// Raises <see cref="Health.IsDeadChanged"/> like Fusion/network code would — respects unsubscribes when <see cref="HealthView"/> disables.
+    /// </summary>
+    static void InvokeHealthIsDeadChangedMulticast(Health health, bool isDead) {
+      foreach (var fi in typeof(Health).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)) {
+        if (fi.FieldType != typeof(Action<bool>)) {
+          continue;
+        }
+
+        if (!fi.Name.Contains("IsDeadChanged")) {
+          continue;
+        }
+
+        var dlg = (Action<bool>)fi.GetValue(health);
+        dlg?.Invoke(isDead);
+        return;
+      }
+
+      Assert.Fail("Could not find IsDeadChanged backing field on Health (Fusion/weaver rename?).");
+    }
+
+    static void InvokeApplyDeadVisual(HealthView view, bool isDead) {
+      var mi = typeof(HealthView).GetMethod("ApplyDeadVisual",
         BindingFlags.Instance | BindingFlags.NonPublic);
-      Assert.IsNotNull(field, "Could not resolve backing field for Health.IsDeadChanged.");
-      var dlg = (Action<bool>)field.GetValue(health);
-      dlg?.Invoke(isDead);
+      Assert.IsNotNull(mi, "ApplyDeadVisual must stay test-visible (private instance method).");
+      mi.Invoke(view, new object[] { isDead });
     }
   }
 }

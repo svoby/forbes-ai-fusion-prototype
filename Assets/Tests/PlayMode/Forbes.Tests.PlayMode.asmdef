@@ -4,9 +4,9 @@
     "references": [
         "Forbes.Runtime",
         "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
         "Fusion.Unity"
     ],
-    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
@@ -14,7 +14,9 @@
         "nunit.framework.dll",
         "Fusion.Runtime.dll",
         "Fusion.Common.dll",
-        "Fusion.Realtime.dll"
+        "Fusion.Realtime.dll",
+        "Fusion.Sockets.dll",
+        "Fusion.Log.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [

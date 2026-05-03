@@ -16,7 +16,8 @@ _build/
 /[Uu]ser[Ss]ettings/
 *.log
 
-# Unity Test Framework CLI output (tools/run-editmode-tests.ps1)
+# Unity Test Framework CLI output (tools/run-editmode-tests.ps1, run-playmode-tests.ps1)
+# + ForbesTestRunFileLogger → TestResults/last-editor-test-run.log
 /TestResults/
 /TestResults*.xml
 

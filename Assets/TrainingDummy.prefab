@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 991001001006}
   - component: {fileID: 991001001007}
   - component: {fileID: 991001001008}
+  - component: {fileID: 991001001021}
   - component: {fileID: 991001001009}
   - component: {fileID: 991001001020}
   - component: {fileID: 2864031344629190355}
@@ -117,6 +118,7 @@ MonoBehaviour:
   NetworkedBehaviours:
   - {fileID: 991001001007}
   - {fileID: 991001001008}
+  - {fileID: 991001001021}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &991001001006
 CharacterController:
@@ -179,6 +181,24 @@ MonoBehaviour:
     _value: 0
   _RespawnAtTick: 0
   _SpawnPosition: {x: 0, y: 0, z: 0}
+--- !u!114 &991001001021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 991001001001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3d4e5f6a7b849594a6b7c8d9e0f1a2b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  WanderRadius: 8
+  MoveSpeed: 6
+  ArrivalThreshold: 0.3
+  MinLegDistance: 1
+  IdleTicksMin: 8
+  IdleTicksMax: 24
 --- !u!114 &991001001009
 MonoBehaviour:
   m_ObjectHideFlags: 0

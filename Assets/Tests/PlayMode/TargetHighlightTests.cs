@@ -1,5 +1,6 @@
 using Fusion;
 using NUnit.Framework;
+using Assert = NUnit.Framework.Assert;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -23,11 +24,12 @@ namespace Forbes.Tests.PlayMode {
       PlayModeTargetingCleanup.DestroyAutoCreatedTargetingSystem();
     }
 
-    [Test]
-    public void AfterAwake_GameObject_IsInactive() {
+    [UnityTest]
+    public IEnumerator AfterAwake_GameObject_IsInactive() {
       _go = new GameObject(nameof(TargetHighlight));
       _go.AddComponent<LineRenderer>();
       _go.AddComponent<TargetHighlight>();
+      yield return null;
       Assert.IsFalse(_go.activeSelf);
     }
 
@@ -46,6 +48,7 @@ namespace Forbes.Tests.PlayMode {
         highlight.SetTarget(targetable);
         Assert.IsTrue(_go.activeSelf);
 
+        yield return null;
         yield return null;
 
         var expected = targetGo.transform.position + Vector3.up * 0.04f;
@@ -77,8 +80,8 @@ namespace Forbes.Tests.PlayMode {
       }
     }
 
-    [Test]
-    public void TwoInstances_SecondAwake_BecomesInstance() {
+    [UnityTest]
+    public IEnumerator TwoInstances_SecondAwake_BecomesInstance() {
       GameObject first = null;
       GameObject second = null;
       try {
@@ -93,10 +96,12 @@ namespace Forbes.Tests.PlayMode {
 
         Object.DestroyImmediate(second);
         second = null;
+        yield return null;
         Assert.IsNull(TargetHighlight.Instance);
 
         Object.DestroyImmediate(first);
         first = null;
+        yield return null;
         Assert.IsNull(TargetHighlight.Instance);
       } finally {
         if (second != null) {
