@@ -33,6 +33,12 @@ namespace Forbes.Tests.EditMode {
         "Health.StartingHealth changed; tests/HUD assume 100. Update SpellRegistry damage if intentional.");
       Assert.AreEqual(3f, _health.RespawnDelaySeconds,
         "Health.RespawnDelaySeconds changed; tick math in DealDamageRpc assumes 3 s.");
+      Assert.IsTrue(_health.FallKillEnabled,
+        "Health.FallKillEnabled default changed; scenes relying on void kill may differ.");
+      Assert.AreEqual(-50f, _health.FallKillBelowWorldY,
+        "Health.FallKillBelowWorldY default changed; update scenes/docs if intentional.");
+      Assert.AreEqual(0.1f, _health.RespawnVerticalNudge,
+        "Health.RespawnVerticalNudge default changed; respawn CC clearance may differ.");
     }
 
     [Test]
