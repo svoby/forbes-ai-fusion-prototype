@@ -78,19 +78,19 @@ NetworkCombatController.FixedUpdateNetwork  (spells, GCD)
 
 ---
 
-## Camera & cursor (WoW style)
+## Camera, cursor & movement (WoW-style)
 
-See `.cursor/rules/controls-spec.mdc` for the full table. Summary:
+**Canonical specification:** [.cursor/rules/controls-spec.mdc](../.cursor/rules/controls-spec.mdc) — execution order (`Update` / `LateUpdate` / Fusion ticks), orbit vs **`_charYaw`** / **`_orbitOffset`**, **`AlwaysFaceYaw`**, **`CharacterController`** rules, and **cursor policy** (**RMB** locks immediately; **LMB** only after ~**20 px** accumulated drag so click-target stays valid).
 
-| Mouse | Camera | Character | Cursor |
-|-------|--------|-----------|--------|
-| Nothing | still | own facing | visible |
-| LMB drag | orbits freely | **own facing** (does not follow camera) | hides during drag, returns on release |
-| RMB drag | rotates with character | follows camera yaw | hides during drag, returns on release |
-| Both | RMB behaviour + auto-forward | follows camera yaw | hides during drag |
+**Short reference:**
 
-Cursor hides only after the mouse travels > 20 px while a button is held.
-`IsLmbDragging` / `IsRmbDragging` reset in `LateUpdate` on release so `TargetingController.Update` (which runs first) can read the correct value before the clear.
+| Mouse | Rotation | Facing / move (tick) |
+|-------|----------|----------------------|
+| None | Idle; Q/E rotate **`Yaw`** | Body-forward move unless **`AlwaysFaceYaw`** (strafe/Q/E/arrows/RMB modes) |
+| LMB only | Orbit lens (**`_orbitOffset`**) — LMB does **not** change **`Yaw`** | LMB-only orbit: move along body forward unless **`AlwaysFaceYaw`** (e.g. A/D strafe forces face to **`LookYaw`**) |
+| RMB only / Both | Free-look: **`_charYaw`** from mouse; **Both** adds auto-forward | **`AlwaysFaceYaw`** true — move/strafe in **`LookYaw`** space |
+
+`TargetingController` reads **`IsLmbDragging`** in **`Update`**; `ThirdPersonOrbitCamera.LateUpdate` clears it **after** that on LMB release (`IsRmbDragging` is mirrored for bookkeeping only; **cursor** follows **`rmb || (lmb && IsLmbDragging)`** in code).
 
 ---
 

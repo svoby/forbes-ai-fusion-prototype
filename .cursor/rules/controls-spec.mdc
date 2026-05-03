@@ -1,54 +1,109 @@
-# WoW-Style Controls Specification
+---
+description: Canonical WoW-style camera, cursor, CharacterController movement, and input for this Fusion prototype — read before changing ThirdPersonOrbitCamera / PlayerMovement / KeyboardInputSource
+---
 
-This file is the source of truth for all input and camera behaviour.
-Do NOT change any of these rules without explicit user approval.
+# WoW-style controls specification (camera ↔ character ↔ input)
+
+Canonical behaviour for **`ThirdPersonOrbitCamera`**, **`KeyboardInputSource`**, **`PlayerMovement`**, and **`TargetingController`**.
+
+When fixing bugs, resolve conflicts in favour of this document and the implementations it names — do not silently change UX without deciding here first.
 
 ---
 
-## Mouse buttons
+## Execution order (why timing matters)
 
-| Situation | Camera | Character facing | Cursor |
-|-----------|--------|-----------------|--------|
-| Nothing held | stationary | keeps own facing | visible, free |
-| LMB held + mouse still | stationary | keeps own facing | visible, free |
-| LMB held + mouse moving | orbits freely around character | keeps own facing (character does NOT rotate with camera) | hides while moving, reappears immediately on release |
-| RMB held + mouse still | stationary | keeps own facing | visible |
-| RMB held + mouse moving | rotates; character rotates with it (AlwaysFaceYaw=true) | follows camera yaw | hides while moving, reappears immediately on release |
-| Both LMB+RMB held | same as RMB + auto-forward | follows camera yaw | hides while rotating |
-
-**Cursor hide rule**: cursor hides only when the mouse has moved past the drag threshold (~20 px) while a button is held. It reappears **immediately** when the button is released, not on the next click.
+- **`ThirdPersonOrbitCamera`**: `LateUpdate`, `[DefaultExecutionOrder(-50)]` — applies mouse deltas, orbit offset, **`MouseMode`**, **`Yaw`**, drag (**`IsLmbDragging`**), **`ManageCursor`**. With default order **`0`** on **`PlayerMovement`**, runs **before** that script’s **`LateUpdate`** each frame so **`Yaw`** / **`MouseMode`** are stable for visuals.
+- **`KeyboardInputSource`**: **`Update`** — reads **`ThirdPersonOrbitCamera.Yaw`** and derives **`AlwaysFaceYaw`**, **`MoveAxes`** (both-buttons auto-forward, etc.).
+- **`FusionInputProvider.OnInput`** — samples **`IInputSource`** once per Fusion tick (`MoveAxes`, **`LookYaw`**, **`AlwaysFaceYaw`**, buttons).
+- **`PlayerMovement`**: **`FixedUpdateNetwork`** (state authority only) — **`CharacterController.Move`**, planar facing from **`GameplayInput`**.
+- **`PlayerMovement`** also uses **`LateUpdate`** on the **local input authority**: applies visual rotation from **`ThirdPersonOrbitCamera.Yaw`** when RMB/strafe/key rules require instant feedback between ticks (`AlwaysFaceYaw` / mouse mode mirrored from **`KeyboardInputSource`** + **`MouseMode`**).
+- **`TargetingController`**: **`Update`** — LMB release runs **before** the camera clears **`IsLmbDragging`** in **`LateUpdate`**, so a click vs orbit-drag is read correctly **the same frame**.
 
 ---
 
-## Keyboard
+## Mouse: camera yaw vs orbit offset
 
-| Key | Action |
-|-----|--------|
-| W / Up arrow | move forward |
-| S / Down arrow | move backward |
-| A | strafe left (always, no mode toggle) |
-| D | strafe right (always, no mode toggle) |
-| Q / Left arrow | rotate camera left; character follows (AlwaysFaceYaw=true) |
-| E / Right arrow | rotate camera right; character follows (AlwaysFaceYaw=true) |
-| Space | jump |
-| 1 / 2 / 3 | cast Spell1 / Spell2 / Spell3 |
-| R | randomise character colour (debug) |
+The camera exposes **`Yaw`** = character-facing yaw (**`_charYaw`**). LMB-only orbit adds **`_orbitOffset`** so horizontal mouse moves rotate the lens **without** rotating the character (**`Yaw`** unchanged by LMB deltas).
 
-**AlwaysFaceYaw** is set when: RMB held, Q/E/arrows rotating, or A/D strafing.
-It is NOT set when only LMB is held (camera orbits but character keeps own facing).
+On **first RMB press this hold**, **`_orbitOffset`** is folded into **`_charYaw`** and reset so the avatar snaps to where the lens was pointing (WoW RMB pickup).
+
+Horizontal mouse deltas while **either** LMB or RMB is held tilt pitch and apply yaw either to **`_orbitOffset`** (LMB only) or **`_charYaw`** (RMB or both).
 
 ---
 
-## Target selection
+## Mouse modes (`CameraMouseMode`)
+
+| Held | Rotation | **`AlwaysFaceYaw` context** (see Keyboard) |
+|------|-----------|--------------------------------------------|
+| None | Keyboard Q/E/arrows rotate **`Yaw`** via **`AddYaw`**. Mouse alone does nothing. | Off unless keys/strafe (below). |
+| **LMB only** | Orbit: **`_orbitOffset`** from mouse **`_charYaw`** unchanged **by LMB**. | Typically off when only LMB (**see strafe exception**). |
+| **RMB only** | Free-look: **`_charYaw`** from mouse. | **On** → move/facing tied to **`LookYaw`**. |
+| **Both** | Same rotation as **RMB**; **`KeyboardInputSource`** forces forward movement (auto-run). | **On**. |
+
+Scroll wheel adjusts orbit distance clamped **[ `_minDistance`, `_maxDistance` ]**.
+
+Serialized drag threshold (**`_dragThresholdPixels`**, default ~**20**) is accumulated **per button press** using **`delta.magnitude`** (LMB tracked for targeting; **`IsRmbDragging`** is tracked internally but **not** used for the cursor gate below).
+
+---
+
+## Cursor lock / visibility (**`ThirdPersonOrbitCamera.ManageCursor`**)
+
+Implementations MUST match:
+
+- **RMB held** (includes **both** buttons): cursor **locked + hidden immediately**, even when the mouse is still.
+- **LMB held**: cursor stays **visible and unlocked** until **`IsLmbDragging`** becomes true (**accumulated** LMB drag &gt; threshold this press). After that it stays locked while LMB remains held (even if the mouse stops), so orbit feels like RMB once drag has begun.
+- **Neither** LMB nor **RMB** requires lock (`ManageCursor(false)` branch): **`Cursor.lockState = None`**, **`visible = true`**.
+
+**Targeting depends on LMB leaving the cursor free until orbit-drag is acknowledged** — **`TargetingController`** raycasts **`Mouse.current.position`** on LMB **release** when **`!IsLmbDragging`**. Do **not** lock on bare LMB press.
+
+---
+
+## Keyboard (`KeyboardInputSource`)
+
+| Input | Behaviour |
+|-------|-----------|
+| **W / S / Up / Down** | Forward / back (**Y** axis of **`MoveAxes`**). |
+| **A / D** | Strafe (**X**). |
+| **Q / E / ← / →** | Rotate camera: **`ThirdPersonOrbitCamera.AddYaw`**, unless **LMB-only** mode then **`AddCharYawKeepCamera`** (turn body, keep lens world-angle). |
+| **Both LMB+RMB** | **`MoveAxes.y`** clamped so forward is applied (effectively press **W** as well). |
+| **Space**, **1/2/3**, **R** | Edge-triggered consumes for jump / spells / colour (see **`FusionInputProvider`**). |
+
+**`AlwaysFaceYaw`** is **`true`** when **any** of: **RMB** or **Both** mouse modes; **Q/E/arrows** held; **A/D** strafe active (**so strafes keep body aligned with **`LookYaw`**, WoW-like**). It is **`false`** for **pure LMB orbit** without strafe/Q/E/arrows/RMB — then movement-facing uses **character forward** (**`FixedUpdateNetwork`**) instead of **`LookYaw`**.
+
+**`LookYaw`** written each **`Update`** = **`ThirdPersonOrbitCamera.Yaw`**.
+
+---
+
+## Character controller (**`PlayerMovement`**)
+
+Runs only with **state authority** and alive, non-casting (when **`NetworkCombatController.IsCasting`**).
+
+- Builds planar move vector from **`GameplayInput.Move`**.
+- **`AlwaysFaceYaw` set →** move relative to **`LookYaw`** quaternion; **clear →** relative to planar **character forward**.
+- Applies jump edge + gravity · **`CharacterController.Move`** inside **`Runner.DeltaTime`**.
+- **`AlwaysFaceYaw` set →** **`transform.forward`** aligns to **`LookYaw`** in **ticks** as well (**`LateUpdate`** on owner smooths/strafes+RMB visually).
+
+Changing this contract requires checking **orbit strafe**, **RMB pickups**, **LMB orbit without body snap**, and **cursor + click targeting**.
+
+---
+
+## Target selection (local)
 
 | Action | Result |
 |--------|--------|
-| Tab | cycle through alive Targetable objects (skip local player) |
-| LMB quick click (no drag) on Targetable | select that target |
-| LMB click on empty space / non-targetable | keep current target (WoW classic) |
-| Escape | clear target |
+| **Tab** | Cycle alive **`Targetable`**, skip local player. |
+| **LMB** release **without** drag (**`!IsLmbDragging`**) | Raypick from cursor through **`Camera.main`**; Fusion **`PhysicsScene`** first, **`Physics`** fallback — select **`Targetable`** or leave selection unchanged if miss/non-target (**WoW-ish**). |
+| **Escape** | Clear selection. |
 
-**Implementation notes**:
-- Raycast uses `runner.GetPhysicsScene()` first (Fusion objects), then `Physics.Raycast` fallback (floor etc.)
-- Drag threshold 20 px; if dragged, release does NOT fire the raycast
-- TargetingController.Update reads IsLmbDragging; ThirdPersonOrbitCamera.LateUpdate clears it on release — order guarantees correct read before clear
+**Drag rule**: LMB movement **beyond** **`_dragThresholdPixels`** ⇒ **`IsLmbDragging`**; release does **not** fire the picker.
+
+---
+
+## File map
+
+| Component | Scripts |
+|-----------|---------|
+| Lens & cursor | **`ThirdPersonOrbitCamera`** |
+| Local intents | **`KeyboardInputSource`**, **`TargetingController`** |
+| Tick input | **`FusionInputProvider`**, **`GameplayInput`** |
+| Body | **`PlayerMovement`** + **`CharacterController`** |
