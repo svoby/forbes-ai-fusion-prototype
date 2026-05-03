@@ -192,6 +192,14 @@ public class NetworkCombatController : NetworkBehaviour {
 
   /// <summary>Converts seconds to tick count using the runner's fixed tick rate.</summary>
   int SecsToTicks(float seconds) {
-    return Mathf.CeilToInt(seconds * Runner.TickRate);
+    return SecsToTicks(Runner.TickRate, seconds);
+  }
+
+  /// <summary>
+  /// Pure tick-rounding helper exposed for EditMode tick-math tests. Must match
+  /// the instance overload above exactly: gameplay timers depend on it.
+  /// </summary>
+  internal static int SecsToTicks(int tickRate, float seconds) {
+    return Mathf.CeilToInt(seconds * tickRate);
   }
 }

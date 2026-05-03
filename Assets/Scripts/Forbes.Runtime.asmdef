@@ -1,0 +1,17 @@
+{
+    "name": "Forbes.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "Fusion.Unity",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

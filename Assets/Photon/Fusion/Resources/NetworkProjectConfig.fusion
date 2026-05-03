@@ -64,6 +64,7 @@
     },
     "AssembliesToWeave": [
         "Fusion.Unity",
+        "Forbes.Runtime",
         "Assembly-CSharp",
         "Assembly-CSharp-firstpass",
         "Fusion.Addons.Physics",
