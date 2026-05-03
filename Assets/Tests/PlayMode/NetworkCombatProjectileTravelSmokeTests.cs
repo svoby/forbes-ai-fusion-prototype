@@ -232,6 +232,81 @@ namespace Forbes.Tests.PlayMode {
 
     [UnityTest]
     [Timeout(120000)]
+    public IEnumerator ProjectileSpell_CasterDiesBeforeImpact_PendingImpactCleared_TargetUnharmed() {
+      var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
+      var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
+      Assert.IsNotNull(playerPrefab);
+      Assert.IsNotNull(dummyPrefab);
+
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        var runner = _session.Runner;
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+
+        var spawnPlayer = new Vector3(-2f, 1f, 0f);
+        var spawnDummy  = new Vector3(6f, 0f, 6f);
+        var spawnFlags  = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+
+        yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
+          runner, playerPrefab, spawnPlayer, Quaternion.identity, spawnFlags, o => _player = o);
+        runner.SetPlayerObject(runner.LocalPlayer, _player);
+
+        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
+          runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
+
+        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
+          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
+        }
+
+        if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
+          mobNt.DisableSharedModeInterpolation = true;
+        }
+
+        yield return FusionPlayModeTestHelpers.WaitFrames(3);
+
+        Assert.IsTrue(_player.TryGetComponent(out NetworkCombatController combat));
+        Assert.IsTrue(_player.TryGetComponent(out Health playerHealth));
+        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
+
+        playerHealth.AuthorityApplyStartingHealthIfUnset();
+        dummyHealth.AuthorityApplyStartingHealthIfUnset();
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+
+        float startDummyHp  = dummyHealth.NetworkedHealth;
+        float startPlayerHp = playerHealth.NetworkedHealth;
+
+        // Fire Fireball (cast-time projectile) so a pending impact is scheduled.
+        _session.InputRelay.TargetNetworkId = _dummy.Id;
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => combat.PendingImpactSpellId != 0, 1200,
+          messageOnFail:
+          $"Fireball pending not scheduled ticks={runner.Tick} casting={combat.CurrentSpellId} end={combat.CastEndTick}");
+
+        int impactTick = combat.PendingImpactTick;
+
+        // Kill the caster while the projectile is in flight.
+        // TryCancelCast(Death) clears both cast state and pending impact.
+        playerHealth.DealDamageRpc(startPlayerHp + 100f);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => playerHealth.IsDead, 240,
+          messageOnFail: "Caster did not die after lethal DealDamageRpc.");
+
+        // Tick past where impact would have landed.
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => runner.Tick > impactTick + 2, 600,
+          messageOnFail: $"tick={runner.Tick} expected to pass impactTick={impactTick}");
+
+        Assert.AreEqual(0, combat.PendingImpactSpellId,
+          "Pending impact must be cleared when the caster dies.");
+        Assert.AreEqual(startDummyHp, dummyHealth.NetworkedHealth, 0.35f,
+          "Target must be undamaged: in-flight projectile abandoned on caster death.");
+        Assert.IsFalse(dummyHealth.IsDead,
+          "Target should be alive — no projectile damage was applied.");
+      }
+    }
+
+    [UnityTest]
+    [Timeout(120000)]
     public IEnumerator ProjectileSpell_TargetMovesOutOfCastRange_StillDamagedByNetworkId() {
       var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
       var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
