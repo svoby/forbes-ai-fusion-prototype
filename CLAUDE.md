@@ -1,46 +1,47 @@
 # Claude Project Context: Unity Fusion Prototype
 
-## Project Type
+## Project type
 Small multiplayer action-RPG style prototype (WoW-like basics).
 
 ## Stack
-- Unity (latest LTS)
+- Unity (LTS)
 - Photon Fusion
 - C#
 
-## Architecture Constraints
-- Gameplay state changes are authoritative on Host/State Authority.
-- Clients submit intent/input only.
-- Gameplay simulation runs in network ticks (`FixedUpdateNetwork`).
-- Keep gameplay logic out of render-only `Update`.
+## Architecture constraints
+- Gameplay state changes are authoritative on **Host / State Authority**.
+- Clients submit **input/intent** only; no client-authoritative combat outcomes.
+- Simulation in network ticks (`FixedUpdateNetwork`); keep gameplay out of render-only `Update`.
 
-## Current Feature Scope
-- Join room (host/client)
-- Spawn network players
-- Move and rotate player
-- Tab target selection
-- Instant spell damage
-- HP sync, death, respawn
-- Minimal UI (my HP, target HP)
+## Current feature scope
+- Join room (host/client); **networked player spawn, movement, look**.
+- **Health, death, respawn**; **Tab** targeting; spell damage on validated paths.
+- **Training dummy** with **`NetworkMobBrain`**: wander, **XZ facing**, **melee**, **aggro**, **chase**, **leash/return** (prototype; mob tick logic runs under state authority).
+- Minimal UI (HP, cast bar, target HP / world selected-target bar).
 
-## Explicit Non-Goals (for now)
-- Custom transport/reorder/loss logic
-- Full rollback/rewind implementation
-- Inventory, quests, persistence, complex AI
-- UI polish before core loop is stable
+## Testing
+- **EditMode (`Forbes.Tests.EditMode`):** pure logic, no runner (e.g. `NetworkMobBrainLogic`, combat validation, HUD math).
+- **PlayMode (`Forbes.Tests.PlayMode`):** Fusion **`GameMode.Single`** smokes; centralize coroutine helpers (`WaitUntil`, `WaitFrames`, `TeleportNetworkObjectForPlayModeSmokeTest`) in **`FusionPlayModeTestHelpers`** (avoid duplicate coroutine code in fixtures).
 
-## Test Checklist (always run)
-1. Two clients can connect to one room.
-2. Both players can move and see each other.
-3. Target selection works.
-4. Spell applies damage only with valid authority and range.
-5. Death and respawn are consistent.
+## Non-goals (for now)
+- Custom transport/reorder semantics, full rollback, inventory/quests/persistence, heavy AI polish.
 
-## Post-feature diff audit (multi-iteration work)
-When implementation took **multiple iterations** to get right, run a **mandatory diff audit** before considering the task complete. **Do not implement new behavior during the audit** — only classify, flag risk, and propose minimal cleanup.
+## Mandatory post-implementation diff audit
 
-- Compare final diff to the original ask; label changes **required** / **cleanup** / **suspicious** / **unrelated**.
-- Flag weakened tests, production-for-tests-only code, changed defaults, public API expansion, unrelated prefab/scene/meta changes, and **Fusion authority** issues.
-- Propose the **smallest safe cleanup**; unrelated changes should be reverted or split out.
+**Trigger:** Any feature that took **multiple fix iterations** before tests or behaviour stabilized.
+
+**Rule:** Before marking work complete, **stop and audit the final diff**. Passing tests alone are insufficient; the change set must be **clean and scoped**.
+
+The audit **must:**
+- Classify substantive changes as **required**, **cleanup**, **suspicious**, or **unrelated**.
+- **Not** add new behaviour during the audit — only analyse and recommend minimal cleanup.
+
+**Must flag:** weakened tests; production code added primarily for tests; changed serialized defaults; unnecessary **public API** growth; **duplicate test helpers**; accidental **prefab/scene/meta** edits; **Fusion authority** mistakes; **`FindObjectsByType` / full-scene scans on hot simulation paths**.
 
 Details: `.cursor/rules/post-feature-diff-audit.mdc`.
+
+## Manual smoke checklist
+1. Two clients in one room; both see movement.
+2. Target selection works.
+3. Spell damage respects authority and range.
+4. Death and respawn stay consistent host + client.

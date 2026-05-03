@@ -17,7 +17,7 @@ namespace Forbes.Tests.PlayMode {
     public void SetUp() {
       PlayModeTargetingCleanup.DestroyAutoCreatedTargetingSystem();
       _session = new FusionSinglePlayerTestSession();
-      _dummy = null;
+      _dummy   = null;
       _testCamera = null;
     }
 
@@ -60,7 +60,7 @@ namespace Forbes.Tests.PlayMode {
         var targeting = sysGo.AddComponent<TargetingController>();
         var healthBar = sysGo.AddComponent<SelectedTargetHealthBar>();
 
-        yield return WaitFrames(5);
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
 
         var spawnDummy = new Vector3(2f, 0f, 0f);
         var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
@@ -80,33 +80,37 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
         Assert.IsTrue(_dummy.TryGetComponent(out Targetable targetable));
         dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntil(
           () => _dummy.IsValid && Mathf.Approximately(dummyHealth.NetworkedHealth, dummyHealth.StartingHealth),
-          maxFrames: 480,
-          "Dummy HP settle.");
+          480,
+          messageOnFail: "Dummy HP settle.");
 
         InvokeSetTarget(targeting, targetable);
-        yield return WaitUntil(() => healthBar.IsBarVisible, maxFrames: 60, "Health bar should appear.");
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => healthBar.IsBarVisible, 60, messageOnFail: "Health bar should appear.");
 
         Assert.AreEqual(1f, healthBar.CurrentFill01, 0.04f);
 
         dummyHealth.DealDamageRpc(dummyHealth.StartingHealth * 0.5f);
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntil(
           () => Mathf.Abs(healthBar.CurrentFill01 - 0.5f) < 0.1f,
-          maxFrames: 180,
+          180,
+          messageOnFail:
           $"Fill ~0.5 (fill={healthBar.CurrentFill01} hp={dummyHealth.NetworkedHealth}).");
 
         Assert.IsTrue(healthBar.IsBarVisible);
 
         InvokeSetTarget(targeting, null);
-        yield return WaitUntil(() => !healthBar.IsBarVisible, maxFrames: 60, "Bar should hide when cleared.");
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => !healthBar.IsBarVisible, 60, messageOnFail: "Bar should hide when cleared.");
 
         InvokeSetTarget(targeting, targetable);
-        yield return WaitUntil(() => healthBar.IsBarVisible, maxFrames: 60);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => healthBar.IsBarVisible, 60);
 
         dummyHealth.DealDamageRpc(dummyHealth.StartingHealth * 2f);
-        yield return WaitUntil(() => dummyHealth.IsDead, maxFrames: 480);
-        yield return WaitUntil(() => !healthBar.IsBarVisible, maxFrames: 90, "Bar should hide for dead target.");
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => dummyHealth.IsDead, 480);
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => !healthBar.IsBarVisible, 90, messageOnFail: "Bar should hide for dead target.");
       }
     }
 
@@ -116,29 +120,6 @@ namespace Forbes.Tests.PlayMode {
         BindingFlags.Instance | BindingFlags.NonPublic);
       Assert.IsNotNull(mi);
       mi.Invoke(targeting, new object[] { target });
-    }
-
-    static IEnumerator WaitUntil(System.Func<bool> predicate, int maxFrames, string messageOnFail = null) {
-      int i = 0;
-      while (i < maxFrames && !predicate()) {
-        i++;
-        yield return new WaitForFixedUpdate();
-        yield return null;
-      }
-
-      if (predicate()) {
-        yield break;
-      }
-
-      string suffix = !string.IsNullOrEmpty(messageOnFail) ? " " + messageOnFail : "";
-      Assert.Fail($"Predicate not satisfied within {maxFrames} frames.{suffix}");
-    }
-
-    static IEnumerator WaitFrames(int count) {
-      for (var i = 0; i < count; i++) {
-        yield return new WaitForFixedUpdate();
-        yield return null;
-      }
     }
   }
 }

@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using Fusion;
 using NUnit.Framework;
@@ -13,15 +12,15 @@ namespace Forbes.Tests.PlayMode {
   [TestFixture]
   public class FusionHealthSmokeTests {
     FusionSinglePlayerTestSession _session;
-    NetworkObject _player;
-    NetworkObject _dummy;
+    NetworkObject                 _player;
+    NetworkObject                 _dummy;
 
     [SetUp]
     public void SetUp() {
       PlayModeTargetingCleanup.DestroyAutoCreatedTargetingSystem();
       _session = new FusionSinglePlayerTestSession();
-      _player = null;
-      _dummy = null;
+      _player  = null;
+      _dummy   = null;
     }
 
     [TearDown]
@@ -33,7 +32,7 @@ namespace Forbes.Tests.PlayMode {
     [Timeout(120000)]
     public IEnumerator FusionSingle_TrainingDummy_LethalDamage_RespawnsAtSpawnPosition() {
       var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
-      var dummyPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
+      var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
       Assert.IsNotNull(playerPrefab);
       Assert.IsNotNull(dummyPrefab);
 
@@ -42,10 +41,10 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         var runner = _session.Runner;
         Assert.IsNotNull(runner);
-        yield return WaitFrames(5);
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
 
         var spawnPlayer = new Vector3(-2f, 1f, 0f);
-        var spawnDummy = new Vector3(6f, 0f, -4f);
+        var spawnDummy  = new Vector3(6f, 0f, -4f);
 
         var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
 
@@ -72,23 +71,23 @@ namespace Forbes.Tests.PlayMode {
 
         playerHealth.AuthorityApplyStartingHealthIfUnset();
         dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return WaitFrames(5);
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
 
         playerHealth.AuthorityResetNetworkedHealthToStartingForTests();
 
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntil(
           () => _dummy.IsValid &&
                Mathf.Approximately(dummyHealth.NetworkedHealth, dummyHealth.StartingHealth),
-          maxFrames: 480,
-          "Dummy HP: " +
+          480,
+          messageOnFail: "Dummy HP: " +
           $"valid={_dummy.IsValid} hp={dummyHealth.NetworkedHealth} start={dummyHealth.StartingHealth} " +
           $"dead={dummyHealth.IsDead} sa={dummyHealth.HasStateAuthority}");
 
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntil(
           () => _player.IsValid &&
                Mathf.Approximately(playerHealth.NetworkedHealth, playerHealth.StartingHealth),
-          maxFrames: 480,
-          "Player HP: " +
+          480,
+          messageOnFail: "Player HP: " +
           $"valid={_player.IsValid} hp={playerHealth.NetworkedHealth} start={playerHealth.StartingHealth} " +
           $"dead={playerHealth.IsDead} sa={playerHealth.HasStateAuthority}");
 
@@ -99,49 +98,26 @@ namespace Forbes.Tests.PlayMode {
         float lethal = dummyHealth.StartingHealth + 25f;
         dummyHealth.DealDamageRpc(lethal);
 
-        yield return WaitUntil(() => dummyHealth.IsDead, maxFrames: 480);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => dummyHealth.IsDead, 480);
 
         Assert.IsTrue(dummyHealth.IsDead);
         Assert.AreEqual(0f, dummyHealth.NetworkedHealth, 1e-3f);
 
         int respawnDue = dummyHealth.RespawnAtTick;
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntil(
           () => !dummyHealth.IsDead,
-          maxFrames: 1200,
-          $"Respawn timeout: IsDead={dummyHealth.IsDead} hp={dummyHealth.NetworkedHealth} " +
+          1200,
+          messageOnFail: $"Respawn timeout: IsDead={dummyHealth.IsDead} hp={dummyHealth.NetworkedHealth} " +
           $"respawnAt={respawnDue} tick~={(int)runner.Tick} ticksExec={runner.TicksExecuted} sa={dummyHealth.HasStateAuthority}");
 
         Assert.IsFalse(dummyHealth.IsDead);
         Assert.AreEqual(dummyHealth.StartingHealth, dummyHealth.NetworkedHealth, 1e-3f);
 
-        yield return WaitFrames(48);
+        yield return FusionPlayModeTestHelpers.WaitFrames(48);
 
         float snapTol = 0.28f;
         Assert.LessOrEqual(Vector3.Distance(_dummy.transform.position, dummyHealth.SpawnPosition), snapTol,
           "Respawn should snap the dummy back to networked SpawnPosition.");
-      }
-    }
-
-    static IEnumerator WaitUntil(Func<bool> predicate, int maxFrames, string messageOnFail = null) {
-      int i = 0;
-      while (i < maxFrames && !predicate()) {
-        i++;
-        yield return new WaitForFixedUpdate();
-        yield return null;
-      }
-
-      if (predicate()) {
-        yield break;
-      }
-
-      string suffix = !string.IsNullOrEmpty(messageOnFail) ? " " + messageOnFail : "";
-      Assert.Fail($"Predicate not satisfied within {maxFrames} frames.{suffix}");
-    }
-
-    static IEnumerator WaitFrames(int count) {
-      for (var i = 0; i < count; i++) {
-        yield return new WaitForFixedUpdate();
-        yield return null;
       }
     }
   }

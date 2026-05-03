@@ -32,7 +32,7 @@ namespace Forbes.Tests.PlayMode {
 
       var sceneManager = _host.GetComponent<NetworkSceneManagerDefault>();
       var objectProvider = _host.GetComponent<NetworkObjectProviderDefault>();
-      // Global config uses PeerModes.Multiple; without Fusion's normal scene setup,
+      // PlayMode harness only (not production): Global config uses PeerModes.Multiple; without Fusion's normal scene setup,
       // SceneManager stays "busy" (no multi-peer roots). The default provider would then
       // return Retry forever and spawns stay Queued — PlayMode tests would hang/time out.
       objectProvider.DelayIfSceneManagerIsBusy = false;

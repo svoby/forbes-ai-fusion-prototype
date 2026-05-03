@@ -4,10 +4,12 @@ using Fusion;
 using NUnit.Framework;
 using Assert = NUnit.Framework.Assert;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Forbes.Tests.PlayMode {
   /// <summary>
   /// Ensures Fusion runner shutdown runs even when StartGame / assertions fail mid-test.
+  /// Shared polling/teleport coroutine helpers avoid copy-pasted <c>WaitUntil</c>/<c>WaitFrames</c> in PlayMode fixtures.
   /// </summary>
   internal static class FusionPlayModeTestHelpers {
     internal static IEnumerator RunWithFusionSession(FusionSinglePlayerTestSession session, Func<IEnumerator> body) {
@@ -77,6 +79,93 @@ namespace Forbes.Tests.PlayMode {
 
       if (otherFail != null) {
         throw otherFail;
+      }
+    }
+
+    /// <summary>
+    /// Polls until <paramref name="predicate"/> is true or <paramref name="maxFrames"/> steps elapse (fails the test).
+    /// </summary>
+    /// <param name="physicsThenRenderEachStep">
+    /// When true (default): <see cref="WaitForFixedUpdate"/> then <c>yield return null</c> per step (typical Fusion smoke).
+    /// When false: only <c>yield return null</c> (slower polling; used by movement smoke where timing matched this pattern).
+    /// </param>
+    internal static IEnumerator WaitUntil(
+      Func<bool> predicate,
+      int maxFrames,
+      bool physicsThenRenderEachStep = true,
+      string messageOnFail = null) {
+      int i = 0;
+      while (i < maxFrames && !predicate()) {
+        i++;
+        if (physicsThenRenderEachStep) {
+          yield return new WaitForFixedUpdate();
+        }
+
+        yield return null;
+      }
+
+      if (predicate()) {
+        yield break;
+      }
+
+      string suffix = !string.IsNullOrEmpty(messageOnFail) ? " " + messageOnFail : "";
+      Assert.Fail($"Predicate not satisfied within {maxFrames} frames.{suffix}");
+    }
+
+    /// <summary>Same as <see cref="WaitUntil"/> but builds the failure suffix lazily only on timeout.</summary>
+    internal static IEnumerator WaitUntilLazy(
+      Func<bool> predicate,
+      int maxFrames,
+      Func<string> buildFailureDetails,
+      bool physicsThenRenderEachStep = true) {
+      int i = 0;
+      while (i < maxFrames && !predicate()) {
+        i++;
+        if (physicsThenRenderEachStep) {
+          yield return new WaitForFixedUpdate();
+        }
+
+        yield return null;
+      }
+
+      if (predicate()) {
+        yield break;
+      }
+
+      string extra = buildFailureDetails != null ? " " + buildFailureDetails() : "";
+      Assert.Fail($"Predicate not satisfied within {maxFrames} frames.{extra}");
+    }
+
+    /// <seealso cref="WaitUntil(Func{bool},int,bool,string)"/>
+    internal static IEnumerator WaitFrames(int count, bool physicsThenRenderEachStep = true) {
+      for (var i = 0; i < count; i++) {
+        if (physicsThenRenderEachStep) {
+          yield return new WaitForFixedUpdate();
+        }
+
+        yield return null;
+      }
+    }
+
+    /// <summary>
+    /// PlayMode-only positioning: expects this runner to hold <b>state authority</b> on <paramref name="obj"/>
+    /// (e.g. <see cref="NetworkSpawnFlags.SharedModeStateAuthLocalPlayer"/> in Single smoke). Uses
+    /// <see cref="NetworkTransform.Teleport"/> when present; otherwise assigns <see cref="Transform"/> (caller must ensure that is valid).
+    /// </summary>
+    internal static void TeleportNetworkObjectForPlayModeSmokeTest(NetworkObject obj, Vector3 worldPos) {
+      Quaternion rot = Quaternion.identity;
+      if (obj.TryGetComponent<CharacterController>(out var cc)) {
+        cc.enabled = false;
+      }
+
+      if (obj.TryGetComponent<NetworkTransform>(out var nt) && nt.HasStateAuthority) {
+        nt.Teleport(worldPos, rot);
+      } else {
+        obj.transform.SetPositionAndRotation(worldPos, rot);
+      }
+
+      if (obj.TryGetComponent<CharacterController>(out var cc2)) {
+        cc2.enabled = true;
       }
     }
 
@@ -159,7 +248,8 @@ namespace Forbes.Tests.PlayMode {
     }
 
     /// <summary>
-    /// Wander off, no melee: keeps <see cref="NetworkMobBrain"/> enabled so Fusion still ticks sibling <see cref="Health"/>.
+    /// PlayMode/smoke helper: disables wander and combat via serialized tuning only.
+    /// Keeps <see cref="NetworkMobBrain"/> enabled so Fusion still ticks sibling <see cref="Health"/> (respawn/melee sibling tests rely on this).
     /// </summary>
     internal static void PinMobBrainNoCombat(NetworkMobBrain brain) {
       if (brain == null) {

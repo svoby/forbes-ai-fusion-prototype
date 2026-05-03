@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using Fusion;
 using NUnit.Framework;
@@ -9,6 +8,7 @@ using UnityEngine.TestTools;
 namespace Forbes.Tests.PlayMode {
   /// <summary>
   /// Verifies authority wander ticks produce non-zero displacement (via replicated transform).
+  /// Uses <see cref="FusionPlayModeTestHelpers.WaitUntil"/> with <c>physicsThenRenderEachStep: false</c> to match prior timing.
   /// </summary>
   [TestFixture]
   public class NetworkMobBrainMovementSmokeTests {
@@ -48,45 +48,30 @@ namespace Forbes.Tests.PlayMode {
 
         var brain = dummy.GetComponent<NetworkMobBrain>();
         Assert.IsNotNull(brain);
-        brain.WanderRadius = 26f;
-        brain.MoveSpeed = 14f;
-        brain.MinLegDistance = 12f;
+        brain.WanderRadius     = 26f;
+        brain.MoveSpeed        = 14f;
+        brain.MinLegDistance   = 12f;
         brain.ArrivalThreshold = 0.18f;
-        brain.IdleTicksMin = 1;
-        brain.IdleTicksMax = 3;
+        brain.IdleTicksMin     = 1;
+        brain.IdleTicksMax     = 3;
 
         if (dummy.TryGetComponent<NetworkTransform>(out var mobNt)) {
           mobNt.DisableSharedModeInterpolation = true;
         }
 
-        yield return WaitFrames(16);
+        yield return FusionPlayModeTestHelpers.WaitFrames(16, physicsThenRenderEachStep: false);
 
         Vector3 p0 = dummy.transform.position;
 
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntil(
           () => NetworkMobBrainLogic.HorizontalSqrDistance(p0, dummy.transform.position) > 0.12f * 0.12f,
-          maxFrames: 900);
+          900,
+          physicsThenRenderEachStep: false);
 
         Vector3 p1 = dummy.transform.position;
         Assert.IsTrue(
           NetworkMobBrainLogic.TryGetHorizontalDirection(p0, p1, out _),
           "expected non-zero horizontal travel for movement smoke test.");
-      }
-    }
-
-    static IEnumerator WaitUntil(Func<bool> predicate, int maxFrames) {
-      int i = 0;
-      while (i < maxFrames && !predicate()) {
-        i++;
-        yield return null;
-      }
-
-      Assert.IsTrue(predicate(), $"Predicate not satisfied within {maxFrames} frames.");
-    }
-
-    static IEnumerator WaitFrames(int count) {
-      for (var i = 0; i < count; i++) {
-        yield return null;
       }
     }
   }

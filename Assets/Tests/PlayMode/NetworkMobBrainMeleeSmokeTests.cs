@@ -14,8 +14,8 @@ namespace Forbes.Tests.PlayMode {
   [TestFixture]
   public class NetworkMobBrainMeleeSmokeTests {
     FusionSinglePlayerTestSession _session;
-    NetworkObject _victim;
-    NetworkObject _mob;
+    NetworkObject                   _victim;
+    NetworkObject                   _mob;
 
     [SetUp]
     public void SetUp() {
@@ -41,14 +41,14 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         NetworkRunner runner = _session.Runner;
         Assert.IsNotNull(runner);
-        yield return WaitFrames(5);
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
 
         // Spawn far apart first: mob melee (range 12) would kill the victim before HP settles, and then
         // AuthorityApplyStartingHealthIfUnset skips while IsDead && RespawnAtTick > 0.
-        var spawnMob = new Vector3(40f, 0f, 0f);
-        var spawnVictimFar = new Vector3(80f, 0f, 0f);
-        var meleeVictim = new Vector3(43f, 0f, 0f);
-        var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+        var spawnMob        = new Vector3(40f, 0f, 0f);
+        var spawnVictimFar  = new Vector3(80f, 0f, 0f);
+        var meleeVictim     = new Vector3(43f, 0f, 0f);
+        var spawnFlags      = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
 
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner,
@@ -80,15 +80,15 @@ namespace Forbes.Tests.PlayMode {
         var brain = _mob.GetComponent<NetworkMobBrain>();
         Assert.IsNotNull(brain);
 
-        yield return WaitFrames(6);
-        AuthorityTeleportTo(_mob, spawnMob);
-        AuthorityTeleportTo(_victim, spawnVictimFar);
+        yield return FusionPlayModeTestHelpers.WaitFrames(6);
+        FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_mob, spawnMob);
+        FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_victim, spawnVictimFar);
         brain.RefreshWanderOriginAuthority();
         if (_victim.TryGetComponent<NetworkMobBrain>(out var victimBrainForOrigin)) {
           victimBrainForOrigin.RefreshWanderOriginAuthority();
         }
 
-        yield return WaitFrames(4);
+        yield return FusionPlayModeTestHelpers.WaitFrames(4);
 
         Assert.IsTrue(brain.HasStateAuthority,
           "Mob must simulate on State Authority for tick melee.");
@@ -97,10 +97,10 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsTrue(_mob.TryGetComponent(out Health mobHealth));
         mobHealth.AuthorityApplyStartingHealthIfUnset();
         victimHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return WaitFrames(5);
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
 
         const float hpTol = 1.5f;
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntilLazy(
           () => _victim.IsValid &&
                _mob.IsValid &&
                victimHealth.Object != null &&
@@ -109,8 +109,8 @@ namespace Forbes.Tests.PlayMode {
                mobHealth.Object.IsValid &&
                Mathf.Abs(victimHealth.NetworkedHealth - victimHealth.StartingHealth) <= hpTol &&
                Mathf.Abs(mobHealth.NetworkedHealth - mobHealth.StartingHealth) <= hpTol,
-          maxFrames: 1200,
-          failureMessage: () =>
+          1200,
+          () =>
             $"HP not settled (tol={hpTol}). " +
             $"victimHP={victimHealth.NetworkedHealth} / {victimHealth.StartingHealth} sa={victimHealth.HasStateAuthority} " +
             $"dead={victimHealth.IsDead} respawnAt={victimHealth.RespawnAtTick} " +
@@ -118,36 +118,36 @@ namespace Forbes.Tests.PlayMode {
 
         // Snapshot HP before closing distance (mob attacks as soon as victim is in range).
         float victimHpBeforeMelee = victimHealth.NetworkedHealth;
-        float mobHpBeforeMelee = mobHealth.NetworkedHealth;
+        float mobHpBeforeMelee    = mobHealth.NetworkedHealth;
         Assert.GreaterOrEqual(victimHpBeforeMelee, victimHealth.StartingHealth - hpTol,
           "Victim should be at full HP before entering mob attack range.");
         Assert.GreaterOrEqual(mobHpBeforeMelee, mobHealth.StartingHealth - hpTol);
 
-        AuthorityTeleportTo(_victim, meleeVictim);
+        FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_victim, meleeVictim);
         brain.RefreshWanderOriginAuthority();
         if (_victim.TryGetComponent<NetworkMobBrain>(out var victimBrainAfterMeleeMove)) {
           victimBrainAfterMeleeMove.RefreshWanderOriginAuthority();
         }
 
-        yield return WaitFrames(4);
+        yield return FusionPlayModeTestHelpers.WaitFrames(4);
 
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntilLazy(
           () => _victim.IsValid &&
                _mob.IsValid &&
                NetworkMobBrainLogic.IsWithinHorizontalRange(
                  _mob.transform.position,
                  _victim.transform.position,
                  brain.AttackRange),
-          maxFrames: 480,
-          failureMessage: () =>
+          480,
+          () =>
             $"Expected mob/victim within melee (range={brain.AttackRange}). " +
             $"mob={_mob.transform.position} victim={_victim.transform.position} " +
             $"hzDist={Mathf.Sqrt(NetworkMobBrainLogic.HorizontalSqrDistance(_mob.transform.position, _victim.transform.position)):F3}");
 
-        yield return WaitUntil(
+        yield return FusionPlayModeTestHelpers.WaitUntilLazy(
           () => _victim.IsValid && victimHealth.NetworkedHealth < victimHpBeforeMelee - 0.5f,
-          maxFrames: 900,
-          failureMessage: () =>
+          900,
+          () =>
             $"Victim HP did not drop (beforeMelee={victimHpBeforeMelee}, now={victimHealth.NetworkedHealth}, dead={victimHealth.IsDead}). " +
             $"mobAuth={brain.HasStateAuthority} inRange=" +
             $"{NetworkMobBrainLogic.IsWithinHorizontalRange(_mob.transform.position, _victim.transform.position, brain.AttackRange)}");
@@ -157,9 +157,9 @@ namespace Forbes.Tests.PlayMode {
           "Mob should not damage its own Health.");
 
         victimHealth.DealDamageRpc(victimHealth.StartingHealth + 50f);
-        yield return WaitUntil(() => victimHealth.IsDead, maxFrames: 480);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => victimHealth.IsDead, 480);
         float hpWhenDead = victimHealth.NetworkedHealth;
-        yield return WaitFrames(90);
+        yield return FusionPlayModeTestHelpers.WaitFrames(90);
         Assert.AreEqual(hpWhenDead, victimHealth.NetworkedHealth, 1e-3f);
         Assert.AreEqual(mobHpBeforeMelee, mobHealth.NetworkedHealth, 1e-2f,
           "Mob HP should be unchanged after victim lethal (no self-damage).");
@@ -171,55 +171,15 @@ namespace Forbes.Tests.PlayMode {
         return;
       }
 
-      brain.WanderRadius = 0f;
-      brain.MoveSpeed = 0f;
-      brain.MinLegDistance = 0f;
-      brain.IdleTicksMin = 1;
-      brain.IdleTicksMax = 1;
-      brain.AttackRange = 12f;
-      brain.AggroRadius = 12f;
-      brain.AttackDamage = 6f;
+      brain.WanderRadius          = 0f;
+      brain.MoveSpeed             = 0f;
+      brain.MinLegDistance        = 0f;
+      brain.IdleTicksMin          = 1;
+      brain.IdleTicksMax          = 1;
+      brain.AttackRange           = 12f;
+      brain.AggroRadius           = 12f;
+      brain.AttackDamage          = 6f;
       brain.AttackIntervalSeconds = 0.05f;
-    }
-
-    static void AuthorityTeleportTo(NetworkObject obj, Vector3 worldPos) {
-      Quaternion rot = Quaternion.identity;
-      if (obj.TryGetComponent<CharacterController>(out var cc)) {
-        cc.enabled = false;
-      }
-
-      if (obj.TryGetComponent<NetworkTransform>(out var nt) && nt.HasStateAuthority) {
-        nt.Teleport(worldPos, rot);
-      } else {
-        obj.transform.SetPositionAndRotation(worldPos, rot);
-      }
-
-      if (obj.TryGetComponent<CharacterController>(out var cc2)) {
-        cc2.enabled = true;
-      }
-    }
-
-    static IEnumerator WaitUntil(Func<bool> predicate, int maxFrames, Func<string> failureMessage = null) {
-      int i = 0;
-      while (i < maxFrames && !predicate()) {
-        i++;
-        yield return new WaitForFixedUpdate();
-        yield return null;
-      }
-
-      if (predicate()) {
-        yield break;
-      }
-
-      string extra = failureMessage != null ? " " + failureMessage() : "";
-      Assert.Fail($"Predicate not satisfied within {maxFrames} frames.{extra}");
-    }
-
-    static IEnumerator WaitFrames(int count) {
-      for (var i = 0; i < count; i++) {
-        yield return new WaitForFixedUpdate();
-        yield return null;
-      }
     }
   }
 }
