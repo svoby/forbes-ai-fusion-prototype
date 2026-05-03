@@ -98,7 +98,7 @@ public class TargetingController : MonoBehaviour {
 
     // Tab: cycle to next alive target.
     if (kb != null && kb.tabKey.wasPressedThisFrame) {
-      Debug.Log("[TargetingController] Tab pressed.");
+      ForbesLog.Targeting("Tab pressed.");
       CycleTarget();
     }
 
@@ -110,7 +110,7 @@ public class TargetingController : MonoBehaviour {
     // LMB release without drag: raycast select.
     if (mouse != null && mouse.leftButton.wasReleasedThisFrame) {
       bool dragged = _camera != null && _camera.IsLmbDragging;
-      Debug.Log($"[TargetingController] LMB released. dragged={dragged}  IsLmbDragging={(_camera != null ? _camera.IsLmbDragging.ToString() : "camera=null")}");
+      ForbesLog.Targeting($"LMB released. dragged={dragged}  IsLmbDragging={(_camera != null ? _camera.IsLmbDragging.ToString() : "camera=null")}");
       if (!dragged) {
         TrySelectFromScreenRay();
       }
@@ -123,21 +123,21 @@ public class TargetingController : MonoBehaviour {
     _tabScratch.Clear();
 
     var allTargetables = Object.FindObjectsByType<Targetable>(FindObjectsInactive.Exclude);
-    Debug.Log($"[TargetingController] CycleTarget: found {allTargetables.Length} Targetable(s) in scene.");
+    ForbesLog.Targeting($"CycleTarget: found {allTargetables.Length} Targetable(s) in scene.");
 
     foreach (var t in allTargetables) {
       var pm = t.GetComponent<PlayerMovement>();
       if (pm != null && pm.HasInputAuthority) {
-        Debug.Log($"[TargetingController]   Skipping '{t.name}' (local player).");
+        ForbesLog.Targeting($"  Skipping '{t.name}' (local player).");
         continue;
       }
 
       if (t.TryGetComponent(out Health h) && h.IsDead) {
-        Debug.Log($"[TargetingController]   Skipping '{t.name}' (dead).");
+        ForbesLog.Targeting($"  Skipping '{t.name}' (dead).");
         continue;
       }
 
-      Debug.Log($"[TargetingController]   Candidate: '{t.DisplayName}'");
+      ForbesLog.Targeting($"  Candidate: '{t.DisplayName}'");
       _tabScratch.Add(t);
     }
 
@@ -205,19 +205,19 @@ public class TargetingController : MonoBehaviour {
       hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
     }
 
-    Debug.Log($"[TargetingController] Raycast screen={screenPos} cam={cam.transform.position:F1} hit={hitSomething} runner={((_runner != null && _runner.IsRunning) ? "OK" : "none")}");
+    ForbesLog.Targeting($"Raycast screen={screenPos} cam={cam.transform.position:F1} hit={hitSomething} runner={((_runner != null && _runner.IsRunning) ? "OK" : "none")}");
 
     if (hitSomething) {
       Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
-      Debug.Log($"[TargetingController]   Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}'");
+      ForbesLog.Targeting($"  Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}'");
       var hit = hitInfo.collider.GetComponentInParent<Targetable>();
-      Debug.Log($"[TargetingController]   Targetable: {(hit != null ? hit.DisplayName : "NULL")}");
+      ForbesLog.Targeting($"  Targetable: {(hit != null ? hit.DisplayName : "NULL")}");
       if (hit != null) {
         SetTarget(hit);
       }
     } else {
       Debug.DrawRay(ray.origin, ray.direction * _maxRaycastDistance, Color.red, 1f);
-      Debug.Log("[TargetingController]   Raycast missed all colliders.");
+      ForbesLog.Targeting("  Raycast missed all colliders.");
     }
   }
 
@@ -241,7 +241,7 @@ public class TargetingController : MonoBehaviour {
 
     _currentTarget = t;
     string label = t != null ? t.DisplayName : "none";
-    Debug.Log($"[TargetingController] Target -> '{label}'");
+    ForbesLog.Targeting($"Target -> '{label}'");
 
     if (TargetHighlight.Instance != null) {
       TargetHighlight.Instance.SetTarget(t);
