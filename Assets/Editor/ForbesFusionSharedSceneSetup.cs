@@ -24,6 +24,7 @@ public static class ForbesFusionSharedSceneSetup {
   public static void ApplyFullCombatSetup() {
     // Ensure networking objects exist in the scene first.
     FusionSceneSetupAssistants.AddNetworkingToScene();
+    EnsureFusionBootstrapMenuVisible();
 
     EnsureFloor();
     EnsureRunnerComponents();
@@ -46,6 +47,7 @@ public static class ForbesFusionSharedSceneSetup {
   [MenuItem("GameObject/Fusion/Scene/Setup + Floor + Player Spawner (tutorial 2)", false, 105)]
   public static void SetupSharedModeScene() {
     FusionSceneSetupAssistants.AddNetworkingToScene();
+    EnsureFusionBootstrapMenuVisible();
     EnsureFloor();
     EnsureRunnerComponents();
     EnsureTargetHighlight();
@@ -72,6 +74,23 @@ public static class ForbesFusionSharedSceneSetup {
     CheckerboardFloor.Create();
     var created = GameObject.Find(CheckerboardFloor.ParentName);
     if (created != null) Undo.RegisterCreatedObjectUndo(created, "Create Checkerboard Floor");
+  }
+
+  /// <summary>
+  /// Fusion sometimes saves <see cref="FusionBootstrap"/> / <see cref="FusionBootstrapDebugGUI"/> disabled;
+  /// then Host/Client IMGUI never runs until something re-enables the component (e.g. F1).
+  /// </summary>
+  static void EnsureFusionBootstrapMenuVisible() {
+    foreach (var bootstrap in Object.FindObjectsByType<FusionBootstrap>(FindObjectsInactive.Include)) {
+      if (bootstrap == null) continue;
+      Undo.RecordObject(bootstrap, "Enable FusionBootstrap");
+      bootstrap.enabled = true;
+      var gui = bootstrap.GetComponent<FusionBootstrapDebugGUI>();
+      if (gui != null) {
+        Undo.RecordObject(gui, "Enable FusionBootstrapDebugGUI");
+        gui.enabled = true;
+      }
+    }
   }
 
   static void EnsureRunnerComponents() {

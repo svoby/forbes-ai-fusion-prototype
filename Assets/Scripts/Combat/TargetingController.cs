@@ -13,6 +13,7 @@ using UnityEngine.InputSystem;
 ///   <item>Tab — cycles through alive <see cref="Targetable"/> objects (closest-first), skipping the local player.</item>
 ///   <item>LMB click (no drag) — raycasts for a <see cref="Targetable"/>; selects it or keeps current if miss.</item>
 ///   <item>Escape — clears target.</item>
+///   <item>Current target clears automatically when they die (including during respawn delay).</item>
 /// </list>
 /// </para>
 /// </summary>
@@ -62,6 +63,8 @@ public class TargetingController : MonoBehaviour {
     }
 
     EnsureCamera();
+
+    ClearCurrentTargetIfDead();
 
     var kb    = Keyboard.current;
     var mouse = Mouse.current;
@@ -192,6 +195,17 @@ public class TargetingController : MonoBehaviour {
   }
 
   // ---- Target management ----
+
+  /// <summary>Drops selection when the target has <see cref="Health"/> and is dead (replicated on clients).</summary>
+  void ClearCurrentTargetIfDead() {
+    if (_currentTarget == null) {
+      return;
+    }
+
+    if (_currentTarget.TryGetComponent(out Health health) && health.IsDead) {
+      SetTarget(null);
+    }
+  }
 
   void SetTarget(Targetable t) {
     if (_currentTarget == t) {

@@ -6,6 +6,14 @@ using System.Diagnostics;
 /// All call sites compile out when the symbol is not defined.
 /// </summary>
 public static class ForbesLog {
+  /// <summary>
+  /// Always logs (not gated by <c>FORBES_LOG</c>). Use for one-off diagnostics and throttle
+  /// at call sites — helpful when Editor scripting defines omit <c>FORBES_LOG</c> but Standalone has it.
+  /// </summary>
+  public static void Diag(string channel, string message, UnityEngine.Object context = null) {
+    UnityEngine.Debug.Log($"[ForbesDiag.{channel}] {message}", context);
+  }
+
   [Conditional("FORBES_LOG")]
   public static void Net(string message, UnityEngine.Object context = null) {
     UnityEngine.Debug.Log("[ForbesNet] " + message, context);

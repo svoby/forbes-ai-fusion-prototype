@@ -1,3 +1,5 @@
+using System.Text;
+using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -41,6 +43,10 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   float _lmbDragAccum;
   float _rmbDragAccum;
 
+  int  _diagNoTargetFrames;
+  bool _loggedTargetOnce;
+  bool _loggedMouseNullOnce;
+
   /// <summary>
   /// Character-facing yaw in world-space degrees.
   /// Q/E keyboard rotation and RMB drag modify this.
@@ -71,86 +77,112 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     }
 
     cam.gameObject.AddComponent<ThirdPersonOrbitCamera>();
-    Debug.Log("[ThirdPersonOrbitCamera] Auto-added to Main Camera. Run 'Tools/Fusion/Scene/Apply Full Combat Setup' to persist this.");
+    ForbesLog.Diag("Camera", "Auto-added ThirdPersonOrbitCamera to Main Camera (scene had none).");
   }
 
   void Awake() {
     _distance = _startDistance;
+    bool isMain = gameObject.CompareTag("MainCamera");
+    ForbesLog.Diag("Camera", $"Awake on '{gameObject.name}' CompareTag(MainCamera)={isMain}", this);
   }
 
   void LateUpdate() {
     if (_target == null) {
+      _loggedTargetOnce = false;
       TryFindLocalPlayer();
       if (_target == null) {
+        _diagNoTargetFrames++;
+        if (_diagNoTargetFrames == 1 || _diagNoTargetFrames % 90 == 0) {
+          LogNoFollowTargetDiag();
+        }
         return;
       }
     }
 
+    _diagNoTargetFrames = 0;
+
+    if (!_loggedTargetOnce) {
+      _loggedTargetOnce = true;
+      string mainCamName = Camera.main != null ? Camera.main.name : "NULL";
+      ForbesLog.Diag("Camera", $"Follow target ok name={_target.name} pos={_target.position:F2} mainCam={mainCamName}", this);
+    }
+
+    // Follow + look-at must run even when Mouse.current is null (input device not ready yet,
+    // remote session, etc.). Previously we returned here and the lens never left the scene default.
     var mouse = Mouse.current;
-    if (mouse == null) {
-      return;
-    }
+    bool lmb = false;
+    bool rmb = false;
 
-    bool lmb = mouse.leftButton.isPressed;
-    bool rmb = mouse.rightButton.isPressed;
+    if (mouse != null) {
+      _loggedMouseNullOnce = false;
+      lmb = mouse.leftButton.isPressed;
+      rmb = mouse.rightButton.isPressed;
 
-    // Accumulate LMB drag pixels so TargetingController can tell click apart from drag.
-    if (mouse.leftButton.wasPressedThisFrame) {
-      _lmbDragAccum = 0f;
-      IsLmbDragging = false;
-    }
-    if (lmb) {
-      _lmbDragAccum += mouse.delta.ReadValue().magnitude;
-      if (_lmbDragAccum > _dragThresholdPixels) IsLmbDragging = true;
-    }
-    // Reset on release (runs in LateUpdate, AFTER TargetingController.Update read the flag).
-    if (mouse.leftButton.wasReleasedThisFrame) IsLmbDragging = false;
-
-    if (mouse.rightButton.wasPressedThisFrame) {
-      _rmbDragAccum = 0f;
-      IsRmbDragging = false;
-      // Snap character yaw to current camera angle so the player immediately
-      // faces where the camera is pointing (WoW RMB behaviour).
-      _charYaw    += _orbitOffset;
-      _orbitOffset = 0f;
-    }
-    if (rmb) {
-      _rmbDragAccum += mouse.delta.ReadValue().magnitude;
-      if (_rmbDragAccum > _dragThresholdPixels) IsRmbDragging = true;
-    }
-    if (mouse.rightButton.wasReleasedThisFrame) IsRmbDragging = false;
-
-    MouseMode = (lmb, rmb) switch {
-      (true, true)   => CameraMouseMode.Both,
-      (false, true)  => CameraMouseMode.Right,
-      (true, false)  => CameraMouseMode.Left,
-      _              => CameraMouseMode.None,
-    };
-
-    // Cursor: lock on RMB (free look). LMB keeps cursor until actual orbit drag crosses threshold — otherwise click-target raycasts still see the real mouse position.
-    ManageCursor(rmb || (lmb && IsLmbDragging));
-
-    // Mouse rotation — LMB and RMB do different things:
-    //   LMB only  → orbit camera around character; _orbitOffset changes, _charYaw untouched.
-    //   RMB only  → rotate character; _charYaw changes, camera follows.
-    //   Both      → same as RMB (auto-forward + character rotation).
-    if (lmb || rmb) {
-      var delta = mouse.delta.ReadValue();
-      _pitch -= delta.y * _sensitivity;
-      _pitch  = Mathf.Clamp(_pitch, _minPitch, _maxPitch);
-
-      if (lmb && !rmb) {
-        _orbitOffset += delta.x * _sensitivity;   // camera orbits, character stays
-      } else {
-        _charYaw     += delta.x * _sensitivity;   // character (and camera) rotate
+      // Accumulate LMB drag pixels so TargetingController can tell click apart from drag.
+      if (mouse.leftButton.wasPressedThisFrame) {
+        _lmbDragAccum = 0f;
+        IsLmbDragging = false;
       }
-    }
+      if (lmb) {
+        _lmbDragAccum += mouse.delta.ReadValue().magnitude;
+        if (_lmbDragAccum > _dragThresholdPixels) IsLmbDragging = true;
+      }
+      // Reset on release (runs in LateUpdate, AFTER TargetingController.Update read the flag).
+      if (mouse.leftButton.wasReleasedThisFrame) IsLmbDragging = false;
 
-    // Scroll-wheel zoom. scroll.y is ~120 units per notch in the new Input System.
-    float scroll = mouse.scroll.ReadValue().y;
-    if (Mathf.Abs(scroll) > 0.01f) {
-      _distance -= scroll * _zoomSpeed;
-      _distance  = Mathf.Clamp(_distance, _minDistance, _maxDistance);
+      if (mouse.rightButton.wasPressedThisFrame) {
+        _rmbDragAccum = 0f;
+        IsRmbDragging = false;
+        // Snap character yaw to current camera angle so the player immediately
+        // faces where the camera is pointing (WoW RMB behaviour).
+        _charYaw    += _orbitOffset;
+        _orbitOffset = 0f;
+      }
+      if (rmb) {
+        _rmbDragAccum += mouse.delta.ReadValue().magnitude;
+        if (_rmbDragAccum > _dragThresholdPixels) IsRmbDragging = true;
+      }
+      if (mouse.rightButton.wasReleasedThisFrame) IsRmbDragging = false;
+
+      MouseMode = (lmb, rmb) switch {
+        (true, true)   => CameraMouseMode.Both,
+        (false, true)  => CameraMouseMode.Right,
+        (true, false)  => CameraMouseMode.Left,
+        _              => CameraMouseMode.None,
+      };
+
+      // Cursor: lock on RMB (free look). LMB keeps cursor until actual orbit drag crosses threshold — otherwise click-target raycasts still see the real mouse position.
+      ManageCursor(rmb || (lmb && IsLmbDragging));
+
+      // Mouse rotation — LMB and RMB do different things:
+      //   LMB only  → orbit camera around character; _orbitOffset changes, _charYaw untouched.
+      //   RMB only  → rotate character; _charYaw changes, camera follows.
+      //   Both      → same as RMB (auto-forward + character rotation).
+      if (lmb || rmb) {
+        var delta = mouse.delta.ReadValue();
+        _pitch -= delta.y * _sensitivity;
+        _pitch  = Mathf.Clamp(_pitch, _minPitch, _maxPitch);
+
+        if (lmb && !rmb) {
+          _orbitOffset += delta.x * _sensitivity;   // camera orbits, character stays
+        } else {
+          _charYaw     += delta.x * _sensitivity;   // character (and camera) rotate
+        }
+      }
+
+      // Scroll-wheel zoom. scroll.y is ~120 units per notch in the new Input System.
+      float scroll = mouse.scroll.ReadValue().y;
+      if (Mathf.Abs(scroll) > 0.01f) {
+        _distance -= scroll * _zoomSpeed;
+        _distance  = Mathf.Clamp(_distance, _minDistance, _maxDistance);
+      }
+    } else {
+      MouseMode = CameraMouseMode.None;
+      ManageCursor(false);
+      if (!_loggedMouseNullOnce) {
+        _loggedMouseNullOnce = true;
+        ForbesLog.Diag("Camera", "Mouse.current is NULL — orbit/scroll skipped; camera follow still runs. (Input System device not paired yet?)", this);
+      }
     }
 
     // Position camera behind and above the pivot.
@@ -203,5 +235,46 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
         return;
       }
     }
+  }
+
+  void LogNoFollowTargetDiag() {
+    var pms  = Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude);
+    var cols = new StringBuilder(384);
+    cols.Append("NO_FOLLOW_TARGET frame=").Append(Time.frameCount)
+      .Append(" t=").Append(Time.time.ToString("F2"))
+      .Append(" PlayerMovement count=").Append(pms.Length);
+
+    NetworkRunner runningRunner = null;
+    foreach (var r in Object.FindObjectsByType<NetworkRunner>(FindObjectsInactive.Exclude)) {
+      if (r != null && r.IsRunning) {
+        runningRunner = r;
+        break;
+      }
+    }
+
+    if (runningRunner == null) {
+      cols.Append(" | NetworkRunner: none running — spusť Host/Client z Fusion-bootstrap UI (F1 toggles HUD).");
+    } else {
+      cols.Append(" | runner OK LocalPlayer=").Append(runningRunner.LocalPlayer.ToString());
+      if (runningRunner.TryGetPlayerObject(runningRunner.LocalPlayer, out var lp) && lp != null) {
+        cols.Append(" SetPlayerObject=").Append(lp.name);
+      } else {
+        cols.Append(" SetPlayerObject=NOT_SET");
+      }
+    }
+
+    for (int i = 0; i < pms.Length; i++) {
+      var pm = pms[i];
+      cols.Append(" |[").Append(i).Append(']').Append(pm.name)
+        .Append(" In=").Append(pm.HasInputAuthority)
+        .Append(" St=").Append(pm.HasStateAuthority);
+      if (pm.Object != null && pm.Object.IsValid) {
+        cols.Append(" NetIn=").Append(pm.Object.InputAuthority.ToString());
+      }
+    }
+
+    cols.Append(" | Mouse=").Append(Mouse.current != null ? "ok" : "NULL");
+    cols.Append(" CamMain=").Append(Camera.main != null ? Camera.main.name : "NULL");
+    ForbesLog.Diag("Camera", cols.ToString(), this);
   }
 }

@@ -4,12 +4,12 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Attached to the NetworkRunner GameObject by the scene setup tool.
-/// Auto-hides the Fusion bootstrap debug HUD once the network session is running,
-/// then lets the user toggle it with F1.
+/// Keeps the Fusion bootstrap debug HUD visible until the local player has joined
+/// (<see cref="NetworkRunner.TryGetPlayerObject"/> for <see cref="NetworkRunner.LocalPlayer"/>),
+/// then auto-hides so the play view is clean. F1 toggles the HUD any time afterward.
 ///
-/// The HUD must remain enabled at startup so FusionBootstrapDebugGUI.OnGUI can
-/// call StartMultipleSharedClients / StartGame. We hide it only after the runner
-/// reports IsRunning = true.
+/// The bootstrap <see cref="FusionBootstrapDebugGUI"/> must stay enabled at least until Host/Client
+/// can be used from OnGUI. Scenes sometimes serialize it disabled; <see cref="Awake"/> forces it on.
 /// </summary>
 [DisallowMultipleComponent]
 public class FusionHudToggle : MonoBehaviour {
@@ -17,13 +17,27 @@ public class FusionHudToggle : MonoBehaviour {
   NetworkRunner            _runner;
   bool                     _autoHidden;
 
+  void Awake() {
+    // Scene (or prior session) may serialize FusionBootstrapDebugGUI disabled — without OnGUI,
+    // Host/Client never appear. Force-enable until we intentionally auto-hide after join.
+    if (_runner == null) _runner = GetComponent<NetworkRunner>();
+    if (_hud == null) _hud = Object.FindAnyObjectByType<FusionBootstrapDebugGUI>(FindObjectsInactive.Include);
+    if (_hud != null) {
+      _hud.enabled = true;
+    }
+  }
+
   void Update() {
     if (_runner == null) _runner = GetComponent<NetworkRunner>();
     if (_hud == null)    _hud    = Object.FindAnyObjectByType<FusionBootstrapDebugGUI>(FindObjectsInactive.Include);
     if (_hud == null)    return;
 
-    // Hide once the session is live (lets OnGUI trigger StartGame first).
-    if (!_autoHidden && _runner != null && _runner.IsRunning) {
+    // Hide only after we're in-session *and* the local player object exists (post-join / post-spawn).
+    if (!_autoHidden
+        && _runner != null
+        && _runner.IsRunning
+        && _runner.TryGetPlayerObject(_runner.LocalPlayer, out var localObj)
+        && localObj != null) {
       _hud.enabled = false;
       _autoHidden  = true;
     }
