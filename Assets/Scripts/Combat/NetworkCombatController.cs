@@ -150,6 +150,8 @@ public class NetworkCombatController : NetworkBehaviour {
     if (reason == CastCancelReason.Death) {
       bool log = IsCasting;
       ClearCastState();
+      // Death clears both cast state and any in-flight pending impact: the
+      // projectile is abandoned and the target will not be damaged.
       ClearPendingImpact();
       if (log) {
         ForbesLog.Net($"Cast cancelled: {reason}", this);
@@ -157,6 +159,10 @@ public class NetworkCombatController : NetworkBehaviour {
       return;
     }
 
+    // Non-Death cancellations (Movement, Jump, NewSpell, InvalidTarget) clear
+    // cast state only — not pending impact. Cancellation fires before
+    // ResolveCast, so no pending impact has been scheduled yet; movement
+    // cannot cancel a projectile already in flight.
     if (!IsCasting) {
       return;
     }
@@ -274,9 +280,18 @@ public class NetworkCombatController : NetworkBehaviour {
     PendingImpactTick    = 0;
   }
 
+  // SpellTravelLogic takes int tickRate; RoundToInt matches the precision
+  // used by SecsToTicks (CeilToInt on float). At 60 Hz both are equal.
   int TickRateRounded => Mathf.RoundToInt(Runner.TickRate);
 
+  // ONE-SLOT MODEL: only one pending impact at a time. Safe with the current
+  // spell table because the only projectile spell (Fireball) is cast-time and
+  // its impact always fires before a second cast could complete. If an instant
+  // projectile spell is ever added, upgrade to a small queue (NetworkLinkedList).
   void SchedulePendingImpact(byte spellId, NetworkId targetId, int impactTick) {
+    if (PendingImpactSpellId != 0) {
+      ForbesLog.Net($"SchedulePendingImpact: overwriting pending impact spellId={PendingImpactSpellId} — one-slot limit.", this);
+    }
     PendingImpactSpellId = spellId;
     PendingImpactTarget  = targetId;
     PendingImpactTick    = impactTick;
@@ -285,6 +300,9 @@ public class NetworkCombatController : NetworkBehaviour {
     }
   }
 
+  // Impact validates only existence and liveness — not range or LoS.
+  // Once scheduled, a projectile tracks the target by NetworkId only.
+  // Covered by smoke: ProjectileSpell_TargetMovesOutOfCastRange_StillDamagedByNetworkId.
   void TryResolvePendingImpact() {
     if (PendingImpactSpellId == 0) {
       return;
