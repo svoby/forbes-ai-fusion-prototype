@@ -15,7 +15,7 @@ public enum CameraMouseMode { None, Left, Right, Both }
 ///   <item>Both held: RMB behaviour + <see cref="KeyboardInputSource"/> forces auto-forward.</item>
 /// </list>
 /// Drag detection (<see cref="IsLmbDragging"/>) lets <see cref="TargetingController"/> distinguish
-/// a LMB click (target select) from a LMB drag (camera orbit).
+/// a LMB click (target select) from a LMB drag (camera orbit). Cursor hides during RMB held, or during LMB orbit once drag passes the pixel threshold (so clicks still raycast freely).
 /// Execution order -50 guarantees LateUpdate runs before PlayerMovement (default 0) so
 /// MouseMode and Yaw are always current when the character applies its facing.
 /// </summary>
@@ -55,7 +55,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   /// <summary>True once the LMB has been dragged past the pixel threshold; resets on release.</summary>
   public bool IsLmbDragging { get; private set; }
 
-  /// <summary>True once the RMB has moved past the drag threshold this press (used for cursor locking).</summary>
+  /// <summary>True once the RMB has moved past the drag threshold this press (mirrors LMB; cursor locks on RMB press regardless).</summary>
   bool IsRmbDragging { get; set; }
 
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -127,11 +127,8 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
       _              => CameraMouseMode.None,
     };
 
-    // Cursor rules (WoW-style):
-    //   LMB orbit  — cursor stays VISIBLE so click-targeting still works on release.
-    //   RMB held   — cursor hides+locks immediately (free-look mode).
-    //   Release    — always restore cursor.
-    ManageCursor(rmb);
+    // Cursor: lock on RMB (free look). LMB keeps cursor until actual orbit drag crosses threshold — otherwise click-target raycasts still see the real mouse position.
+    ManageCursor(rmb || (lmb && IsLmbDragging));
 
     // Mouse rotation — LMB and RMB do different things:
     //   LMB only  → orbit camera around character; _orbitOffset changes, _charYaw untouched.
