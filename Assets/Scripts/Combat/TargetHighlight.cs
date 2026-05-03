@@ -4,7 +4,8 @@ using UnityEngine;
 /// Renders a golden selection ring under the locally selected target.
 /// Attach to a dedicated scene GameObject (not on the target itself).
 /// <see cref="TargetingController"/> calls <see cref="SetTarget"/> when selection changes.
-/// Uses a <see cref="LineRenderer"/> in a circle pattern — no custom shaders required.
+/// When no target is selected the <see cref="LineRenderer"/> is disabled; the GameObject stays active
+/// so siblings on <c>[TargetingSystem]</c> (e.g. <see cref="TargetingController"/>, <see cref="SelectedTargetHealthBar"/>) keep receiving Unity events.
 /// </summary>
 [RequireComponent(typeof(LineRenderer))]
 public class TargetHighlight : MonoBehaviour {
@@ -23,7 +24,9 @@ public class TargetHighlight : MonoBehaviour {
     _instance = this;
     _ring = GetComponent<LineRenderer>();
     BuildRing();
-    gameObject.SetActive(false);
+    // Do not deactivate this GameObject: <c>[TargetingSystem]</c> also hosts
+    // <see cref="TargetingController"/> and <see cref="SelectedTargetHealthBar"/>, which must keep running.
+    _ring.enabled = false;
   }
 
   void OnDestroy() {
@@ -34,12 +37,16 @@ public class TargetHighlight : MonoBehaviour {
 
   public void SetTarget(Targetable t) {
     _target = t != null ? t.transform : null;
-    gameObject.SetActive(_target != null);
+    if (_ring != null) {
+      _ring.enabled = _target != null;
+    }
   }
 
   void LateUpdate() {
     if (_target == null) {
-      gameObject.SetActive(false);
+      if (_ring != null) {
+        _ring.enabled = false;
+      }
       return;
     }
 

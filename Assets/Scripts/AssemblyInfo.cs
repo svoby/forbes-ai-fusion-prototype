@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 // (NetworkCombatController.SecsToTicks) and any future internal seams stay
 // reachable without widening their visibility for production callers.
 [assembly: InternalsVisibleTo("Forbes.Tests.EditMode")]
+[assembly: InternalsVisibleTo("Forbes.Tests.PlayMode")]

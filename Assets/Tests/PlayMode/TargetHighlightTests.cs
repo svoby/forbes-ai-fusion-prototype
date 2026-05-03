@@ -25,12 +25,12 @@ namespace Forbes.Tests.PlayMode {
     }
 
     [UnityTest]
-    public IEnumerator AfterAwake_GameObject_IsInactive() {
+    public IEnumerator AfterAwake_RingRenderer_IsDisabled() {
       _go = new GameObject(nameof(TargetHighlight));
       _go.AddComponent<LineRenderer>();
       _go.AddComponent<TargetHighlight>();
       yield return null;
-      Assert.IsFalse(_go.activeSelf);
+      Assert.IsFalse(_go.GetComponent<LineRenderer>().enabled);
     }
 
     [UnityTest]
@@ -46,7 +46,7 @@ namespace Forbes.Tests.PlayMode {
         var targetable = targetGo.AddComponent<Targetable>();
 
         highlight.SetTarget(targetable);
-        Assert.IsTrue(_go.activeSelf);
+        Assert.IsTrue(_go.GetComponent<LineRenderer>().enabled);
 
         yield return null;
         yield return null;
@@ -62,9 +62,9 @@ namespace Forbes.Tests.PlayMode {
     }
 
     [Test]
-    public void SetTarget_Null_DeactivatesImmediately() {
+    public void SetTarget_Null_DisablesRingImmediately() {
       _go = new GameObject(nameof(TargetHighlight));
-      _go.AddComponent<LineRenderer>();
+      var lr = _go.AddComponent<LineRenderer>();
       var highlight = _go.AddComponent<TargetHighlight>();
 
       var targetGo = new GameObject("Target");
@@ -72,9 +72,9 @@ namespace Forbes.Tests.PlayMode {
       var targetable = targetGo.AddComponent<Targetable>();
       try {
         highlight.SetTarget(targetable);
-        Assert.IsTrue(_go.activeSelf);
+        Assert.IsTrue(lr.enabled);
         highlight.SetTarget(null);
-        Assert.IsFalse(_go.activeSelf);
+        Assert.IsFalse(lr.enabled);
       } finally {
         Object.DestroyImmediate(targetGo);
       }

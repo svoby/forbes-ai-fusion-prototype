@@ -74,6 +74,8 @@ namespace Forbes.Tests.PlayMode {
         dummyHealth.AuthorityApplyStartingHealthIfUnset();
         yield return WaitFrames(5);
 
+        playerHealth.AuthorityResetNetworkedHealthToStartingForTests();
+
         yield return WaitUntil(
           () => _dummy.IsValid &&
                Mathf.Approximately(dummyHealth.NetworkedHealth, dummyHealth.StartingHealth),

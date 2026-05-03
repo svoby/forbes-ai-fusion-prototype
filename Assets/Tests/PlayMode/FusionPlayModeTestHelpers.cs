@@ -37,26 +37,32 @@ namespace Forbes.Tests.PlayMode {
       }
 
       if (assertionFail == null && otherFail == null) {
-        IEnumerator inner = body();
-        bool innerDone = false;
-        while (!innerDone) {
-          bool hasNext;
-          try {
-            hasNext = inner.MoveNext();
-          } catch (AssertionException ex) {
-            assertionFail = ex;
-            break;
-          } catch (Exception ex) {
-            otherFail = ex;
-            break;
-          }
+        bool prevSuppress = TargetingController.SuppressLocalSelectionInputInTests;
+        TargetingController.SuppressLocalSelectionInputInTests = true;
+        try {
+          IEnumerator inner = body();
+          bool innerDone = false;
+          while (!innerDone) {
+            bool hasNext;
+            try {
+              hasNext = inner.MoveNext();
+            } catch (AssertionException ex) {
+              assertionFail = ex;
+              break;
+            } catch (Exception ex) {
+              otherFail = ex;
+              break;
+            }
 
-          if (!hasNext) {
-            innerDone = true;
-            break;
-          }
+            if (!hasNext) {
+              innerDone = true;
+              break;
+            }
 
-          yield return inner.Current;
+            yield return inner.Current;
+          }
+        } finally {
+          TargetingController.SuppressLocalSelectionInputInTests = prevSuppress;
         }
       }
 

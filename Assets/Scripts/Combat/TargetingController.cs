@@ -33,11 +33,17 @@ public class TargetingController : MonoBehaviour {
       ? _currentTarget.NetworkObject.Id
       : default;
 
+  /// <summary>
+  /// When true, Tab / Escape / LMB target selection is skipped (PlayMode tests only).
+  /// Prevents editor/hardware input from re-selecting after reflection-driven <c>SetTarget</c>.
+  /// </summary>
+  internal static bool SuppressLocalSelectionInputInTests { get; set; }
+
   // ---- Auto-bootstrap ----
 
   /// <summary>
-  /// Creates a TargetingController (and its TargetHighlight sibling) automatically
-  /// at scene load if one doesn't already exist.
+  /// Creates a TargetingController, target highlight, and selected-target world health bar automatically
+  /// at scene load if none exists.
   /// </summary>
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
   static void AutoCreate() {
@@ -49,6 +55,7 @@ public class TargetingController : MonoBehaviour {
     go.AddComponent<LineRenderer>();    // must be before TargetHighlight.Awake
     go.AddComponent<TargetHighlight>();
     go.AddComponent<TargetingController>();
+    go.AddComponent<SelectedTargetHealthBar>();
     Debug.Log("[TargetingController] Auto-created TargetingSystem. Run 'Apply Full Combat Setup' to persist.");
   }
 
@@ -65,6 +72,10 @@ public class TargetingController : MonoBehaviour {
     EnsureCamera();
 
     ClearCurrentTargetIfDead();
+
+    if (SuppressLocalSelectionInputInTests) {
+      return;
+    }
 
     var kb    = Keyboard.current;
     var mouse = Mouse.current;

@@ -35,3 +35,12 @@ Small multiplayer action-RPG style prototype (WoW-like basics).
 3. Target selection works.
 4. Spell applies damage only with valid authority and range.
 5. Death and respawn are consistent.
+
+## Post-feature diff audit (multi-iteration work)
+When implementation took **multiple iterations** to get right, run a **mandatory diff audit** before considering the task complete. **Do not implement new behavior during the audit** — only classify, flag risk, and propose minimal cleanup.
+
+- Compare final diff to the original ask; label changes **required** / **cleanup** / **suspicious** / **unrelated**.
+- Flag weakened tests, production-for-tests-only code, changed defaults, public API expansion, unrelated prefab/scene/meta changes, and **Fusion authority** issues.
+- Propose the **smallest safe cleanup**; unrelated changes should be reverted or split out.
+
+Details: `.cursor/rules/post-feature-diff-audit.mdc`.

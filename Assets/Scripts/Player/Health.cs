@@ -78,6 +78,17 @@ public class Health : NetworkBehaviour {
     _applyStartingHealthIfUnsetDue = true;
   }
 
+  /// <summary>
+  /// State authority only. Restores <see cref="NetworkedHealth"/> to <see cref="StartingHealth"/> while alive (PlayMode smoke stability).
+  /// </summary>
+  internal void AuthorityResetNetworkedHealthToStartingForTests() {
+    if (!HasStateAuthority || IsDead) {
+      return;
+    }
+
+    NetworkedHealth = StartingHealth;
+  }
+
   public override void FixedUpdateNetwork() {
     if (!HasStateAuthority) {
       return;

@@ -201,7 +201,9 @@ public class NetworkMobBrain : NetworkBehaviour {
 
     if (NetworkMobBrainLogic.TryGetHorizontalDirection(pos, _spawnPosition, out var dirR)) {
       transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirR, transform.rotation);
-      float speed = Mathf.Max(0f, MoveSpeed);
+      // Wander uses MoveSpeed; chase uses ChaseSpeed. When MoveSpeed is zeroed to pin wander (tests / dummies),
+      // return must still use a positive speed — take the max so leash-return matches chase mobility.
+      float speed = Mathf.Max(Mathf.Max(0f, MoveSpeed), Mathf.Max(0f, ChaseSpeed));
       Vector3 planarR = dirR * (speed * dt);
       _controller.Move(planarR + _velocity * dt);
     } else {
