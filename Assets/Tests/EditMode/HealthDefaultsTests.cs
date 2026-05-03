@@ -41,7 +41,7 @@ namespace Forbes.Tests.EditMode {
         BindingFlags.Public | BindingFlags.Instance);
       Assert.IsNotNull(ev, "Health.IsDeadChanged event was renamed or removed.");
       Assert.AreEqual(typeof(Action<bool>), ev.EventHandlerType,
-        "Health.IsDeadChanged signature drifted from Action<bool>; HealthView/FacingIndicator subscribers will break.");
+        "Health.IsDeadChanged signature drifted from Action<bool>; HealthView subscribers will break.");
     }
 
     [TestCase("NetworkedHealth", typeof(float))]

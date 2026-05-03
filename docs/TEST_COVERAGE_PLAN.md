@@ -77,7 +77,7 @@ Constants are inlined: `PlayerSpeed = 10f`, `JumpForce = 5f`, `GravityValue = -9
 
 [`CombatHud`](../Assets/Scripts/UI/CombatHud.cs) is IMGUI on the runner GameObject. Each frame it reads:
 `runner.TryGetPlayerObject(LocalPlayer)` → `Health` for self HP and `NetworkCombatController` for cast bar (`IsCasting`, `CastProgress`, `CurrentSpellId`), GCD remaining (`GcdEndTick - Runner.Tick`), per-spell CDs, and `LastFailReason` (visible for 2 s).
-[`HealthView`](../Assets/Scripts/Player/HealthView.cs) subscribes to `Health.IsDeadChanged` and toggles a `MeshRenderer`. [`FacingIndicator`](../Assets/Scripts/Player/FacingIndicator.cs) subscribes to the same event to hide eyes on death.
+[`HealthView`](../Assets/Scripts/Player/HealthView.cs) subscribes to `Health.IsDeadChanged` and toggles every `Renderer` under the character root (body + prefab children such as “eyes”).
 
 ---
 
@@ -109,8 +109,7 @@ Constants are inlined: `PlayerSpeed = 10f`, `JumpForce = 5f`, `GravityValue = -9
 ### P1 — should add next (component scope)
 - `TargetableTests` (PlayMode) — `DisplayName` fallback to `gameObject.name`; respects serialised override.
 - `TargetHighlightTests` (PlayMode) — `Awake` deactivates; `SetTarget(t)` activates and tracks; `SetTarget(null)` deactivates.
-- `HealthViewTests` (PlayMode) — toggling `Health.IsDeadChanged` flips `MeshRenderer.enabled`; `OnDisable` unsubscribes.
-- `FacingIndicatorTests` (PlayMode) — eyes spawned in `Start`; hidden on death event.
+- `HealthViewTests` (PlayMode) — toggling `Health.IsDeadChanged` flips all `Renderer.enabled` in the hierarchy; `OnDisable` unsubscribes.
 - `KeyboardInputSourceConsumeTests` (PlayMode) — exercises only the `IInputSource` Consume* contract through a `FakeInputSource` test double, since the real one reads `Keyboard.current`.
 - `FusionInputProviderTests` (PlayMode, no runner) — feed a `FakeInputSource` + a tiny `TargetingController` substitute and assert the `GameplayInput` written to `NetworkInput` (this needs a small seam — see F).
 
@@ -139,7 +138,6 @@ Create only when implementing tests (this plan does not author them):
 - `Assets/Tests/PlayMode/TargetableTests.cs`
 - `Assets/Tests/PlayMode/TargetHighlightTests.cs`
 - `Assets/Tests/PlayMode/HealthViewTests.cs`
-- `Assets/Tests/PlayMode/FacingIndicatorTests.cs`
 - `Assets/Tests/PlayMode/KeyboardInputSourceConsumeTests.cs`
 - `Assets/Tests/PlayMode/FusionInputProviderTests.cs`
 - `Assets/Tests/PlayMode/FusionVerticalSliceSmokeTests.cs`
@@ -189,12 +187,8 @@ Note: the current public signature requires a `NetworkRunner`. These tests assum
 ### `HealthViewTests.cs` (PlayMode)
 - Given a `GameObject` with `Health` + `HealthView` + `MeshRenderer`, when invoking `Health.IsDeadChanged?.Invoke(true)` via reflection, then `_renderer.enabled == false`.
 - Given the same after `IsDeadChanged?.Invoke(false)`, then `_renderer.enabled == true`.
+- Given a child `MeshRenderer` under the same root, when `Invoke(true)`, then it is disabled together with the root renderer.
 - Given a disabled `HealthView`, when raising `IsDeadChanged`, then no exception is raised and the renderer state is untouched (handler unsubscribed in `OnDisable`).
-
-### `FacingIndicatorTests.cs` (PlayMode)
-- Given a `GameObject` with `CharacterController` + `FacingIndicator`, when `Start` runs, then exactly two `Eye_L` and `Eye_R` child GameObjects exist with no Collider.
-- Given the same after firing `Health.IsDeadChanged?.Invoke(true)`, then both eyes are `SetActive(false)`.
-- Given a fall-back path with no `CharacterController`, when `Start` runs, then eyes use the standard 2 m capsule defaults (assert positions are within tolerance of `(±0.15, 1.64, 0.45)` derived from defaults).
 
 ### `KeyboardInputSourceConsumeTests.cs` (PlayMode, via `FakeInputSource`)
 - Given a `FakeInputSource` with `_pendingSpell1 = true`, when calling `ConsumeSpell1` once, then result is true.
@@ -250,7 +244,6 @@ Assets/Tests/
     ├── TargetableTests.cs
     ├── TargetHighlightTests.cs
     ├── HealthViewTests.cs
-    ├── FacingIndicatorTests.cs
     ├── KeyboardInputSourceConsumeTests.cs
     ├── FusionInputProviderTests.cs
     └── FusionVerticalSliceSmokeTests.cs

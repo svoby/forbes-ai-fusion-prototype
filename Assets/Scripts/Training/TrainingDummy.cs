@@ -21,9 +21,5 @@ public class TrainingDummy : MonoBehaviour {
     if (GetComponent<Targetable>() == null) {
       gameObject.AddComponent<Targetable>();
     }
-
-    if (GetComponent<FacingIndicator>() == null) {
-      gameObject.AddComponent<FacingIndicator>();
-    }
   }
 }
