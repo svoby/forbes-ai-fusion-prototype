@@ -353,20 +353,6 @@ public static class ForbesFusionSharedSceneSetup {
     nameTxt.alignment = TextAnchor.MiddleCenter;
     nameTxt.text = "";
 
-    var timerGo = new GameObject("Timer");
-    Undo.RegisterCreatedObjectUndo(timerGo, "CastBar Timer");
-    timerGo.transform.SetParent(panel.transform, false);
-    var timerRt = timerGo.AddComponent<RectTransform>();
-    timerRt.anchorMin = new Vector2(1f, 0f);
-    timerRt.anchorMax = new Vector2(1f, 0f);
-    timerRt.pivot = new Vector2(1f, 0f);
-    timerRt.anchoredPosition = new Vector2(-14f, 18f);
-    timerRt.sizeDelta = new Vector2(132f, 36f);
-    var timerTxt = timerGo.AddComponent<Text>();
-    CastBarView.StyleHudText(timerTxt, uiFont, 20, FontStyle.Bold, new Color(0.95f, 0.95f, 0.95f));
-    timerTxt.alignment = TextAnchor.MiddleRight;
-    timerTxt.text = "";
-
     var trackGo = new GameObject("FillTrack");
     Undo.RegisterCreatedObjectUndo(trackGo, "CastBar FillTrack");
     trackGo.transform.SetParent(panel.transform, false);
@@ -374,8 +360,8 @@ public static class ForbesFusionSharedSceneSetup {
     trackRt.anchorMin = new Vector2(0f, 0f);
     trackRt.anchorMax = new Vector2(1f, 0f);
     trackRt.pivot = new Vector2(0.5f, 0f);
-    trackRt.anchoredPosition = new Vector2(-58f, 20f);
-    trackRt.sizeDelta = new Vector2(-156f, 30f);
+    trackRt.anchoredPosition = new Vector2(0f, 20f);
+    trackRt.sizeDelta = new Vector2(-24f, 30f);
     var trackImg = trackGo.AddComponent<Image>();
     trackImg.sprite = white;
     trackImg.color = new Color(0.06f, 0.06f, 0.08f, 1f);
@@ -394,7 +380,7 @@ public static class ForbesFusionSharedSceneSetup {
     fillImg.fillAmount = 0f;
 
     var view = canvasGo.AddComponent<CastBarView>();
-    view.BindUi(panelGroup, fillImg, nameTxt, timerTxt);
+    view.BindUi(panelGroup, fillImg, nameTxt);
     view.StampLayoutVersion(CastBarView.CurrentHudLayoutVersion);
 
     EditorUtility.SetDirty(view);

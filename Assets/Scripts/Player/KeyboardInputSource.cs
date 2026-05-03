@@ -88,7 +88,13 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
     // -- Strafe: A / D always strafe regardless of mouse mode --
     float moveX = (kb.dKey.isPressed ? 1f : 0f) - (kb.aKey.isPressed ? 1f : 0f);
 
-    MoveAxes = new Vector2(moveX, moveY);
+    // Diagonal keyboard combos must not exceed unit length (classic √2 speed bug).
+    var axes = new Vector2(moveX, moveY);
+    if (axes.sqrMagnitude > 1f) {
+      axes.Normalize();
+    }
+
+    MoveAxes = axes;
 
     // -- Rotate camera: Q / E and ← / → arrow keys --
     bool turnLeft  = kb.qKey.isPressed || kb.leftArrowKey.isPressed;

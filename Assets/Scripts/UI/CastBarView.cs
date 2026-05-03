@@ -15,7 +15,7 @@ public class CastBarView : MonoBehaviour {
   public const string HudCanvasChildName = "ForbesHudCanvas";
 
   /// <summary>Bump when default HUD geometry changes so <see cref="EnsureForRunner"/> can rebuild stale UI.</summary>
-  public const int CurrentHudLayoutVersion = 4;
+  public const int CurrentHudLayoutVersion = 5;
 
   public const float CastBarPanelWidth   = 640f;
   public const float CastBarPanelHeight = 112f;
@@ -32,9 +32,6 @@ public class CastBarView : MonoBehaviour {
 
   [SerializeField] Text _spellNameText;
 
-  /// <summary>Optional right-side elapsed/total timer.</summary>
-  [SerializeField] Text _timerText;
-
   [SerializeField, Tooltip("Lerp speed for smoothing fill presentation only.")]
   float _fillSmoothSpeed = 12f;
 
@@ -48,11 +45,10 @@ public class CastBarView : MonoBehaviour {
   public bool UsesCurrentHudLayout => IsUiBound && _builtLayoutVersion >= CurrentHudLayoutVersion;
 
   /// <summary>Wires UI built in code or from the editor setup tool.</summary>
-  public void BindUi(CanvasGroup rootGroup, Image fillImage, Text spellNameText, Text timerText) {
+  public void BindUi(CanvasGroup rootGroup, Image fillImage, Text spellNameText) {
     _rootGroup      = rootGroup;
     _fillImage      = fillImage;
     _spellNameText  = spellNameText;
-    _timerText      = timerText;
   }
 
   public void StampLayoutVersion(int version) {
@@ -208,32 +204,14 @@ public class CastBarView : MonoBehaviour {
     nameTxt.alignment = TextAnchor.MiddleCenter;
     nameTxt.text      = "";
 
-    var timerGo = new GameObject("Timer");
-    timerGo.transform.SetParent(panel.transform, false);
-    var timerRt = timerGo.AddComponent<RectTransform>();
-    timerRt.anchorMin = new Vector2(1f, 0f);
-    timerRt.anchorMax = new Vector2(1f, 0f);
-    timerRt.pivot = new Vector2(1f, 0f);
-    timerRt.anchoredPosition = new Vector2(-14f, 18f);
-    timerRt.sizeDelta = new Vector2(132f, 36f);
-    var timerTxt = timerGo.AddComponent<Text>();
-    StyleHudText(
-      timerTxt,
-      uiFont,
-      20,
-      FontStyle.Bold,
-      new Color(0.95f, 0.95f, 0.95f));
-    timerTxt.alignment = TextAnchor.MiddleRight;
-    timerTxt.text       = "";
-
     var trackGo = new GameObject("FillTrack");
     trackGo.transform.SetParent(panel.transform, false);
     var trackRt = trackGo.AddComponent<RectTransform>();
     trackRt.anchorMin = new Vector2(0f, 0f);
     trackRt.anchorMax = new Vector2(1f, 0f);
     trackRt.pivot = new Vector2(0.5f, 0f);
-    trackRt.anchoredPosition = new Vector2(-58f, 20f);
-    trackRt.sizeDelta = new Vector2(-156f, 30f);
+    trackRt.anchoredPosition = new Vector2(0f, 20f);
+    trackRt.sizeDelta = new Vector2(-24f, 30f);
     var trackImg = trackGo.AddComponent<Image>();
     trackImg.sprite = white;
     trackImg.color = new Color(0.06f, 0.06f, 0.08f, 1f);
@@ -250,7 +228,7 @@ public class CastBarView : MonoBehaviour {
     fillImg.fillAmount = 0f;
 
     var view = canvasGo.AddComponent<CastBarView>();
-    view.BindUi(panelGroup, fillImg, nameTxt, timerTxt);
+    view.BindUi(panelGroup, fillImg, nameTxt);
     view.StampLayoutVersion(CurrentHudLayoutVersion);
     return view;
   }
@@ -277,7 +255,6 @@ public class CastBarView : MonoBehaviour {
     }
     if (_fillImage != null) _fillImage.fillAmount = 0f;
     if (_spellNameText != null) _spellNameText.text = "";
-    if (_timerText != null) _timerText.text = "";
     _displayFill = 0f;
   }
 
@@ -320,16 +297,5 @@ public class CastBarView : MonoBehaviour {
     float dt = Time.deltaTime * _fillSmoothSpeed;
     _displayFill = Mathf.Clamp01(Mathf.MoveTowards(_displayFill, targetFill, dt));
     _fillImage.fillAmount = _displayFill;
-
-    int totalTicks = combat.CastEndTick - combat.CastStartTick;
-    if (totalTicks > 0 && _timerText != null) {
-      float dtSec = Mathf.Max(_runner.DeltaTime, float.Epsilon);
-      float elapsed = (_runner.Tick - combat.CastStartTick) * dtSec;
-      float total = totalTicks * dtSec;
-      elapsed = Mathf.Clamp(elapsed, 0f, total);
-      _timerText.text = $"{elapsed:0.1f} / {total:0.1f}";
-    } else if (_timerText != null) {
-      _timerText.text = "";
-    }
   }
 }
