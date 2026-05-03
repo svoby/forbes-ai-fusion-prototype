@@ -1,0 +1,31 @@
+---
+description: Each new feature must be developed on a dedicated git branch
+alwaysApply: true
+---
+
+# Feature Branching
+
+Before starting **any new feature**, the agent must:
+
+1. Check the current branch: `git branch --show-current`
+2. If on `main` (or `master`), create and switch to a feature branch:
+   ```
+   git checkout -b feature/<short-kebab-description>
+   ```
+3. All implementation commits go on that branch — **never commit feature work directly to `main`**.
+
+## Branch naming
+
+- `feature/<name>` — new functionality
+- `fix/<name>` — bug fixes without new features
+- `chore/<name>` — tooling, refactors, non-functional changes
+
+## Example
+
+```
+git checkout -b feature/mob-aggro-radius
+```
+
+## When the feature is done
+
+Remind the user to open a PR / merge the branch; do **not** merge to `main` automatically.
