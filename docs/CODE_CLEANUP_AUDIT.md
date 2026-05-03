@@ -117,7 +117,7 @@ Then run `Forbes.Tests.EditMode` in the Editor Test Runner and confirm all green
 ### Finding 3 — `PlayerCombat.cs` is live dead code
 
 **File:** `Assets/Scripts/Player/PlayerCombat.cs`
-**Risk:** Medium — not on the prefab (confirmed: grep of `PlayerCharacter.prefab` returns no match), so no double-damage occurs today. However the script:
+**Risk:** Medium — **correction: `PlayerCombat` WAS on the prefab.** The original audit searched for the class name "PlayerCombat" in the prefab YAML, which returned no match. However, Unity prefabs store script references by GUID (`m_Script: {fileID: 11500000, guid: c7d8e9f0a1b243c58697a8b9c0d1e2f3, type: 3}`), not by class name. A GUID search on `PlayerCharacter.prefab` confirms the component is attached at `!u!114 &451230013` and also listed in the `NetworkedBehaviours` array. This means the double-damage risk was active. The script:
 
 - Compiles into `Forbes.Runtime`.
 - Contains `FixedUpdateNetwork` that reads `GameplayInput.Spell1` and calls `DealDamageRpc` with its own `SpellDamage = 15f`, bypassing `CombatValidator`.
@@ -126,10 +126,10 @@ Then run `Forbes.Tests.EditMode` in the Editor Test Runner and confirm all green
 If accidentally re-added to the prefab via "Add Component", it would silently deal a second 15-damage hit on every Spell1 press.
 The class comment says "LEGACY — will be replaced by NetworkCombatController in Milestone 3." That milestone has effectively landed.
 
-**Fix:** Delete `Assets/Scripts/Player/PlayerCombat.cs` and its `.meta` file. Update `TEST_COVERAGE_PLAN.md` risk-map item 5 to mark it resolved (see Finding 9).
+**Fix:** Delete `Assets/Scripts/Player/PlayerCombat.cs` and its `.meta` file. Also remove the component block (`!u!114 &451230013`) and its references from `PlayerCharacter.prefab` — three locations: `m_Component` list entry, the `MonoBehaviour` YAML block, and the `NetworkedBehaviours` list entry. Update `TEST_COVERAGE_PLAN.md` risk-map item 5 to mark it resolved (see Finding 9).
 
-**Behavior change:** No.
-**Tests required before touching:** Confirm `PlayerCharacter.prefab` has no `PlayerCombat` component (already confirmed). Run EditMode tests after deletion.
+**Behavior change:** Removing the live `PlayerCombat` component eliminates the real double-damage hazard on Spell1 that `TEST_COVERAGE_PLAN.md` risk 5 identified. The `NetworkCombatController` remains the sole authority for casting. This is a **defect fix**, not a gameplay tuning change.
+**Tests required before touching:** Confirm `PlayerCharacter.prefab` has no `PlayerCombat` component via GUID search. Run EditMode tests after deletion.
 
 ---
 
