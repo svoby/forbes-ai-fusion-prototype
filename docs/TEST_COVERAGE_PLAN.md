@@ -134,14 +134,8 @@ Create only when implementing tests (this plan does not author them):
 - `Assets/Tests/EditMode/CombatValidatorPureTests.cs`
 - `Assets/Tests/EditMode/HealthDefaultsTests.cs`
 - `Assets/Tests/EditMode/CombatFailReasonEnumTests.cs`
-- `Assets/Tests/PlayMode/Forbes.Tests.PlayMode.asmdef` — references same as above plus `UnityEngine` runtime; Test platforms: PlayMode only.
-- `Assets/Tests/PlayMode/TargetableTests.cs`
-- `Assets/Tests/PlayMode/TargetHighlightTests.cs`
-- `Assets/Tests/PlayMode/HealthViewTests.cs`
-- `Assets/Tests/PlayMode/KeyboardInputSourceConsumeTests.cs`
-- `Assets/Tests/PlayMode/FusionInputProviderTests.cs`
-- `Assets/Tests/PlayMode/FusionVerticalSliceSmokeTests.cs`
-- `Assets/Tests/Common/FakeInputSource.cs` — a `MonoBehaviour` implementing [`IInputSource`](../Assets/Scripts/Core/IInputSource.cs) for tests; not in either test asmdef root, but in the PlayMode asmdef so production can never reference it.
+- **PlayMode / component tests** — *not present in this repository today;* if added later, use a dedicated `Assets/Tests/PlayMode/` assembly (see sections P1/P2 and folder sketch below).
+- `Assets/Tests/Common/FakeInputSource.cs` — a `MonoBehaviour` implementing [`IInputSource`](../Assets/Scripts/Core/IInputSource.cs) for tests; keep out of production asmdefs.
 
 ---
 
@@ -227,26 +221,16 @@ These seams should be reviewed and approved before any test-driven edits to prod
 8. **seam-8 — auto-bootstrap teardown.** [`TargetingController.AutoCreate`](../Assets/Scripts/Combat/TargetingController.cs) and [`ThirdPersonOrbitCamera.AutoAddToMainCamera`](../Assets/Scripts/Player/ThirdPersonOrbitCamera.cs) fire on `RuntimeInitializeOnLoadMethod`. PlayMode tests should clean up in `[TearDown]`: `Object.DestroyImmediate(GameObject.Find("[TargetingSystem]"))`, etc. No seam needed.
 9. **seam-9 — legacy `PlayerCombat`.** [`PlayerCombat`](../Assets/Scripts/Player/PlayerCombat.cs) is documented "legacy will be replaced" but is still listed in `PlayerCharacter.prefab`. Tests should add a guard asserting only one combat component dispatches damage per Spell1 press; long-term remove the script.
 
-Folder layout proposed (no asmdef written yet):
+Folder layout proposed (no asmdef written yet); **only `EditMode/` is checked in today.**
 
 ```
 Assets/Tests/
 ├── Common/
-│   └── FakeInputSource.cs
+│   └── FakeInputSource.cs   (planned)
 ├── EditMode/
 │   ├── Forbes.Tests.EditMode.asmdef
-│   ├── SpellRegistryTests.cs
-│   ├── CombatValidatorPureTests.cs
-│   ├── HealthDefaultsTests.cs
-│   └── CombatFailReasonEnumTests.cs
-└── PlayMode/
-    ├── Forbes.Tests.PlayMode.asmdef
-    ├── TargetableTests.cs
-    ├── TargetHighlightTests.cs
-    ├── HealthViewTests.cs
-    ├── KeyboardInputSourceConsumeTests.cs
-    ├── FusionInputProviderTests.cs
-    └── FusionVerticalSliceSmokeTests.cs
+│   └── ...
+└── PlayMode/   (planned — optional future PlayMode assembly and fixtures)
 ```
 
 ---
@@ -275,19 +259,9 @@ Run EditMode tests (no graphics needed):
   -logFile -
 ```
 
-Run PlayMode tests (graphics required by Unity Test Framework):
-
-```cmd
-%UNITY_EXE% ^
-  -batchmode ^
-  -projectPath "%CD%" ^
-  -runTests -testPlatform playmode ^
-  -testResults "%CD%\TestResults\playmode.xml" ^
-  -logFile -
-```
+If you add **PlayMode** tests later (not in this repo now), use batchmode **without** `-nographics` and e.g. `-testPlatform playmode`. See Unity Test Framework docs for `-assemblyNames`.
 
 Notes:
-- `-nographics` is incompatible with `-runTests -testPlatform playmode`; do not add it there.
 - Exit code is non-zero on test failures; CI can gate on `%ERRORLEVEL%`.
 - Add `-testFilter "Forbes.*"` once tests have a stable namespace to avoid running Fusion's own tests.
 - Add `-testCategory "Smoke"` for the Fusion smoke pass; tag those tests with `[Category("Smoke")]`.
@@ -297,10 +271,10 @@ Notes:
 ## H. Agent rules (for future AI changes — also pin into AGENTS.md when adopted)
 
 1. **Read this plan first.** Before modifying anything in `Assets/Scripts/Combat`, `Assets/Scripts/Player`, `Assets/Scripts/Networking`, or `Assets/Scripts/Core`, open `docs/TEST_COVERAGE_PLAN.md` and identify which sections cover the change.
-2. **Run the relevant tests after the change.** EditMode tests are cheap — always run them. Run PlayMode for any change in [Health](../Assets/Scripts/Player/Health.cs), [NetworkCombatController](../Assets/Scripts/Combat/NetworkCombatController.cs), [TargetingController](../Assets/Scripts/Combat/TargetingController.cs), [PlayerMovement](../Assets/Scripts/Player/PlayerMovement.cs), or any prefab that those reference.
+2. **Run the relevant tests after the change.** EditMode tests are cheap — always run them. If PlayMode tests exist in the repo, run them after changes to [Health](../Assets/Scripts/Player/Health.cs), [NetworkCombatController](../Assets/Scripts/Combat/NetworkCombatController.cs), [TargetingController](../Assets/Scripts/Combat/TargetingController.cs), [PlayerMovement](../Assets/Scripts/Player/PlayerMovement.cs), or related prefabs.
 3. **Do not declare a task complete on a red bar.** A failing test is a regression unless the same change explicitly updates the test and its rationale in this document.
 4. **Tests pin existing behaviour.** They are not the spec — they are the safety net for the spec in `AGENTS.md` / `CLAUDE.md` / `docs/architecture.md`. If a test forces a gameplay change to pass, fix the test, not the gameplay.
 5. **Do not refactor broad systems while adding tests.** Tests and refactors are separate PRs/commits. The seams in section F are the only edits authorised by this plan, and only after explicit approval.
 6. **Constants are load-bearing.** Changing `SpellRegistry` entries, `Health.StartingHealth`, `Health.RespawnDelaySeconds`, or `NetworkCombatController.GcdSec` requires updating tests in the same change and noting the impact in the PR.
 7. **Networked enum byte values are forever.** `CombatFailReason` numbering must not change; add new values at the end.
-8. **Auto-bootstrapped objects must be torn down.** Any PlayMode test that involves [`TargetingController.AutoCreate`](../Assets/Scripts/Combat/TargetingController.cs) or [`ThirdPersonOrbitCamera.AutoAddToMainCamera`](../Assets/Scripts/Player/ThirdPersonOrbitCamera.cs) must clean up the resulting GameObjects in `[TearDown]`.
+8. **Auto-bootstrapped objects must be torn down.** Any **PlayMode** test (if present) that involves [`TargetingController.AutoCreate`](../Assets/Scripts/Combat/TargetingController.cs) or [`ThirdPersonOrbitCamera.AutoAddToMainCamera`](../Assets/Scripts/Player/ThirdPersonOrbitCamera.cs) must clean up the resulting GameObjects in `[TearDown]`.
