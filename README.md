@@ -2,16 +2,56 @@
 
 Unity multiplayer vertical-slice prototype using Photon Fusion.
 
-## Goal (Current)
+## Current State
 
-Build a fast playable POC with:
-- Host + Client room connect
-- Player spawn
-- Movement + rotation
-- Tab target selection
-- One instant spell
-- HP sync, death, respawn
-- Minimal HUD
+A playable host+client room with third-person movement, tab-targeting, spell combat, mob AI, and a minimal HUD.
+
+### Implemented Features
+
+| Area | Detail |
+|---|---|
+| **Networking** | Host/client room; networked player spawn |
+| **Movement** | `CharacterController`-based third-person movement with WoW-style orbit camera |
+| **Targeting** | Tab-cycle target selection; target highlight; world-space target HP bar |
+| **Combat** | Cast bar, spell validation (`CombatValidator`), projectile travel (`SpellTravelLogic`), networked damage (`NetworkCombatController`); death + respawn |
+| **Mob AI** | `NetworkMobBrain` — wander, XZ facing, aggro/chase, melee, leash/return (`TrainingDummy` prefab) |
+| **HUD** | Player HP bar (`HealthView`), cast bar (`CastBarView`), selected-target info bar (`SelectedTargetHealthBar`), Fusion stats toggle |
+
+### Script Layout
+
+```
+Assets/Scripts/
+  Combat/          CombatValidator, NetworkCombatController, SpellRegistry,
+                   SpellTravelLogic, Targetable, TargetHighlight, TargetingController
+  Core/            GameplayInput, IInputSource, ForbesLog, CheckerboardFloor
+  Mobs/            NetworkMobBrain, NetworkMobBrainLogic
+  Networking/      FusionInputProvider, PlayerSpawner, TrainingDummySpawner
+  Player/          Health, HealthView, PlayerCombat, PlayerMovement,
+                   ThirdPersonOrbitCamera, KeyboardInputSource, PlayerColor
+  Training/        TrainingDummy
+  UI/              CastBarView, CombatHud, FusionHudToggle,
+                   SelectedTargetHealthBar, TargetHealthBarLogic
+```
+
+### Tests
+
+**EditMode** (`Forbes.Tests.EditMode`) — pure logic, no runner:
+- `CombatValidatorPureTests`, `CombatFailReasonEnumTests`
+- `NetworkCombatSecsToTicksTests`
+- `SpellRegistryTests`, `SpellTravelLogicTests`
+- `NetworkMobBrainLogicTests`
+- `CastBarLayoutDefaultsTests`, `CastBarHudRegressionTests`
+- `HealthDefaultsTests`, `TargetHealthBarLogicTests`
+
+**PlayMode** (`Forbes.Tests.PlayMode`) — Fusion `GameMode.Single` smokes:
+- `FusionHealthSmokeTests`
+- `FusionSinglePlayerTestSession` (session fixture)
+- `NetworkMobBrainMovementSmokeTests`, `NetworkMobBrainMeleeSmokeTests`, `NetworkMobBrainChaseLeashSmokeTests`
+- `NetworkCombatProjectileTravelSmokeTests`
+- `TargetableTests`, `TargetHighlightTests`, `PlayModeTargetingCleanup`
+- `HealthViewTests`, `SelectedTargetHealthBarSmokeTests`
+
+Shared helpers: `FusionPlayModeTestHelpers`, `FusionPlayModeTestInputRelay`, `FusionPlayModeTestAssets`.
 
 ## Tech
 
@@ -22,27 +62,52 @@ Build a fast playable POC with:
 ## Scope
 
 ### In Scope
-- 2-player gameplay loop for internal testing
-- Authority-correct damage flow
-- Basic combat feedback through HP/UI
+- 2-player gameplay loop (host + one client)
+- Authority-correct damage and mob state
+- Basic combat feedback through HP/HUD
 
 ### Out of Scope (Milestone 1)
-- Custom physics engine
-- Manual packet order/loss handling
+- Custom physics / manual packet ordering
 - Full rollback/rewind stack
-- Inventory/quests/persistence
+- Inventory, quests, persistence
 
-## Setup (Quick)
+## Setup
 
-1. Install Unity LTS via Unity Hub.
-2. Create or open project in this repo.
-3. Install Photon Fusion SDK.
-4. Configure Photon AppId.
-5. Run two clients (Host + Client) and verify room join.
+1. Install Unity LTS via Unity Hub and open this repo.
+2. Install Photon Fusion SDK.
+3. Configure your Photon AppId (`PhotonAppSettings`).
+4. Run two clients (Host + Client) and verify room join.
 
-## Development Rules
+## Running Tests
 
-- State changes on Host/State Authority only.
-- Clients send input/intent only.
-- Tick-based gameplay in `FixedUpdateNetwork`.
-- Keep features small and test after each step.
+### Inside the Editor
+- **Window → General → Test Runner → Edit Mode** → select `Forbes.Tests.EditMode` → **Run All**.
+- Switch to **Play Mode** tab for PlayMode smokes.
+
+### CLI (Editor must be closed)
+
+```powershell
+# EditMode
+powershell -ExecutionPolicy Bypass -File tools\run-editmode-tests.ps1
+
+# PlayMode
+powershell -ExecutionPolicy Bypass -File tools\run-playmode-tests.ps1
+```
+
+Results: `TestResults/editmode.xml` / `TestResults/playmode.xml`.
+Logs: `TestResults/unity-editmode.log` / `TestResults/unity-playmode.log`.
+
+## Architecture Rules
+
+- Gameplay state changes are authoritative on **Host / State Authority only**.
+- Clients submit **input/intent** — never authoritative combat outcomes.
+- Core simulation runs in `FixedUpdateNetwork`; keep gameplay out of render-only `Update`.
+- One responsibility per `MonoBehaviour`; avoid god classes.
+
+## Manual Smoke Checklist
+
+1. Two clients in one room; both see movement.
+2. Tab-targeting cycles players and dummies; highlight appears on target.
+3. Spell damage respects range validation and hits only on host authority.
+4. Death and respawn stay consistent on host and client.
+5. Training dummy aggroes, chases, melees, and leashes correctly.
