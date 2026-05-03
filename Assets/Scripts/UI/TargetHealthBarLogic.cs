@@ -32,4 +32,26 @@ public static class TargetHealthBarLogic {
 
     return Quaternion.LookRotation(toCamera, worldUp);
   }
+
+  /// <summary>
+  /// Sizes a UI strip horizontally from the parent left edge using anchors (alternative to <c>Image.Type.Filled</c>).
+  /// Returns the same normalized value as <see cref="ComputeHealthFill"/> applied to (<paramref name="currentHealth"/>, <paramref name="maxHealth"/>).
+  /// Does nothing when <paramref name="strip"/> is null.
+  /// </summary>
+  public static float ApplyHorizontalHpAnchors(
+    RectTransform strip,
+    float currentHealth,
+    float maxHealth) {
+    float t = ComputeHealthFill(currentHealth, maxHealth);
+    if (strip == null) {
+      return t;
+    }
+
+    strip.anchorMin        = new Vector2(0f, 0f);
+    strip.anchorMax        = new Vector2(t, 1f);
+    strip.offsetMin        = Vector2.zero;
+    strip.offsetMax        = Vector2.zero;
+    strip.anchoredPosition = Vector2.zero;
+    return t;
+  }
 }

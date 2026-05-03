@@ -21,7 +21,7 @@ public class Health : NetworkBehaviour {
   /// <summary>Added to respawn Y so the CharacterController is not embedded in the floor after teleport.</summary>
   public float RespawnVerticalNudge = 0.1f;
 
-  [Networked]
+  [Networked, OnChangedRender(nameof(OnNetworkedHealthRenderChanged))]
   public float NetworkedHealth { get; set; }
 
   [Networked, OnChangedRender(nameof(OnIsDeadChangedRender))]
@@ -36,6 +36,9 @@ public class Health : NetworkBehaviour {
 
   /// <summary>Render-side notification fired by Fusion when <see cref="IsDead"/> changes.</summary>
   public event Action<bool> IsDeadChanged;
+
+  /// <summary>Render-side: fired when replicated <see cref="NetworkedHealth"/> updates on this client's view.</summary>
+  public event Action<float> NetworkedHealthRenderChanged;
 
   CharacterController _controller;
 
@@ -54,6 +57,10 @@ public class Health : NetworkBehaviour {
     IsDeadChanged?.Invoke(IsDead);
   }
 
+  void OnNetworkedHealthRenderChanged() {
+    NetworkedHealthRenderChanged?.Invoke(NetworkedHealth);
+  }
+
   public override void Spawned() {
     if (HasStateAuthority) {
       SpawnPosition = transform.position;
@@ -64,6 +71,7 @@ public class Health : NetworkBehaviour {
 
     // Networked props are now safe to read; let view subscribers (HealthView) apply the initial value.
     IsDeadChanged?.Invoke(IsDead);
+    NetworkedHealthRenderChanged?.Invoke(NetworkedHealth);
   }
 
   /// <summary>

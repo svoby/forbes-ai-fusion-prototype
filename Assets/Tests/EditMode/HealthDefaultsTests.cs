@@ -50,6 +50,15 @@ namespace Forbes.Tests.EditMode {
         "Health.IsDeadChanged signature drifted from Action<bool>; HealthView subscribers will break.");
     }
 
+    [Test]
+    public void NetworkedHealthRenderChanged_IsPublicEventActionOfFloat() {
+      var ev = typeof(Health).GetEvent("NetworkedHealthRenderChanged",
+        BindingFlags.Public | BindingFlags.Instance);
+      Assert.IsNotNull(ev, "Health.NetworkedHealthRenderChanged event was renamed or removed.");
+      Assert.AreEqual(typeof(Action<float>), ev.EventHandlerType,
+        "Health.NetworkedHealthRenderChanged signature drifted from Action<float>; target HUD breaks.");
+    }
+
     [TestCase("NetworkedHealth", typeof(float))]
     [TestCase("IsDead",          typeof(NetworkBool))]
     [TestCase("RespawnAtTick",   typeof(int))]

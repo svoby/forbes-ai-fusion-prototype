@@ -144,6 +144,7 @@ public static class ForbesFusionSharedSceneSetup {
     EnsureComponent<KeyboardInputSource>(go);
     EnsureComponent<FusionInputProvider>(go);
     EnsureComponent<TargetingController>(go);
+    EnsureComponent<SelectedTargetHealthBar>(go);
     var dummySpawner = EnsureComponent<TrainingDummySpawner>(go);
     EnsureComponent<CombatHud>(go);
     EnsureComponent<FusionHudToggle>(go);

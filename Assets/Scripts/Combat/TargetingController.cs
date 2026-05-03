@@ -59,6 +59,22 @@ public class TargetingController : MonoBehaviour {
     Debug.Log("[TargetingController] Auto-created TargetingSystem. Run 'Apply Full Combat Setup' to persist.");
   }
 
+  /// <summary>
+  /// <see cref="SelectedTargetHealthBar"/> must sit on the same GameObject as this controller.
+  /// Scenes wired via <c>Apply Full Combat Setup</c> add only <see cref="TargetingController"/>, so we
+  /// attach the bar at runtime when missing (no error if already present).
+  /// </summary>
+  [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+  static void EnsureSelectedTargetHealthBarOnExistingControllers() {
+    foreach (var tc in Object.FindObjectsByType<TargetingController>(FindObjectsInactive.Include)) {
+      if (tc == null || tc.GetComponent<SelectedTargetHealthBar>() != null) {
+        continue;
+      }
+
+      tc.gameObject.AddComponent<SelectedTargetHealthBar>();
+    }
+  }
+
   // ---- Per-frame logic ----
 
   bool _loggedStart;

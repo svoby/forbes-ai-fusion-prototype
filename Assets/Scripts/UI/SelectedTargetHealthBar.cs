@@ -6,6 +6,8 @@ using UnityEngine.UI;
 /// </summary>
 [DisallowMultipleComponent]
 public class SelectedTargetHealthBar : MonoBehaviour {
+  static Sprite _whiteUiSprite;
+
   [SerializeField] float _verticalOffset = 1.85f;
 
   [Tooltip("World-space width of the bar (height follows aspect from rect).")]
@@ -18,6 +20,11 @@ public class SelectedTargetHealthBar : MonoBehaviour {
   Transform           _followRoot;
   Canvas              _canvas;
   Image               _fillImage;
+  RectTransform       _fillRect;
+
+  Health _wiredHealth;
+
+  float _displayedFill01 = 1f;
 
   void Awake() {
     _targeting = GetComponent<TargetingController>();
@@ -37,9 +44,12 @@ public class SelectedTargetHealthBar : MonoBehaviour {
         !target.TryGetComponent(out Health health) ||
         health.IsDead ||
         health.StartingHealth <= 0f) {
+      UnwireHealth();
       SetBarVisible(false);
       return;
     }
+
+    TryWireHealth(health);
 
     Vector3 worldPos = target.transform.position + Vector3.up * _verticalOffset;
     _followRoot.position = worldPos;
@@ -49,11 +59,60 @@ public class SelectedTargetHealthBar : MonoBehaviour {
       Quaternion.identity,
       Vector3.up);
 
-    _fillImage.fillAmount = TargetHealthBarLogic.ComputeHealthFill(
-      health.NetworkedHealth,
-      health.StartingHealth);
+    ApplyHpFill(health.NetworkedHealth, health.StartingHealth);
 
     SetBarVisible(true);
+  }
+
+  void OnDisable() {
+    UnwireHealth();
+  }
+
+  void OnDestroy() {
+    UnwireHealth();
+  }
+
+  void TryWireHealth(Health health) {
+    if (_wiredHealth == health) {
+      return;
+    }
+
+    UnwireHealth();
+    _wiredHealth = health;
+    _wiredHealth.NetworkedHealthRenderChanged += OnWiredHealthHpRender;
+    OnWiredHealthHpRender(_wiredHealth.NetworkedHealth);
+  }
+
+  void UnwireHealth() {
+    if (_wiredHealth != null) {
+      _wiredHealth.NetworkedHealthRenderChanged -= OnWiredHealthHpRender;
+      _wiredHealth = null;
+    }
+  }
+
+  void OnWiredHealthHpRender(float hp) {
+    if (_wiredHealth == null) {
+      return;
+    }
+
+    ApplyHpFill(hp, _wiredHealth.StartingHealth);
+  }
+
+  /// <summary>
+  /// Uses <see cref="RectTransform"/> horizontal anchors instead of <see cref="Image.Type.Filled"/>,
+  /// so HP ratio is visibly obvious even when Filled/UI backend misbehaves in world-space canvases.
+  /// </summary>
+  void ApplyHpFill(float currentHp, float maxHp) {
+    if (_fillRect == null) {
+      return;
+    }
+
+    _displayedFill01 = TargetHealthBarLogic.ApplyHorizontalHpAnchors(_fillRect, currentHp, maxHp);
+
+    // Keep Fill simple (full tinted quad inside the anchored strip); avoids Filled quirks.
+    if (_fillImage != null) {
+      _fillImage.fillAmount = 1f;
+    }
   }
 
   void BuildWorldBar() {
@@ -88,21 +147,55 @@ public class SelectedTargetHealthBar : MonoBehaviour {
     var bgRt = bgGo.AddComponent<RectTransform>();
     StretchFullRect(bgRt);
     var bgImg = bgGo.AddComponent<Image>();
+    UiApplyWhiteSprite(bgImg);
     bgImg.color = new Color(0.12f, 0.12f, 0.12f, 0.88f);
     bgImg.raycastTarget = false;
 
     var fillGo = new GameObject("Fill");
     fillGo.transform.SetParent(canvasGo.transform, false);
     fillGo.layer = canvasGo.layer;
-    var fillRt = fillGo.AddComponent<RectTransform>();
-    StretchFullRect(fillRt);
+    _fillRect = fillGo.AddComponent<RectTransform>();
+    StretchFullRectAnchorLeft(_fillRect);
     _fillImage = fillGo.AddComponent<Image>();
-    _fillImage.type = Image.Type.Filled;
-    _fillImage.fillMethod = Image.FillMethod.Horizontal;
-    _fillImage.fillOrigin = 0;
+    UiApplyWhiteSprite(_fillImage);
+    _fillImage.type = Image.Type.Simple;
     _fillImage.color = new Color(0.25f, 0.78f, 0.35f, 1f);
     _fillImage.raycastTarget = false;
+    _fillImage.preserveAspect = false;
     _fillImage.fillAmount = 1f;
+  }
+
+  /// <summary>Full-width strip; horizontal extent is driven by <see cref="ApplyHpFill"/> via <c>anchorMax.x</c>.</summary>
+  static void StretchFullRectAnchorLeft(RectTransform rt) {
+    rt.anchorMin = Vector2.zero;
+    rt.anchorMax = Vector2.one;
+    rt.pivot = new Vector2(0.5f, 0.5f);
+    rt.offsetMin = Vector2.zero;
+    rt.offsetMax = Vector2.zero;
+    rt.localScale = Vector3.one;
+    rt.localPosition = Vector3.zero;
+  }
+
+  /// <summary>
+  /// Unity UI <see cref="Image.Type.Filled"/> needs a sprite; without it, changing
+  /// <see cref="Image.fillAmount"/> often has no visible effect despite the value updating.
+  /// </summary>
+  static void UiApplyWhiteSprite(Image img) {
+    if (img == null || img.sprite != null) {
+      return;
+    }
+
+    if (_whiteUiSprite == null) {
+      Texture2D tex = Texture2D.whiteTexture;
+      _whiteUiSprite = Sprite.Create(
+        tex,
+        new Rect(0f, 0f, tex.width, tex.height),
+        new Vector2(0.5f, 0.5f),
+        100f);
+      _whiteUiSprite.hideFlags = HideFlags.DontSave;
+    }
+
+    img.sprite = _whiteUiSprite;
   }
 
   static void StretchFullRect(RectTransform rt) {
@@ -121,7 +214,7 @@ public class SelectedTargetHealthBar : MonoBehaviour {
     }
   }
 
-  internal float CurrentFill01 => _fillImage != null ? _fillImage.fillAmount : 0f;
+  internal float CurrentFill01 => _displayedFill01;
 
   internal bool IsBarVisible => _canvas != null && _canvas.enabled;
 }

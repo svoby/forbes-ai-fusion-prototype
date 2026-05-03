@@ -5,7 +5,8 @@
         "Forbes.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Fusion.Unity"
+        "Fusion.Unity",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"
