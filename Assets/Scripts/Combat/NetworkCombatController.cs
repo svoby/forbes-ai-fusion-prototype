@@ -51,6 +51,15 @@ public class NetworkCombatController : NetworkBehaviour {
   /// <summary>Tick at which <see cref="LastFailReason"/> was set; HUD hides after ~2 s.</summary>
   [Networked] public int LastFailTick { get; set; }
 
+  /// <summary>0 = no delayed impact queued.</summary>
+  [Networked] public byte PendingImpactSpellId { get; set; }
+
+  /// <summary>Logical projectile target lock (<see cref="NetworkId"/>).</summary>
+  [Networked] public NetworkId PendingImpactTarget { get; set; }
+
+  /// <summary>Simulation tick when <see cref="PendingImpactSpellId"/> resolves.</summary>
+  [Networked] public int PendingImpactTick { get; set; }
+
   // ---
 
   /// <summary>True while a cast-time spell is in flight; <see cref="PlayerMovement"/> uses this to freeze movement.</summary>
@@ -83,6 +92,8 @@ public class NetworkCombatController : NetworkBehaviour {
       TryCancelCast(CastCancelReason.Death);
       return;
     }
+
+    TryResolvePendingImpact();
 
     // Resolve a cast-time spell when the timer expires.
     if (CurrentSpellId != 0 && Runner.Tick >= CastEndTick) {
@@ -139,6 +150,7 @@ public class NetworkCombatController : NetworkBehaviour {
     if (reason == CastCancelReason.Death) {
       bool log = IsCasting;
       ClearCastState();
+      ClearPendingImpact();
       if (log) {
         ForbesLog.Net($"Cast cancelled: {reason}", this);
       }
@@ -188,10 +200,20 @@ public class NetworkCombatController : NetworkBehaviour {
     int castTicks = SecsToTicks(spell.CastTimeSec);
 
     if (castTicks == 0) {
-      // Instant spell: apply damage directly.
-      targetHealth.DealDamageRpc(spell.Damage);
       SetCooldownEndTick(spellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
-      ForbesLog.Net($"Instant cast: {spell.Name} -> dmg {spell.Damage}", this);
+
+      if (SpellTravelLogic.HasProjectile(spell)) {
+        float distanceMeters = Vector3.Distance(transform.position, targetHealth.transform.position);
+        int travelTicks =
+          SpellTravelLogic.ComputeTravelTicks(distanceMeters, spell.ProjectileSpeedMetersPerSecond, TickRateRounded);
+        int impactTick =
+          SpellTravelLogic.ComputeImpactTick(Runner.Tick, travelTicks);
+        SchedulePendingImpact(spellId, targetId, impactTick);
+        ForbesLog.Net($"Instant cast (projectile): {spell.Name} impactTick={impactTick} travelTicks={travelTicks}", this);
+      } else {
+        targetHealth.DealDamageRpc(spell.Damage);
+        ForbesLog.Net($"Instant cast: {spell.Name} -> dmg {spell.Damage}", this);
+      }
     } else {
       // Cast-time spell: set networked state; damage fires in ResolveCast.
       CurrentSpellId = spellId;
@@ -210,16 +232,28 @@ public class NetworkCombatController : NetworkBehaviour {
     var spell = SpellRegistry.Get(CurrentSpellId);
 
     // Re-validate: target might have died or walked out of range during cast.
-    if (CombatValidator.TryValidate(
+    if (!CombatValidator.TryValidate(
           Runner, transform, CastTarget, spell,
           Runner.Tick, gcdEndTick: 0, cooldownEndTick: 0,
           isAlreadyCasting: false,
           out var targetHealth, out var failReason)) {
-      targetHealth.DealDamageRpc(spell.Damage);
-      ForbesLog.Net($"Cast resolved: {spell.Name} -> dmg {spell.Damage}", this);
-    } else {
       SetFailReason(failReason);
       ForbesLog.Net($"Cast resolved but invalid at completion: {failReason}", this);
+      ClearCastState();
+      return;
+    }
+
+    if (SpellTravelLogic.HasProjectile(spell)) {
+      float distanceMeters = Vector3.Distance(transform.position, targetHealth.transform.position);
+      int travelTicks =
+        SpellTravelLogic.ComputeTravelTicks(distanceMeters, spell.ProjectileSpeedMetersPerSecond, TickRateRounded);
+      int impactTick =
+        SpellTravelLogic.ComputeImpactTick(Runner.Tick, travelTicks);
+      SchedulePendingImpact(CurrentSpellId, CastTarget, impactTick);
+      ForbesLog.Net($"Cast resolved (projectile): {spell.Name} impactTick={impactTick}", this);
+    } else {
+      targetHealth.DealDamageRpc(spell.Damage);
+      ForbesLog.Net($"Cast resolved: {spell.Name} -> dmg {spell.Damage}", this);
     }
 
     ClearCastState();
@@ -232,6 +266,59 @@ public class NetworkCombatController : NetworkBehaviour {
     CastTarget     = default;
     CastStartTick  = 0;
     CastEndTick    = 0;
+  }
+
+  void ClearPendingImpact() {
+    PendingImpactSpellId = 0;
+    PendingImpactTarget  = default;
+    PendingImpactTick    = 0;
+  }
+
+  int TickRateRounded => Mathf.RoundToInt(Runner.TickRate);
+
+  void SchedulePendingImpact(byte spellId, NetworkId targetId, int impactTick) {
+    PendingImpactSpellId = spellId;
+    PendingImpactTarget  = targetId;
+    PendingImpactTick    = impactTick;
+    if (Runner.Tick >= impactTick) {
+      TryResolvePendingImpact();
+    }
+  }
+
+  void TryResolvePendingImpact() {
+    if (PendingImpactSpellId == 0) {
+      return;
+    }
+
+    if (Runner.Tick < PendingImpactTick) {
+      return;
+    }
+
+    byte sid = PendingImpactSpellId;
+    NetworkId nid = PendingImpactTarget;
+    ClearPendingImpact();
+
+    var spell = SpellRegistry.Get(sid);
+    if (!spell.IsValid) {
+      return;
+    }
+
+    if (!Runner.TryFindObject(nid, out var targetObj)
+        || targetObj == null
+        || !targetObj.TryGetComponent(out Health impactHealth)) {
+      SetFailReason(CombatFailReason.NoTarget);
+      ForbesLog.Net("Pending impact: target missing -> NoTarget", this);
+      return;
+    }
+
+    if (impactHealth.IsDead) {
+      SetFailReason(CombatFailReason.TargetDead);
+      ForbesLog.Net("Pending impact: target dead", this);
+      return;
+    }
+
+    impactHealth.DealDamageRpc(spell.Damage);
+    ForbesLog.Net($"Pending impact resolved: {spell.Name} dmg={spell.Damage}", this);
   }
 
   void SetFailReason(CombatFailReason reason) {

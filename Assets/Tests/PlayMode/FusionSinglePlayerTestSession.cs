@@ -16,11 +16,14 @@ namespace Forbes.Tests.PlayMode {
 
     internal NetworkRunner Runner => _runner;
 
+    internal FusionPlayModeTestInputRelay InputRelay { get; private set; }
+
     internal IEnumerator Start() {
       Assert.IsNull(_host, "Session already started.");
 
       _host = new GameObject(nameof(FusionSinglePlayerTestSession) + "_RunnerHost");
       _runner = _host.AddComponent<NetworkRunner>();
+      InputRelay = _host.AddComponent<FusionPlayModeTestInputRelay>();
 
       if (_host.GetComponent<NetworkSceneManagerDefault>() == null) {
         _host.AddComponent<NetworkSceneManagerDefault>();
@@ -70,6 +73,7 @@ namespace Forbes.Tests.PlayMode {
       }
 
       _runner = null;
+      InputRelay = null;
     }
   }
 }

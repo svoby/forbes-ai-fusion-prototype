@@ -27,6 +27,8 @@ namespace Forbes.Tests.EditMode {
       Assert.AreEqual(30f,  spell.RangeMeters);
       Assert.AreEqual(30f,  spell.Damage);
       Assert.IsTrue(spell.TriggersGcd);
+      Assert.Greater(spell.ProjectileSpeedMetersPerSecond, 0f,
+        "Fireball carries a logical projectile for travel-time gameplay.");
     }
 
     [Test]
@@ -39,6 +41,9 @@ namespace Forbes.Tests.EditMode {
       Assert.AreEqual(25f,  spell.RangeMeters);
       Assert.AreEqual(15f,  spell.Damage);
       Assert.IsTrue(spell.TriggersGcd);
+      Assert.AreEqual(0f, spell.ProjectileSpeedMetersPerSecond,
+        "Arcane Shot remains instant / hitscan (speed convention 0).");
+      Assert.IsFalse(SpellTravelLogic.HasProjectile(spell));
     }
 
     [Test]
@@ -51,6 +56,7 @@ namespace Forbes.Tests.EditMode {
       Assert.AreEqual(30f,  spell.RangeMeters);
       Assert.AreEqual(60f,  spell.Damage);
       Assert.IsTrue(spell.TriggersGcd);
+      Assert.AreEqual(0f, spell.ProjectileSpeedMetersPerSecond);
     }
 
     [Test]
