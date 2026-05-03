@@ -3,7 +3,7 @@
 Status: drafted from a read-only inspection of the current vertical slice.
 Scope: protect existing behaviour described in [README.md](../README.md), [AGENTS.md](../AGENTS.md), [CLAUDE.md](../CLAUDE.md), and [docs/architecture.md](architecture.md). This plan does **not** propose gameplay changes.
 
-Unity Test Framework: present (`com.unity.test-framework@1.6.0`) in [Packages/manifest.json](../Packages/manifest.json). No `Assets/Tests/` folder yet, no asmdefs under `Assets/Scripts/` (everything compiles into `Assembly-CSharp`).
+Unity Test Framework: present (`com.unity.test-framework@1.6.0`) in [Packages/manifest.json](../Packages/manifest.json). **Note: this plan was originally drafted before the test infrastructure existed.** `Assets/Tests/EditMode/` (assembly `Forbes.Tests.EditMode`) and `Assets/Tests/PlayMode/` (assembly `Forbes.Tests.PlayMode`) now exist; `Assets/Scripts/Forbes.Runtime.asmdef` is also present. The folder layout and asmdef setup described in sections D and F are complete.
 
 ---
 
@@ -89,7 +89,7 @@ Constants are inlined: `PlayerSpeed = 10f`, `JumpForce = 5f`, `GravityValue = -9
 | 2 | `Health.DealDamageRpc` authority + double-death | Guarded by `HasStateAuthority` and early `IsDead` return. Removing either lets clients overwrite HP or schedule duplicate respawns. | Damage applied on non-authority; multiple respawns; HP underflow if `Mathf.Max(0,...)` is removed. | PlayMode Fusion smoke (Single mode). |
 | 3 | Tick math | Two formulas: `SecsToTicks = Mathf.CeilToInt(seconds * Runner.TickRate)` (private) and `RespawnAtTick = Runner.Tick + Mathf.Max(1, Mathf.CeilToInt(RespawnDelaySeconds * Runner.TickRate))`. Off-by-one or rounding drift will silently change feel. | Spells resolve a tick early/late; respawn fires immediately. | EditMode parametric (needs the `internal` seam in F). |
 | 4 | `GameplayInput.TargetId` propagation | Three hops (`TargetingController.CurrentTargetId` → `FusionInputProvider.OnInput` → `NetworkCombatController.TryStartCast(targetId)`). Any hop returning `default` causes silent NoTarget rejections. | Spells fail with `NoTarget` despite a visible ring. | PlayMode component test with fakes + Fusion smoke. |
-| 5 | Cast resolution at `CastEndTick` + legacy `PlayerCombat` still on prefab | [`PlayerCombat`](../Assets/Scripts/Player/PlayerCombat.cs) is documented as legacy but is still wired (see prefab `m_Script: 856e4624...`); it can re-fire damage on `Spell1` if not removed. `ResolveCast` re-validation is essential. | Double damage; cast that should fail at completion still fires. | Fusion smoke + a guard test asserting only one `DealDamageRpc` per Spell1 press. |
+| 5 | Cast resolution at `CastEndTick` + ~~legacy `PlayerCombat` still on prefab~~ | **Status: resolved.** `PlayerCombat.cs` confirmed absent from `PlayerCharacter.prefab` and deleted from the repo (see `docs/CODE_CLEANUP_AUDIT.md` Finding 3). `ResolveCast` re-validation in `NetworkCombatController` remains essential. | Double damage; cast that should fail at completion still fires. | Fusion smoke remains valid to guard `ResolveCast` re-validation independently of `PlayerCombat`. |
 | 6 | `PlayerMovement` freeze while casting / dead | Two early returns. If the order is reshuffled (e.g. dead check after movement), a dead player can drift. | Dead/casting players slide around. | PlayMode test against the field interactions. |
 | 7 | Tab cycle determinism | Sort by `NetworkObject.Id.Raw` (uint compare). If list construction or sort changes, cycle order becomes unstable across clients. | Tab targets in different order across machines, breaks demo. | EditMode pure list-based test (with a seam to inject the targetable enumeration). |
 | 8 | `KeyboardInputSource` Consume* idempotency | Each spell key sets a latch in Update; `Consume*` returns true once and resets. If `Consume*` returns true twice the player double-casts. | Single keystroke fires two spells across two ticks. | EditMode pure (the latches are private bools but `Consume*` is the public surface). |
@@ -219,9 +219,9 @@ These seams should be reviewed and approved before any test-driven edits to prod
 6. **seam-6 — `KeyboardInputSource` is already abstracted via `IInputSource`.** No seam needed: write a `FakeInputSource` test double, do not test the real `Update` path. Manual-only verification covers `Keyboard.current` reads.
 7. **seam-7 — `TrainingDummySpawner` bypass.** Editor-only and coroutine-driven. Smoke tests should NOT rely on it; they should `runner.Spawn(dummyPrefab, ...)` themselves.
 8. **seam-8 — auto-bootstrap teardown.** [`TargetingController.AutoCreate`](../Assets/Scripts/Combat/TargetingController.cs) and [`ThirdPersonOrbitCamera.AutoAddToMainCamera`](../Assets/Scripts/Player/ThirdPersonOrbitCamera.cs) fire on `RuntimeInitializeOnLoadMethod`. PlayMode tests should clean up in `[TearDown]`: `Object.DestroyImmediate(GameObject.Find("[TargetingSystem]"))`, etc. No seam needed.
-9. **seam-9 — legacy `PlayerCombat`.** [`PlayerCombat`](../Assets/Scripts/Player/PlayerCombat.cs) is documented "legacy will be replaced" but is still listed in `PlayerCharacter.prefab`. Tests should add a guard asserting only one combat component dispatches damage per Spell1 press; long-term remove the script.
+9. ~~**seam-9 — legacy `PlayerCombat`.**~~ **Resolved.** `PlayerCombat.cs` was not on `PlayerCharacter.prefab` and has been deleted from the repo (see `docs/CODE_CLEANUP_AUDIT.md` Finding 3). No seam or guard test needed.
 
-Folder layout proposed (no asmdef written yet); **only `EditMode/` is checked in today.**
+Folder layout (now implemented — both `EditMode/` and `PlayMode/` assemblies exist):
 
 ```
 Assets/Tests/
