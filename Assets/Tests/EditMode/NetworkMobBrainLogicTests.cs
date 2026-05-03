@@ -41,5 +41,54 @@ namespace Forbes.Tests.EditMode {
       var dest = new Vector3(1.05f, 5f, 1.02f);
       Assert.IsTrue(NetworkMobBrainLogic.HasArrivedHorizontally(pos, dest, 0.1f));
     }
+
+    [Test]
+    public void TryGetHorizontalDirection_IgnoresY_UsesXZOnly() {
+      var from = new Vector3(0f, 100f, 0f);
+      var to = new Vector3(3f, -50f, 4f);
+      Assert.IsTrue(NetworkMobBrainLogic.TryGetHorizontalDirection(from, to, out var dir));
+      var expected = new Vector3(3f, 0f, 4f).normalized;
+      Assert.AreEqual(expected.x, dir.x, 1e-5f);
+      Assert.AreEqual(expected.y, dir.y, 1e-5f);
+      Assert.AreEqual(expected.z, dir.z, 1e-5f);
+    }
+
+    [Test]
+    public void TryGetHorizontalDirection_WhenValid_IsUnitLength() {
+      var from = Vector3.zero;
+      var to = new Vector3(2f, 0f, 2f);
+      Assert.IsTrue(NetworkMobBrainLogic.TryGetHorizontalDirection(from, to, out var dir));
+      Assert.AreEqual(1f, dir.magnitude, 1e-5f);
+      Assert.AreEqual(0f, dir.y, 1e-5f);
+    }
+
+    [Test]
+    public void TryGetHorizontalDirection_SameXZ_ReturnsFalseAndZero() {
+      var from = new Vector3(1f, 0f, 2f);
+      var to = new Vector3(1f, 9f, 2f);
+      Assert.IsFalse(NetworkMobBrainLogic.TryGetHorizontalDirection(from, to, out var dir));
+      Assert.AreEqual(0f, dir.x, 1e-5f);
+      Assert.AreEqual(0f, dir.y, 1e-5f);
+      Assert.AreEqual(0f, dir.z, 1e-5f);
+    }
+
+    [Test]
+    public void RotationFacingHorizontal_RightForward_PointsPositiveX() {
+      var q = NetworkMobBrainLogic.RotationFacingHorizontal(Vector3.right, Quaternion.identity);
+      Vector3 worldForward = q * Vector3.forward;
+      Assert.AreEqual(1f, worldForward.x, 1e-4f);
+      Assert.AreEqual(0f, worldForward.y, 1e-4f);
+      Assert.AreEqual(0f, worldForward.z, 1e-4f);
+    }
+
+    [Test]
+    public void RotationFacingHorizontal_ZeroOrTiny_PreservesFallback() {
+      var fallback = Quaternion.Euler(0f, 47f, 0f);
+      var qZero = NetworkMobBrainLogic.RotationFacingHorizontal(Vector3.zero, fallback);
+      Assert.Less(Quaternion.Angle(qZero, fallback), 1e-3f);
+
+      var qTiny = NetworkMobBrainLogic.RotationFacingHorizontal(new Vector3(1e-5f, 0f, 1e-5f), fallback);
+      Assert.Less(Quaternion.Angle(qTiny, fallback), 1e-3f);
+    }
   }
 }

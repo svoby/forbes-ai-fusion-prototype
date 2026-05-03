@@ -9,6 +9,8 @@ public enum NetworkMobBrainState {
 }
 
 public static class NetworkMobBrainLogic {
+  const float HorizontalEpsSqr = 1e-8f;
+
   /// <summary>
   /// Uniform random point on the XZ disk around <paramref name="origin"/>; Y matches origin.
   /// <paramref name="uRadius"/> and <paramref name="uAngle"/> must be in [0, 1).
@@ -38,5 +40,44 @@ public static class NetworkMobBrainLogic {
   public static bool HasArrivedHorizontally(Vector3 position, Vector3 destination, float arrivalThreshold) {
     float th = Mathf.Max(0f, arrivalThreshold);
     return HorizontalSqrDistance(position, destination) <= th * th;
+  }
+
+  /// <summary>
+  /// Normalized direction on XZ from <paramref name="from"/> to <paramref name="to"/>; Y difference is ignored.
+  /// Returns false and <paramref name="horizontalDirection"/> zero when horizontal separation is below epsilon.
+  /// </summary>
+  public static bool TryGetHorizontalDirection(Vector3 from, Vector3 to, out Vector3 horizontalDirection) {
+    float dx = to.x - from.x;
+    float dz = to.z - from.z;
+    float sqr = dx * dx + dz * dz;
+    if (sqr < HorizontalEpsSqr || float.IsNaN(sqr) || float.IsInfinity(sqr)) {
+      horizontalDirection = Vector3.zero;
+      return false;
+    }
+
+    float invLen = 1f / Mathf.Sqrt(sqr);
+    horizontalDirection = new Vector3(dx * invLen, 0f, dz * invLen);
+    return true;
+  }
+
+  /// <summary>
+  /// Instant yaw to face <paramref name="horizontalForward"/> projected onto XZ.
+  /// When the horizontal length is near zero or non-finite, returns <paramref name="fallback"/>.
+  /// </summary>
+  public static Quaternion RotationFacingHorizontal(Vector3 horizontalForward, Quaternion fallback) {
+    float x = horizontalForward.x;
+    float z = horizontalForward.z;
+    float sqr = x * x + z * z;
+    if (sqr < HorizontalEpsSqr || float.IsNaN(sqr) || float.IsInfinity(sqr)) {
+      return fallback;
+    }
+
+    float invLen = 1f / Mathf.Sqrt(sqr);
+    Vector3 forward = new Vector3(x * invLen, 0f, z * invLen);
+    if (float.IsNaN(forward.x) || float.IsInfinity(forward.x)) {
+      return fallback;
+    }
+
+    return Quaternion.LookRotation(forward, Vector3.up);
   }
 }

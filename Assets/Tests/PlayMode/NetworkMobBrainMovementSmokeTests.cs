@@ -60,8 +60,21 @@ namespace Forbes.Tests.PlayMode {
         Vector3 p0 = dummy.transform.position;
 
         yield return WaitUntil(
-          () => Vector3.Distance(p0, dummy.transform.position) > 0.06f,
+          () => NetworkMobBrainLogic.HorizontalSqrDistance(p0, dummy.transform.position) > 0.12f * 0.12f,
           maxFrames: 900);
+
+        Vector3 p1 = dummy.transform.position;
+        Assert.IsTrue(
+          NetworkMobBrainLogic.TryGetHorizontalDirection(p0, p1, out var travelDir),
+          "expected non-zero horizontal travel for facing smoke test.");
+
+        Vector3 f = dummy.transform.forward;
+        var forwardHz = new Vector3(f.x, 0f, f.z);
+        Assert.Greater(forwardHz.sqrMagnitude, 1e-6f, "horizontal forward should be non-degenerate.");
+        forwardHz.Normalize();
+
+        float dot = Vector3.Dot(travelDir, forwardHz);
+        Assert.Greater(dot, 0.7f, $"mob should generally face travel direction (dot={dot}).");
       }
     }
 

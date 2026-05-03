@@ -74,10 +74,8 @@ public class NetworkMobBrain : NetworkBehaviour {
           break;
         }
 
-        Vector3 delta = _destination - pos;
-        delta.y = 0f;
-        if (delta.sqrMagnitude > 1e-8f) {
-          Vector3 dir = delta.normalized;
+        if (NetworkMobBrainLogic.TryGetHorizontalDirection(pos, _destination, out var dir)) {
+          transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dir, transform.rotation);
           Vector3 planar = dir * (MoveSpeed * dt);
           _controller.Move(planar + _velocity * dt);
         } else {
