@@ -16,7 +16,10 @@ public enum CameraMouseMode { None, Left, Right, Both }
 /// </list>
 /// Drag detection (<see cref="IsLmbDragging"/>) lets <see cref="TargetingController"/> distinguish
 /// a LMB click (target select) from a LMB drag (camera orbit).
+/// Execution order -50 guarantees LateUpdate runs before PlayerMovement (default 0) so
+/// MouseMode and Yaw are always current when the character applies its facing.
 /// </summary>
+[DefaultExecutionOrder(-50)]
 public class ThirdPersonOrbitCamera : MonoBehaviour {
   /// <summary>Orbit speed in degrees per mouse-delta pixel.</summary>
   [SerializeField] float _sensitivity = 0.25f;
@@ -31,14 +34,20 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   [SerializeField] float _dragThresholdPixels = 20f;
 
   Transform _target;
-  float _yaw;
+  float _charYaw;       // character-facing yaw; Q/E and RMB drag modify this
+  float _orbitOffset;   // extra camera angle added by LMB orbit; character ignores it
   float _pitch = 15f;
   float _distance;
   float _lmbDragAccum;
   float _rmbDragAccum;
 
-  /// <summary>Camera's current horizontal orbit angle in world-space degrees.</summary>
-  public float Yaw => _yaw;
+  /// <summary>
+  /// Character-facing yaw in world-space degrees.
+  /// Q/E keyboard rotation and RMB drag modify this.
+  /// LMB orbit does NOT affect this value, so the character never snaps
+  /// to the camera orbit angle when Q/E are pressed mid-orbit.
+  /// </summary>
+  public float Yaw => _charYaw;
 
   /// <summary>What combination of mouse buttons is currently held.</summary>
   public CameraMouseMode MouseMode { get; private set; }
@@ -100,6 +109,10 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     if (mouse.rightButton.wasPressedThisFrame) {
       _rmbDragAccum = 0f;
       IsRmbDragging = false;
+      // Snap character yaw to current camera angle so the player immediately
+      // faces where the camera is pointing (WoW RMB behaviour).
+      _charYaw    += _orbitOffset;
+      _orbitOffset = 0f;
     }
     if (rmb) {
       _rmbDragAccum += mouse.delta.ReadValue().magnitude;
@@ -116,17 +129,24 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
 
     // Cursor rules (WoW-style):
     //   LMB orbit  — cursor stays VISIBLE so click-targeting still works on release.
-    //   RMB free-look — cursor hides+locks, but only once the mouse has actually moved
-    //                   past the drag threshold (a quick RMB click won't hide it).
+    //   RMB held   — cursor hides+locks immediately (free-look mode).
     //   Release    — always restore cursor.
-    ManageCursor(IsRmbDragging || IsLmbDragging);
+    ManageCursor(rmb);
 
-    // Orbit when any button held.
+    // Mouse rotation — LMB and RMB do different things:
+    //   LMB only  → orbit camera around character; _orbitOffset changes, _charYaw untouched.
+    //   RMB only  → rotate character; _charYaw changes, camera follows.
+    //   Both      → same as RMB (auto-forward + character rotation).
     if (lmb || rmb) {
       var delta = mouse.delta.ReadValue();
-      _yaw   += delta.x * _sensitivity;
       _pitch -= delta.y * _sensitivity;
       _pitch  = Mathf.Clamp(_pitch, _minPitch, _maxPitch);
+
+      if (lmb && !rmb) {
+        _orbitOffset += delta.x * _sensitivity;   // camera orbits, character stays
+      } else {
+        _charYaw     += delta.x * _sensitivity;   // character (and camera) rotate
+      }
     }
 
     // Scroll-wheel zoom. scroll.y is ~120 units per notch in the new Input System.
@@ -137,8 +157,9 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     }
 
     // Position camera behind and above the pivot.
+    // Total camera yaw = character yaw + LMB orbit offset.
     var pivot = _target.position + _pivotOffset;
-    var rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+    var rotation = Quaternion.Euler(_pitch, _charYaw + _orbitOffset, 0f);
     transform.position = pivot + rotation * new Vector3(0f, 0f, -_distance);
     transform.LookAt(pivot, Vector3.up);
   }
@@ -158,18 +179,30 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   }
 
   /// <summary>
-  /// Called by <see cref="KeyboardInputSource"/> when A/D turn the character in non-RMB mode.
-  /// Keeps the camera yaw in sync so the camera follows the character.
+  /// Called by <see cref="KeyboardInputSource"/> when Q/E or arrow keys rotate the character.
+  /// Modifies <see cref="_charYaw"/> only — the LMB orbit offset is unaffected, so pressing
+  /// Q/E while orbiting with LMB turns the character without snapping to the orbit angle.
   /// </summary>
   public void AddYaw(float degrees) {
-    _yaw += degrees;
+    _charYaw += degrees;
+  }
+
+  /// <summary>
+  /// Called by <see cref="KeyboardInputSource"/> when Q/E are pressed while LMB is held.
+  /// Rotates the character yaw but compensates <see cref="_orbitOffset"/> by the same amount
+  /// so the camera stays at the same world angle — only the player turns.
+  /// </summary>
+  public void AddCharYawKeepCamera(float degrees) {
+    _charYaw     += degrees;
+    _orbitOffset -= degrees;
   }
 
   void TryFindLocalPlayer() {
     foreach (var pm in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude)) {
       if (pm.HasInputAuthority) {
-        _target = pm.transform;
-        _yaw = _target.eulerAngles.y;
+        _target      = pm.transform;
+        _charYaw     = _target.eulerAngles.y;
+        _orbitOffset = 0f;
         return;
       }
     }

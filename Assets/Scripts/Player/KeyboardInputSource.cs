@@ -94,8 +94,15 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
     bool turnLeft  = kb.qKey.isPressed || kb.leftArrowKey.isPressed;
     bool turnRight = kb.eKey.isPressed || kb.rightArrowKey.isPressed;
     if (_camera != null) {
-      if (turnLeft)  _camera.AddYaw(-TurnRateDegPerSec * Time.deltaTime);
-      if (turnRight) _camera.AddYaw( TurnRateDegPerSec * Time.deltaTime);
+      bool lmbOnly = _camera.MouseMode == CameraMouseMode.Left;
+      if (turnLeft) {
+        if (lmbOnly) _camera.AddCharYawKeepCamera(-TurnRateDegPerSec * Time.deltaTime);
+        else         _camera.AddYaw             (-TurnRateDegPerSec * Time.deltaTime);
+      }
+      if (turnRight) {
+        if (lmbOnly) _camera.AddCharYawKeepCamera( TurnRateDegPerSec * Time.deltaTime);
+        else         _camera.AddYaw             ( TurnRateDegPerSec * Time.deltaTime);
+      }
     }
 
     // LookYaw mirrors the camera's current yaw.

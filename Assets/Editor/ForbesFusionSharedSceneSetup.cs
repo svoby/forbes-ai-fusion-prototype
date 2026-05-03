@@ -88,6 +88,7 @@ public static class ForbesFusionSharedSceneSetup {
     EnsureComponent<TargetingController>(go);
     var dummySpawner = EnsureComponent<TrainingDummySpawner>(go);
     EnsureComponent<CombatHud>(go);
+    EnsureComponent<FusionHudToggle>(go);
 
     WireAssetRef(spawner, "PlayerPrefab", PlayerPrefabPath);
     WireAssetRef(dummySpawner, "TrainingDummyPrefab", TrainingDummyPrefabPath);

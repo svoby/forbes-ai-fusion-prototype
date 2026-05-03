@@ -119,19 +119,28 @@ public class PlayerMovement : NetworkBehaviour {
 
   /// <summary>
   /// Client-side prediction for character rotation: applies facing at full render
-  /// frame rate so Q/E/arrows feel instant rather than snapping every Fusion tick.
-  /// Only runs on the input authority (local player); other clients rely on
-  /// NetworkTransform interpolation from the state authority.
+  /// frame rate so RMB free-look and Q/E/arrows feel instant rather than snapping
+  /// every Fusion tick. Runs AFTER ThirdPersonOrbitCamera.LateUpdate (execution
+  /// order -50) so MouseMode and Yaw are always current this frame.
+  /// Only runs on the input authority (local player).
   /// </summary>
   void LateUpdate() {
     if (!HasInputAuthority) return;
     if (_health != null && _health.IsDead) return;
 
     if (_orbitCam == null) _orbitCam = UnityEngine.Object.FindAnyObjectByType<ThirdPersonOrbitCamera>();
-    if (_keys    == null) _keys     = UnityEngine.Object.FindAnyObjectByType<KeyboardInputSource>();
-    if (_orbitCam == null || _keys == null) return;
+    if (_orbitCam == null) return;
 
-    if (_keys.AlwaysFaceYaw) {
+    // RMB (or both) → character must face camera yaw this frame.
+    bool rmbActive = _orbitCam.MouseMode == CameraMouseMode.Right ||
+                     _orbitCam.MouseMode == CameraMouseMode.Both;
+
+    // Q/E / arrows / strafe → also face camera yaw (via KeyboardInputSource flag).
+    bool keyFace = false;
+    if (_keys == null) _keys = UnityEngine.Object.FindAnyObjectByType<KeyboardInputSource>();
+    if (_keys != null) keyFace = _keys.AlwaysFaceYaw;
+
+    if (rmbActive || keyFace) {
       var fwd = Quaternion.Euler(0f, _orbitCam.Yaw, 0f) * Vector3.forward;
       transform.forward = new Vector3(fwd.x, 0f, fwd.z).normalized;
     }
