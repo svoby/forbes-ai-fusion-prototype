@@ -1,0 +1,4 @@
+Noto Sans Regular (bundled UI font)
+
+Source: Google Fonts · https://fonts.google.com/noto/specimen/Noto+Sans
+License: SIL Open Font License (OFL) 1.1 · https://openfontlicense.org

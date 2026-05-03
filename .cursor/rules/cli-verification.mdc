@@ -1,0 +1,35 @@
+---
+description: Prefer Unity Test Runner (Edit Mode) while the Editor is open; use tools/Run-EditModeTests.ps1 only when the project can be opened in batchmode (Editor closed / CI).
+alwaysApply: true
+---
+
+# EditMode tests — when to run what
+
+## With the Editor open (normal workflow)
+
+- **Window → General → Test Runner** → **Edit Mode** tab → select assembly **Forbes.Tests.EditMode** → **Run All** (or run a single fixture).
+- This works while the project is open; you do **not** need batchmode or to close Unity.
+
+## From the shell (CI, or when you can close the Editor)
+
+- Batch Unity **cannot** open the same project twice. `tools\Run-EditModeTests.ps1` requires the **Editor closed** for this project.
+
+  ```text
+  powershell -ExecutionPolicy Bypass -File tools\Run-EditModeTests.ps1
+  ```
+
+- Results: `TestResults-EditMode.xml`.
+
+# CLI verification
+
+- When the user reports **compile errors**, **broken tests**, or **Console errors tied to gameplay/C#**, prefer **Test Runner (Edit Mode)** in the open Editor. Use batchmode when feasible:
+
+  ```text
+  powershell -ExecutionPolicy Bypass -File tools\Run-EditModeTests.ps1
+  ```
+
+  from repo root (**Unity batchmode rejects a locked project** — close the Editor on this project first, or run tests inside the Editor as above).
+
+- Read `TestResults-EditMode.xml` for failures when using batchmode; fix code and re-run.
+
+- Do not declare "fixed" without a green test run when the failure was in compilable/gameplay C#.

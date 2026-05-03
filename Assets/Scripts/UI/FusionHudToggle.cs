@@ -1,3 +1,4 @@
+using System.Collections;
 using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -21,10 +22,27 @@ public class FusionHudToggle : MonoBehaviour {
     // Scene (or prior session) may serialize FusionBootstrapDebugGUI disabled — without OnGUI,
     // Host/Client never appear. Force-enable until we intentionally auto-hide after join.
     if (_runner == null) _runner = GetComponent<NetworkRunner>();
+
     if (_hud == null) _hud = Object.FindAnyObjectByType<FusionBootstrapDebugGUI>(FindObjectsInactive.Include);
     if (_hud != null) {
       _hud.enabled = true;
     }
+  }
+
+  void Start() {
+    if (_runner == null) {
+      _runner = GetComponent<NetworkRunner>();
+    }
+    StartCoroutine(EnsureCastBarAfterDestroyFlush());
+  }
+
+  /// <summary>
+  /// Wait one frame so queued <see cref="Object.Destroy"/> from HUD teardown completes before rebuilding;
+  /// same-frame Destroy+Create duplicates children and the wrong <see cref="CastBarView"/> can "win".
+  /// </summary>
+  IEnumerator EnsureCastBarAfterDestroyFlush() {
+    yield return null;
+    CastBarView.EnsureForRunner(_runner);
   }
 
   void Update() {

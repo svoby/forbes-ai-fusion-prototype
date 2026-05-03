@@ -16,8 +16,12 @@ using UnityEngine;
 /// derived from ticks via <c>Runner.DeltaTime</c> on the render side.
 /// </para>
 /// </summary>
+[DefaultExecutionOrder(-100)]
 public class NetworkCombatController : NetworkBehaviour {
   const float GcdSec = 1.0f;
+
+  /// <summary>Squared move magnitude above this cancels a cast-time spell (state authority).</summary>
+  const float MovementCancelSqr = 1e-6f;
 
   // --- Networked cast state ---
 
@@ -52,9 +56,12 @@ public class NetworkCombatController : NetworkBehaviour {
   /// <summary>True while a cast-time spell is in flight; <see cref="PlayerMovement"/> uses this to freeze movement.</summary>
   public bool IsCasting => CurrentSpellId != 0 && Runner != null && Runner.Tick < CastEndTick;
 
-  /// <summary>0–1 cast progress; safe to use in render without Runner null check (IsCasting guards it).</summary>
+  /// <summary>0–1 cast progress for UI render; avoids NRE when <see cref="Runner"/> not yet resolved.</summary>
   public float CastProgress {
     get {
+      if (Runner == null) {
+        return 0f;
+      }
       int total = CastEndTick - CastStartTick;
       return total <= 0 ? 0f : Mathf.Clamp01((float)(Runner.Tick - CastStartTick) / total);
     }
@@ -73,7 +80,7 @@ public class NetworkCombatController : NetworkBehaviour {
     }
 
     if (_health != null && _health.IsDead) {
-      ClearCastState();
+      TryCancelCast(CastCancelReason.Death);
       return;
     }
 
@@ -87,11 +94,70 @@ public class NetworkCombatController : NetworkBehaviour {
       return;
     }
 
-    if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell1)) { TryStartCast(1, input.TargetId); }
-    else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell2)) { TryStartCast(2, input.TargetId); }
-    else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell3)) { TryStartCast(3, input.TargetId); }
+    if (IsCasting) {
+      if (input.Move.sqrMagnitude > MovementCancelSqr) {
+        TryCancelCast(CastCancelReason.Movement);
+      } else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Jump)) {
+        TryCancelCast(CastCancelReason.Jump);
+      } else {
+        var castSpell = SpellRegistry.Get(CurrentSpellId);
+        if (castSpell.IsValid
+            && !CombatValidator.TryValidate(
+              Runner, transform, CastTarget, castSpell,
+              Runner.Tick, gcdEndTick: 0, cooldownEndTick: 0,
+              isAlreadyCasting: false,
+              out _, out _)) {
+          TryCancelCast(CastCancelReason.InvalidTarget);
+        }
+      }
+    }
+
+    if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell1)) {
+      TryCastOrInterrupt(1, input.TargetId);
+    } else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell2)) {
+      TryCastOrInterrupt(2, input.TargetId);
+    } else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell3)) {
+      TryCastOrInterrupt(3, input.TargetId);
+    }
 
     _prevButtons = input.Buttons;
+  }
+
+  /// <summary>
+  /// Authoritative cast interrupt. Only mutates networked cast fields on state authority.
+  /// Does not refund GCD or alter spell cooldowns.
+  /// </summary>
+  public void TryCancelCast(CastCancelReason reason) {
+    if (!HasStateAuthority || Runner == null) {
+      return;
+    }
+
+    if (reason == CastCancelReason.None) {
+      return;
+    }
+
+    if (reason == CastCancelReason.Death) {
+      bool log = IsCasting;
+      ClearCastState();
+      if (log) {
+        ForbesLog.Net($"Cast cancelled: {reason}", this);
+      }
+      return;
+    }
+
+    if (!IsCasting) {
+      return;
+    }
+
+    ClearCastState();
+    ForbesLog.Net($"Cast cancelled: {reason}", this);
+  }
+
+  void TryCastOrInterrupt(byte spellId, NetworkId targetId) {
+    if (IsCasting) {
+      TryCancelCast(CastCancelReason.NewSpell);
+    }
+    TryStartCast(spellId, targetId);
   }
 
   // ---- Cast initiation ----

@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "Fusion.Unity",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

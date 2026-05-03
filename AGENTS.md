@@ -32,3 +32,13 @@ This repository is a Unity multiplayer prototype using Photon Fusion.
 - No authority violations.
 - No critical console errors.
 - Includes quick manual verification steps.
+
+## CLI verification (agents)
+When diagnosing compile/regression bugs, **run EditMode tests from the terminal** instead of guessing:
+
+```text
+powershell -ExecutionPolicy Bypass -File tools\Run-EditModeTests.ps1
+```
+
+- Output: `TestResults-EditMode.xml` at repo root.
+- **Close Unity Editor first** -- batch Unity exits with error if another instance has the project open.

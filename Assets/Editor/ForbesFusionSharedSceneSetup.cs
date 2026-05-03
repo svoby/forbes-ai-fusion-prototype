@@ -4,6 +4,7 @@ using Fusion.Editor;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// Scene and prefab setup helpers for the Forbes Fusion prototype.
@@ -19,6 +20,44 @@ public static class ForbesFusionSharedSceneSetup {
   // -----------------------------------------------------------------------
   //  Full one-click setup — run this after pulling updated scripts
   // -----------------------------------------------------------------------
+
+  [MenuItem("Tools/Fusion/Scene/Ensure Cast Bar HUD Only", false, 101)]
+  public static void MenuEnsureCastBarHudOnly() {
+    if (Application.isPlaying) {
+      return;
+    }
+
+    int created = EnsureCastBarHudForLoadedScenes();
+    if (created > 0) {
+      Debug.Log($"Forbes: ForbesHudCanvas added under NetworkRunner ({created}). Save the scene.");
+    }
+  }
+
+  /// <summary>Places cast bar under runners in scenes that are loaded in the editor. Does not run automatically.</summary>
+  static int EnsureCastBarHudForLoadedScenes() {
+    int created = 0;
+
+    foreach (NetworkRunner runner in Object.FindObjectsByType<NetworkRunner>(FindObjectsInactive.Include)) {
+      if (runner == null || !runner.gameObject.scene.IsValid()) {
+        continue;
+      }
+
+      if (PrefabUtility.IsPartOfPrefabAsset(runner.gameObject)) {
+        continue;
+      }
+
+      if (FindHudCanvasDirectChild(runner) != null) {
+        continue;
+      }
+
+      EnsureHudCanvas(runner);
+      created++;
+
+      EditorSceneManager.MarkSceneDirty(runner.gameObject.scene);
+    }
+
+    return created;
+  }
 
   [MenuItem("Tools/Fusion/Scene/Apply Full Combat Setup (run once)", false, 100)]
   public static void ApplyFullCombatSetup() {
@@ -108,6 +147,7 @@ public static class ForbesFusionSharedSceneSetup {
     var dummySpawner = EnsureComponent<TrainingDummySpawner>(go);
     EnsureComponent<CombatHud>(go);
     EnsureComponent<FusionHudToggle>(go);
+    EnsureHudCanvas(runner);
 
     WireAssetRef(spawner, "PlayerPrefab", PlayerPrefabPath);
     WireAssetRef(dummySpawner, "TrainingDummyPrefab", TrainingDummyPrefabPath);
@@ -226,6 +266,149 @@ public static class ForbesFusionSharedSceneSetup {
     }
 
     PrefabUtility.UnloadPrefabContents(contents);
+  }
+
+  // -----------------------------------------------------------------------
+  //  HUD canvas (cast bar)
+  // -----------------------------------------------------------------------
+
+  static Transform FindHudCanvasDirectChild(NetworkRunner runner) {
+    Transform t = runner.transform;
+    for (var i = 0; i < t.childCount; i++) {
+      Transform c = t.GetChild(i);
+      if (c != null && c.name == CastBarView.HudCanvasChildName) {
+        return c;
+      }
+    }
+
+    return null;
+  }
+
+  /// <summary>
+  /// One overlay canvas under the runner with <see cref="CastBarView"/> wired.
+  /// Skips creation if <see cref="CastBarView.HudCanvasChildName"/> already exists. Cast bar overlay does not create an EventSystem (avoids Input System UI module clashes and is not needed for passive rendering).
+  /// </summary>
+  static void EnsureHudCanvas(NetworkRunner runner) {
+    if (FindHudCanvasDirectChild(runner) != null) {
+      return;
+    }
+
+    Font uiFont = CastBarView.ResolveDefaultHudFont(26);
+
+    var white = Sprite.Create(
+      Texture2D.whiteTexture,
+      new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height),
+      new Vector2(0.5f, 0.5f),
+      100f);
+
+    GameObject canvasGo = new GameObject(CastBarView.HudCanvasChildName);
+    Undo.RegisterCreatedObjectUndo(canvasGo, "Forbes HUD Canvas");
+    canvasGo.transform.SetParent(runner.transform, false);
+
+    var canvas = canvasGo.AddComponent<Canvas>();
+    canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+    canvas.sortingOrder = 1000;
+
+    var scaler = canvasGo.AddComponent<CanvasScaler>();
+    scaler.uiScaleMode            = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+    scaler.referenceResolution    = new Vector2(1920f, 1080f);
+    scaler.matchWidthOrHeight     = 0.5f;
+    scaler.referencePixelsPerUnit = 100f;
+    canvasGo.AddComponent<GraphicRaycaster>();
+
+    GameObject panel = new GameObject("CastBarPanel");
+    Undo.RegisterCreatedObjectUndo(panel, "CastBarPanel");
+    panel.transform.SetParent(canvasGo.transform, false);
+    var panelRect = panel.AddComponent<RectTransform>();
+    panelRect.anchorMin = new Vector2(0.5f, 0f);
+    panelRect.anchorMax = new Vector2(0.5f, 0f);
+    panelRect.pivot = new Vector2(0.5f, 0f);
+    panelRect.anchoredPosition = new Vector2(0f, CastBarView.CastBarLiftFromBottomPx);
+    panelRect.sizeDelta = new Vector2(CastBarView.CastBarPanelWidth, CastBarView.CastBarPanelHeight);
+    var panelGroup = panel.AddComponent<CanvasGroup>();
+    panelGroup.alpha = 0f;
+    panelGroup.blocksRaycasts = false;
+
+    var bg = new GameObject("Background");
+    Undo.RegisterCreatedObjectUndo(bg, "CastBar Background");
+    bg.transform.SetParent(panel.transform, false);
+    var bgRt = bg.AddComponent<RectTransform>();
+    StretchFull(bgRt);
+    var bgImg = bg.AddComponent<Image>();
+    bgImg.sprite = white;
+    bgImg.color = new Color(0.12f, 0.12f, 0.14f, 0.95f);
+
+    var nameGo = new GameObject("SpellName");
+    Undo.RegisterCreatedObjectUndo(nameGo, "CastBar SpellName");
+    nameGo.transform.SetParent(panel.transform, false);
+    var nameRt = nameGo.AddComponent<RectTransform>();
+    nameRt.anchorMin = new Vector2(0f, 1f);
+    nameRt.anchorMax = new Vector2(1f, 1f);
+    nameRt.pivot = new Vector2(0.5f, 1f);
+    nameRt.anchoredPosition = new Vector2(0f, -6f);
+    nameRt.sizeDelta = new Vector2(-24f, 40f);
+    var nameTxt = nameGo.AddComponent<Text>();
+    CastBarView.StyleHudText(nameTxt, uiFont, 26, FontStyle.Bold, Color.white);
+    nameTxt.alignment = TextAnchor.MiddleCenter;
+    nameTxt.text = "";
+
+    var timerGo = new GameObject("Timer");
+    Undo.RegisterCreatedObjectUndo(timerGo, "CastBar Timer");
+    timerGo.transform.SetParent(panel.transform, false);
+    var timerRt = timerGo.AddComponent<RectTransform>();
+    timerRt.anchorMin = new Vector2(1f, 0f);
+    timerRt.anchorMax = new Vector2(1f, 0f);
+    timerRt.pivot = new Vector2(1f, 0f);
+    timerRt.anchoredPosition = new Vector2(-14f, 18f);
+    timerRt.sizeDelta = new Vector2(132f, 36f);
+    var timerTxt = timerGo.AddComponent<Text>();
+    CastBarView.StyleHudText(timerTxt, uiFont, 20, FontStyle.Bold, new Color(0.95f, 0.95f, 0.95f));
+    timerTxt.alignment = TextAnchor.MiddleRight;
+    timerTxt.text = "";
+
+    var trackGo = new GameObject("FillTrack");
+    Undo.RegisterCreatedObjectUndo(trackGo, "CastBar FillTrack");
+    trackGo.transform.SetParent(panel.transform, false);
+    var trackRt = trackGo.AddComponent<RectTransform>();
+    trackRt.anchorMin = new Vector2(0f, 0f);
+    trackRt.anchorMax = new Vector2(1f, 0f);
+    trackRt.pivot = new Vector2(0.5f, 0f);
+    trackRt.anchoredPosition = new Vector2(-58f, 20f);
+    trackRt.sizeDelta = new Vector2(-156f, 30f);
+    var trackImg = trackGo.AddComponent<Image>();
+    trackImg.sprite = white;
+    trackImg.color = new Color(0.06f, 0.06f, 0.08f, 1f);
+
+    var fillGo = new GameObject("Fill");
+    Undo.RegisterCreatedObjectUndo(fillGo, "CastBar Fill");
+    fillGo.transform.SetParent(trackGo.transform, false);
+    var fillRt = fillGo.AddComponent<RectTransform>();
+    StretchFull(fillRt);
+    var fillImg = fillGo.AddComponent<Image>();
+    fillImg.sprite = white;
+    fillImg.type = Image.Type.Filled;
+    fillImg.fillMethod = Image.FillMethod.Horizontal;
+    fillImg.fillOrigin = 0;
+    fillImg.color = new Color(0.85f, 0.45f, 0.12f, 1f);
+    fillImg.fillAmount = 0f;
+
+    var view = canvasGo.AddComponent<CastBarView>();
+    view.BindUi(panelGroup, fillImg, nameTxt, timerTxt);
+    view.StampLayoutVersion(CastBarView.CurrentHudLayoutVersion);
+
+    EditorUtility.SetDirty(view);
+    EditorUtility.SetDirty(canvasGo);
+
+    Debug.Log("ForbesFusionSharedSceneSetup: Created ForbesHudCanvas with CastBarView.");
+  }
+
+  static void StretchFull(RectTransform rt) {
+    rt.anchorMin = Vector2.zero;
+    rt.anchorMax = Vector2.one;
+    rt.pivot = new Vector2(0.5f, 0.5f);
+    rt.offsetMin = Vector2.zero;
+    rt.offsetMax = Vector2.zero;
+    rt.localScale = Vector3.one;
   }
 
   // -----------------------------------------------------------------------

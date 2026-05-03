@@ -9,7 +9,7 @@ using UnityEngine;
 /// <list type="bullet">
 ///   <item>Own HP</item>
 ///   <item>Selected target name + HP</item>
-///   <item>Cast bar (spell name + progress %)</item>
+///   <item>Cast timing is shown by <see cref="CastBarView"/> (canvas)</item>
 ///   <item>GCD remaining</item>
 ///   <item>Per-spell cooldowns [1] [2] [3]</item>
 ///   <item>Last cast failure reason (shown for 2 s)</item>
@@ -22,19 +22,18 @@ public class CombatHud : MonoBehaviour {
 
   string _selfLine   = "";
   string _targetLine = "";
-  string _castBar    = "";
   string _gcdLine    = "";
   string _cdLine     = "";
   string _failLine   = "";
 
   void Awake() {
-    _runner   = GetComponent<NetworkRunner>();
+    _runner    = GetComponent<NetworkRunner>();
     _targeting = GetComponent<TargetingController>();
   }
 
   void Update() {
     if (_runner == null || !_runner.IsRunning) {
-      _selfLine = _targetLine = _castBar = _gcdLine = _cdLine = _failLine = "";
+      _selfLine = _targetLine = _gcdLine = _cdLine = _failLine = "";
       return;
     }
 
@@ -69,7 +68,7 @@ public class CombatHud : MonoBehaviour {
   }
 
   void UpdateCombatLines() {
-    _castBar = _gcdLine = _cdLine = _failLine = "";
+    _gcdLine = _cdLine = _failLine = "";
 
     if (!_runner.TryGetPlayerObject(_runner.LocalPlayer, out var playerObj)) {
       return;
@@ -77,13 +76,6 @@ public class CombatHud : MonoBehaviour {
 
     if (!playerObj.TryGetComponent(out NetworkCombatController combat)) {
       return;
-    }
-
-    // Cast bar.
-    if (combat.IsCasting) {
-      var spell = SpellRegistry.Get(combat.CurrentSpellId);
-      int pct = Mathf.RoundToInt(combat.CastProgress * 100f);
-      _castBar = $"Casting: {spell.Name}  [{pct}%]";
     }
 
     // GCD.
@@ -116,10 +108,6 @@ public class CombatHud : MonoBehaviour {
       normal   = { textColor = Color.white },
     };
 
-    var castStyle = new GUIStyle(style) {
-      normal = { textColor = new Color(1f, 0.9f, 0.3f) },
-    };
-
     var failStyle = new GUIStyle(style) {
       normal = { textColor = new Color(1f, 0.3f, 0.3f) },
     };
@@ -127,7 +115,6 @@ public class CombatHud : MonoBehaviour {
     float y = pad;
     DrawLine(_selfLine,   style,    pad, ref y, rowH);
     DrawLine(_targetLine, style,    pad, ref y, rowH);
-    DrawLine(_castBar,    castStyle, pad, ref y, rowH);
     DrawLine(_gcdLine,    style,    pad, ref y, rowH);
     DrawLine(_cdLine,     style,    pad, ref y, rowH);
     DrawLine(_failLine,   failStyle, pad, ref y, rowH);
