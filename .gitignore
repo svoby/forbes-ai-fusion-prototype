@@ -16,7 +16,8 @@ _build/
 /[Uu]ser[Ss]ettings/
 *.log
 
-# Unity Test Framework CLI output (Run-EditModeTests.ps1)
+# Unity Test Framework CLI output (tools/run-editmode-tests.ps1)
+/TestResults/
 /TestResults*.xml
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.

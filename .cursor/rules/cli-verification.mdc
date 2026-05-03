@@ -1,5 +1,5 @@
 ---
-description: Prefer Unity Test Runner (Edit Mode) while the Editor is open; use tools/Run-EditModeTests.ps1 only when the project can be opened in batchmode (Editor closed / CI).
+description: Prefer Unity Test Runner (Edit Mode) while the Editor is open; use tools/run-editmode-tests.ps1 (or Run-EditModeTests.ps1) only when the project can be opened in batchmode (Editor closed / CI).
 alwaysApply: true
 ---
 
@@ -12,24 +12,24 @@ alwaysApply: true
 
 ## From the shell (CI, or when you can close the Editor)
 
-- Batch Unity **cannot** open the same project twice. `tools\Run-EditModeTests.ps1` requires the **Editor closed** for this project.
+- Batch Unity **cannot** open the project twice. `tools\run-editmode-tests.ps1` (wrapper: `Run-EditModeTests.ps1`) requires the **Editor closed** for this project.
 
   ```text
-  powershell -ExecutionPolicy Bypass -File tools\Run-EditModeTests.ps1
+  powershell -ExecutionPolicy Bypass -File tools\run-editmode-tests.ps1
   ```
 
-- Results: `TestResults-EditMode.xml`.
+- Results: `TestResults/editmode.xml`, log: `TestResults/unity-editmode.log` (see `docs/TEST_HARNESS.md`).
 
 # CLI verification
 
 - When the user reports **compile errors**, **broken tests**, or **Console errors tied to gameplay/C#**, prefer **Test Runner (Edit Mode)** in the open Editor. Use batchmode when feasible:
 
   ```text
-  powershell -ExecutionPolicy Bypass -File tools\Run-EditModeTests.ps1
+  powershell -ExecutionPolicy Bypass -File tools\run-editmode-tests.ps1
   ```
 
   from repo root (**Unity batchmode rejects a locked project** — close the Editor on this project first, or run tests inside the Editor as above).
 
-- Read `TestResults-EditMode.xml` for failures when using batchmode; fix code and re-run.
+- Read `TestResults/editmode.xml` for failures when using batchmode; fix code and re-run.
 
 - Do not declare "fixed" without a green test run when the failure was in compilable/gameplay C#.

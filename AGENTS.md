@@ -37,8 +37,10 @@ This repository is a Unity multiplayer prototype using Photon Fusion.
 When diagnosing compile/regression bugs, **run EditMode tests from the terminal** instead of guessing:
 
 ```text
-powershell -ExecutionPolicy Bypass -File tools\Run-EditModeTests.ps1
+powershell -ExecutionPolicy Bypass -File tools\run-editmode-tests.ps1
 ```
 
-- Output: `TestResults-EditMode.xml` at repo root.
+(`tools\Run-EditModeTests.ps1` delegates to the same runner.)
+
+- Output: `TestResults/editmode.xml` and `TestResults/unity-editmode.log` (see `docs/TEST_HARNESS.md`).
 - **Close Unity Editor first** -- batch Unity exits with error if another instance has the project open.
