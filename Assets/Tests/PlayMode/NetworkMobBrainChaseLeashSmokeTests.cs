@@ -262,11 +262,11 @@ namespace Forbes.Tests.PlayMode {
       }
 
       brain.WanderRadius          = 0f;
-      brain.MoveSpeed             = 0f;
+      brain.WalkSpeed             = 0f;
+      brain.RunSpeed              = 14f;
       brain.MinLegDistance        = 0f;
       brain.IdleTicksMin          = 1;
       brain.IdleTicksMax          = 1;
-      brain.ChaseSpeed            = 14f;
       brain.LeashRadius           = 50f;
       brain.AggroRadius           = 14f;
       brain.AttackRange           = 1.4f;
