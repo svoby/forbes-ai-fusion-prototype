@@ -90,5 +90,48 @@ namespace Forbes.Tests.EditMode {
       var qTiny = NetworkMobBrainLogic.RotationFacingHorizontal(new Vector3(1e-5f, 0f, 1e-5f), fallback);
       Assert.Less(Quaternion.Angle(qTiny, fallback), 1e-3f);
     }
+
+    [Test]
+    public void IsWithinHorizontalRange_SameXZ_DifferentY_IsInside() {
+      var a = new Vector3(1f, 0f, 2f);
+      var b = new Vector3(1f, 999f, 2f);
+      Assert.IsTrue(NetworkMobBrainLogic.IsWithinHorizontalRange(a, b, 0.05f));
+    }
+
+    [Test]
+    public void IsWithinHorizontalRange_OutsideHorizontalRange_ReturnsFalse() {
+      var a = Vector3.zero;
+      var b = new Vector3(3f, 0f, 4f);
+      Assert.IsFalse(NetworkMobBrainLogic.IsWithinHorizontalRange(a, b, 4.99f));
+      Assert.IsTrue(NetworkMobBrainLogic.IsWithinHorizontalRange(a, b, 5.01f));
+    }
+
+    [Test]
+    public void IsWithinHorizontalRange_NegativeRange_ClampedToZero() {
+      var a = Vector3.zero;
+      var b = new Vector3(1f, 0f, 0f);
+      Assert.IsFalse(NetworkMobBrainLogic.IsWithinHorizontalRange(a, b, -2f));
+    }
+
+    [Test]
+    public void CanAttackAtTick_WhenBeforeCooldown_False() {
+      Assert.IsFalse(NetworkMobBrainLogic.CanAttackAtTick(4, 5));
+      Assert.IsTrue(NetworkMobBrainLogic.CanAttackAtTick(5, 5));
+      Assert.IsTrue(NetworkMobBrainLogic.CanAttackAtTick(6, 5));
+    }
+
+    [Test]
+    public void SecondsToTicks_AlwaysAtLeastOne() {
+      Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(0f, 60));
+      Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(0.001f, 60));
+      Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(1f, 1));
+      Assert.AreEqual(60, NetworkMobBrainLogic.SecondsToTicks(1f, 60));
+    }
+
+    [Test]
+    public void SecondsToTicks_NonPositiveTickRate_UsesOne() {
+      Assert.AreEqual(3, NetworkMobBrainLogic.SecondsToTicks(3f, 0));
+      Assert.AreEqual(3, NetworkMobBrainLogic.SecondsToTicks(3f, -5));
+    }
   }
 }

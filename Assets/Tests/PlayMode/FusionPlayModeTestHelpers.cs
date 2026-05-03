@@ -3,6 +3,7 @@ using System.Collections;
 using Fusion;
 using NUnit.Framework;
 using Assert = NUnit.Framework.Assert;
+using UnityEngine;
 
 namespace Forbes.Tests.PlayMode {
   /// <summary>
@@ -149,6 +150,25 @@ namespace Forbes.Tests.PlayMode {
       }
 
       Assert.Fail($"TrySpawn remained Queued longer than {maxFrames} frames.");
+    }
+
+    /// <summary>
+    /// Wander off, no melee: keeps <see cref="NetworkMobBrain"/> enabled so Fusion still ticks sibling <see cref="Health"/>.
+    /// </summary>
+    internal static void PinMobBrainNoCombat(NetworkMobBrain brain) {
+      if (brain == null) {
+        return;
+      }
+
+      brain.WanderRadius = 0f;
+      brain.MoveSpeed = 0f;
+      brain.MinLegDistance = 0f;
+      brain.IdleTicksMin = 1;
+      brain.IdleTicksMax = 1;
+      brain.AttackRange = 0f;
+      brain.AggroRadius = 0f;
+      brain.AttackDamage = 0f;
+      brain.AttackIntervalSeconds = 999f;
     }
   }
 }

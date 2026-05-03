@@ -43,6 +43,29 @@ public static class NetworkMobBrainLogic {
   }
 
   /// <summary>
+  /// Horizontal separation on XZ only; Y difference does not affect the distance check.
+  /// Negative <paramref name="range"/> is treated as zero.
+  /// </summary>
+  public static bool IsWithinHorizontalRange(Vector3 a, Vector3 b, float range) {
+    float r = Mathf.Max(0f, range);
+    return HorizontalSqrDistance(a, b) <= r * r;
+  }
+
+  public static bool CanAttackAtTick(int currentTick, int nextAttackTick) {
+    return currentTick >= nextAttackTick;
+  }
+
+  /// <summary>
+  /// Converts a non-negative second interval to simulation ticks; always at least one tick.
+  /// </summary>
+  public static int SecondsToTicks(float seconds, int tickRate) {
+    int tr = Mathf.Max(1, tickRate);
+    float s = Mathf.Max(0f, seconds);
+    int ticks = Mathf.CeilToInt(s * tr);
+    return Mathf.Max(1, ticks);
+  }
+
+  /// <summary>
   /// Normalized direction on XZ from <paramref name="from"/> to <paramref name="to"/>; Y difference is ignored.
   /// Returns false and <paramref name="horizontalDirection"/> zero when horizontal separation is below epsilon.
   /// </summary>

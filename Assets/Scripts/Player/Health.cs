@@ -39,6 +39,9 @@ public class Health : NetworkBehaviour {
 
   CharacterController _controller;
 
+  /// <summary>Authority-only: one-shot apply requested by tests when Editor spawn order leaves HP at default.</summary>
+  bool _applyStartingHealthIfUnsetDue;
+
   /// <summary>Authority-only: record spawn position this tick after NetworkTransform applied (see <see cref="Spawned"/>).</summary>
   int _spawnRecordDueTick = -1;
 
@@ -63,9 +66,35 @@ public class Health : NetworkBehaviour {
     IsDeadChanged?.Invoke(IsDead);
   }
 
+  /// <summary>
+  /// State Authority: schedule aligning HP with <see cref="StartingHealth"/> on the next simulation tick
+  /// if it is still unset (Editor PlayMode quirk with some spawns). Does not resurrect real deaths (respawn tick scheduled).
+  /// </summary>
+  public void AuthorityApplyStartingHealthIfUnset() {
+    if (!HasStateAuthority) {
+      return;
+    }
+
+    _applyStartingHealthIfUnsetDue = true;
+  }
+
   public override void FixedUpdateNetwork() {
     if (!HasStateAuthority) {
       return;
+    }
+
+    if (_applyStartingHealthIfUnsetDue) {
+      _applyStartingHealthIfUnsetDue = false;
+      if (StartingHealth > 0f &&
+          NetworkedHealth <= 0.001f &&
+          !(IsDead && RespawnAtTick > 0)) {
+        ForbesLog.Health($"AuthorityApplyStartingHealthIfUnset tick={Runner.Tick} -> {StartingHealth} obj={name}", this);
+        NetworkedHealth = StartingHealth;
+        if (IsDead) {
+          IsDead = false;
+          RespawnAtTick = 0;
+        }
+      }
     }
 
     if (_spawnRecordDueTick >= 0 && Runner.Tick >= _spawnRecordDueTick) {

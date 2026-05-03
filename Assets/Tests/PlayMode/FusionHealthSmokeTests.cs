@@ -42,6 +42,7 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         var runner = _session.Runner;
         Assert.IsNotNull(runner);
+        yield return WaitFrames(5);
 
         var spawnPlayer = new Vector3(-2f, 1f, 0f);
         var spawnDummy = new Vector3(6f, 0f, -4f);
@@ -54,10 +55,10 @@ namespace Forbes.Tests.PlayMode {
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
 
-        // Health smoke asserts respawn snap: disable wander (Fusion may still tick disabled NB) and shared-mode
-        // interpolation so render transform matches authority teleport after Respawn().
+        // Health smoke: pin dummy movement/melee (same as victim in mob tests). Do not disable NetworkMobBrain —
+        // in Editor PlayMode that can stop sibling simulation ticks (respawn never runs).
         if (_dummy.TryGetComponent<NetworkMobBrain>(out var mobBrain)) {
-          UnityEngine.Object.Destroy(mobBrain);
+          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
         }
 
         if (_dummy.TryGetComponent<NetworkTransform>(out var mobNt)) {
@@ -69,15 +70,25 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsTrue(_player.TryGetComponent(out Health playerHealth));
         Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
 
+        playerHealth.AuthorityApplyStartingHealthIfUnset();
+        dummyHealth.AuthorityApplyStartingHealthIfUnset();
+        yield return WaitFrames(5);
+
         yield return WaitUntil(
           () => _dummy.IsValid &&
                Mathf.Approximately(dummyHealth.NetworkedHealth, dummyHealth.StartingHealth),
-          maxFrames: 480);
+          maxFrames: 480,
+          "Dummy HP: " +
+          $"valid={_dummy.IsValid} hp={dummyHealth.NetworkedHealth} start={dummyHealth.StartingHealth} " +
+          $"dead={dummyHealth.IsDead} sa={dummyHealth.HasStateAuthority}");
 
         yield return WaitUntil(
           () => _player.IsValid &&
                Mathf.Approximately(playerHealth.NetworkedHealth, playerHealth.StartingHealth),
-          maxFrames: 480);
+          maxFrames: 480,
+          "Player HP: " +
+          $"valid={_player.IsValid} hp={playerHealth.NetworkedHealth} start={playerHealth.StartingHealth} " +
+          $"dead={playerHealth.IsDead} sa={playerHealth.HasStateAuthority}");
 
         Assert.AreEqual(dummyHealth.StartingHealth, dummyHealth.NetworkedHealth, 1e-3f,
           "Dummy should start at StartingHealth once spawned with authority.");
@@ -91,7 +102,12 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsTrue(dummyHealth.IsDead);
         Assert.AreEqual(0f, dummyHealth.NetworkedHealth, 1e-3f);
 
-        yield return WaitUntil(() => !dummyHealth.IsDead, maxFrames: 1200);
+        int respawnDue = dummyHealth.RespawnAtTick;
+        yield return WaitUntil(
+          () => !dummyHealth.IsDead,
+          maxFrames: 1200,
+          $"Respawn timeout: IsDead={dummyHealth.IsDead} hp={dummyHealth.NetworkedHealth} " +
+          $"respawnAt={respawnDue} tick~={(int)runner.Tick} ticksExec={runner.TicksExecuted} sa={dummyHealth.HasStateAuthority}");
 
         Assert.IsFalse(dummyHealth.IsDead);
         Assert.AreEqual(dummyHealth.StartingHealth, dummyHealth.NetworkedHealth, 1e-3f);
@@ -104,18 +120,25 @@ namespace Forbes.Tests.PlayMode {
       }
     }
 
-    static IEnumerator WaitUntil(Func<bool> predicate, int maxFrames) {
+    static IEnumerator WaitUntil(Func<bool> predicate, int maxFrames, string messageOnFail = null) {
       int i = 0;
       while (i < maxFrames && !predicate()) {
         i++;
+        yield return new WaitForFixedUpdate();
         yield return null;
       }
 
-      Assert.IsTrue(predicate(), $"Predicate not satisfied within {maxFrames} frames.");
+      if (predicate()) {
+        yield break;
+      }
+
+      string suffix = !string.IsNullOrEmpty(messageOnFail) ? " " + messageOnFail : "";
+      Assert.Fail($"Predicate not satisfied within {maxFrames} frames.{suffix}");
     }
 
     static IEnumerator WaitFrames(int count) {
       for (var i = 0; i < count; i++) {
+        yield return new WaitForFixedUpdate();
         yield return null;
       }
     }

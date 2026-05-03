@@ -50,6 +50,7 @@ namespace Forbes.Tests.PlayMode {
       Assert.IsFalse(startTask.IsFaulted, startTask.Exception?.ToString());
       Assert.IsTrue(startTask.Result.Ok, startTask.Result.ErrorMessage);
       Assert.IsTrue(_runner.IsRunning, "Runner should be running after StartGame.");
+      Time.timeScale = 1f;
     }
 
     internal IEnumerator ShutdownAndDestroy() {

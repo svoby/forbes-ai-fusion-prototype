@@ -15,6 +15,11 @@ public class NetworkMobBrain : NetworkBehaviour {
   public int IdleTicksMin = 8;
   public int IdleTicksMax = 24;
 
+  public float AttackRange = 2f;
+  public float AttackDamage = 10f;
+  public float AttackIntervalSeconds = 1.5f;
+  public float AggroRadius = 6f;
+
   CharacterController _controller;
   Health _health;
   Vector3 _spawnPosition;
@@ -22,6 +27,10 @@ public class NetworkMobBrain : NetworkBehaviour {
   Vector3 _destination;
   NetworkMobBrainState _state;
   int _idleUntilTick;
+  int _nextAttackTick;
+
+  /// <summary>Authority: record wander origin on tick+1 so <see cref="NetworkTransform"/> spawn pose is applied first.</summary>
+  int _spawnRecordDueTick = -1;
 
   public override void Spawned() {
     _controller = GetComponent<CharacterController>();
@@ -31,9 +40,20 @@ public class NetworkMobBrain : NetworkBehaviour {
       return;
     }
 
-    _spawnPosition = transform.position;
+    _spawnRecordDueTick = Runner != null ? Runner.Tick + 1 : -1;
     _state = NetworkMobBrainState.Idle;
     _idleUntilTick = Runner.Tick;
+    _nextAttackTick = Runner.Tick;
+  }
+
+  /// <summary>
+  /// State Authority: call after an external teleport (e.g. respawn) so wander origin and melee distance use the new pose.
+  /// </summary>
+  public void RefreshWanderOriginAuthority() {
+    if (!HasStateAuthority) {
+      return;
+    }
+    _spawnPosition = transform.position;
   }
 
   public override void FixedUpdateNetwork() {
@@ -52,6 +72,16 @@ public class NetworkMobBrain : NetworkBehaviour {
     }
 
     _velocity.y += GravityValue * dt;
+
+    if (_spawnRecordDueTick >= 0 && Runner.Tick >= _spawnRecordDueTick) {
+      _spawnPosition = transform.position;
+      _spawnRecordDueTick = -1;
+    }
+
+    if (_spawnRecordDueTick >= 0) {
+      _controller.Move(_velocity * dt);
+      return;
+    }
 
     switch (_state) {
       case NetworkMobBrainState.Idle:
@@ -84,6 +114,58 @@ public class NetworkMobBrain : NetworkBehaviour {
 
         break;
     }
+
+    TryMeleeAuthority();
+  }
+
+  void TryMeleeAuthority() {
+    if (!NetworkMobBrainLogic.CanAttackAtTick(Runner.Tick, _nextAttackTick)) {
+      return;
+    }
+
+    Vector3 pos = transform.position;
+    float attackR = Mathf.Max(0f, AttackRange);
+    float considerR = Mathf.Max(Mathf.Max(0f, AggroRadius), attackR);
+    Health best = null;
+    float bestSqr = float.MaxValue;
+    Health[] candidates = UnityEngine.Object.FindObjectsByType<Health>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+    for (var i = 0; i < candidates.Length; i++) {
+      Health h = candidates[i];
+      if (h == null || h == _health) {
+        continue;
+      }
+
+      if (h.Object != null && !h.Object.IsValid) {
+        continue;
+      }
+
+      if (h.IsDead) {
+        continue;
+      }
+
+      Vector3 hp = h.transform.position;
+      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hp, considerR)) {
+        continue;
+      }
+
+      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hp, attackR)) {
+        continue;
+      }
+
+      float sqr = NetworkMobBrainLogic.HorizontalSqrDistance(pos, hp);
+      if (sqr < bestSqr) {
+        bestSqr = sqr;
+        best = h;
+      }
+    }
+
+    if (best == null) {
+      return;
+    }
+
+    best.DealDamageRpc(AttackDamage);
+    int cooldownTicks = NetworkMobBrainLogic.SecondsToTicks(AttackIntervalSeconds, Runner.TickRate);
+    _nextAttackTick = Runner.Tick + cooldownTicks;
   }
 
   void PickNewDestination() {

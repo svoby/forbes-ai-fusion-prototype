@@ -59,6 +59,12 @@ Outputs:
 - **JUnit-style XML:** `TestResults/playmode.xml`
 - **Unity log:** `TestResults/unity-playmode.log`
 
+### Fusion PlayMode notes
+
+- **`NetworkMobBrainMeleeSmokeTests`:** authority mob melee uses tick cadence; victim is spawned out of range first so HP can settle, then moved in range. Baseline HP is taken **before** closing distance, because the mob attacks immediately in range.
+- **`FusionHealthSmokeTests`:** do not `Destroy` networked behaviours on the dummy; use **`FusionPlayModeTestHelpers.PinMobBrainNoCombat`** so wander/melee are off while Fusion still ticks sibling **`Health`** (respawn assertions need simulation).
+- **`Health.AuthorityApplyStartingHealthIfUnset`:** used by PlayMode smoke when Editor spawn order leaves **`NetworkedHealth`** at zero; real deaths (scheduled **`RespawnAtTick`**) are not overwritten.
+
 ## More detail
 
 See `docs/TEST_COVERAGE_PLAN.md` for planned coverage and naming of test fixtures.
