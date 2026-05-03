@@ -56,7 +56,10 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner, prefab, spawnVictim, Quaternion.identity, PlayerRef.None, spawnFlags,
-          o => FusionPlayModeTestHelpers.PinMobBrainNoCombat(o.GetComponent<NetworkMobBrain>()));
+          o => {
+            victim = o;
+            FusionPlayModeTestHelpers.PinMobBrainNoCombat(o.GetComponent<NetworkMobBrain>());
+          });
 
         if (victim.TryGetComponent<NetworkTransform>(out var victimNt)) {
           victimNt.DisableSharedModeInterpolation = true;
@@ -122,7 +125,10 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner, prefab, spawnVictimFar, Quaternion.identity, PlayerRef.None, spawnFlags,
-          o => FusionPlayModeTestHelpers.PinMobBrainNoCombat(o.GetComponent<NetworkMobBrain>()));
+          o => {
+            victim = o;
+            FusionPlayModeTestHelpers.PinMobBrainNoCombat(o.GetComponent<NetworkMobBrain>());
+          });
 
         if (victim.TryGetComponent<NetworkTransform>(out var victimNt)) {
           victimNt.DisableSharedModeInterpolation = true;
@@ -204,7 +210,10 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner, prefab, victimNear, Quaternion.identity, PlayerRef.None, spawnFlags,
-          o => FusionPlayModeTestHelpers.PinMobBrainNoCombat(o.GetComponent<NetworkMobBrain>()));
+          o => {
+            victim = o;
+            FusionPlayModeTestHelpers.PinMobBrainNoCombat(o.GetComponent<NetworkMobBrain>());
+          });
 
         if (victim.TryGetComponent<NetworkTransform>(out var victimNt)) {
           victimNt.DisableSharedModeInterpolation = true;
