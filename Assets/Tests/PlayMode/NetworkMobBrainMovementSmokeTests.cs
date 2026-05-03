@@ -49,7 +49,7 @@ namespace Forbes.Tests.PlayMode {
         var brain = dummy.GetComponent<NetworkMobBrain>();
         Assert.IsNotNull(brain);
         brain.WanderRadius     = 26f;
-        brain.MoveSpeed        = 14f;
+        brain.WalkSpeed        = 14f;
         brain.MinLegDistance   = 12f;
         brain.ArrivalThreshold = 0.18f;
         brain.IdleTicksMin     = 1;

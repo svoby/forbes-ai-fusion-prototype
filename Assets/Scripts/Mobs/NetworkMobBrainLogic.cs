@@ -86,6 +86,16 @@ public static class NetworkMobBrainLogic {
     return false;
   }
 
+  /// <summary>
+  /// Returns <paramref name="runSpeed"/> when the mob is actively chasing or returning (leash),
+  /// otherwise returns <paramref name="walkSpeed"/> (idle / wander).
+  /// Both values are clamped to zero so negative tuning data never reverses movement.
+  /// </summary>
+  public static float SelectMobSpeed(NetworkMobBrainState state, float walkSpeed, float runSpeed) {
+    bool sprinting = state == NetworkMobBrainState.Chase || state == NetworkMobBrainState.Return;
+    return sprinting ? Mathf.Max(0f, runSpeed) : Mathf.Max(0f, walkSpeed);
+  }
+
   public static bool CanAttackAtTick(int currentTick, int nextAttackTick) {
     return currentTick >= nextAttackTick;
   }

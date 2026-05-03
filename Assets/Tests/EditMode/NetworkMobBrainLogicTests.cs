@@ -188,5 +188,41 @@ namespace Forbes.Tests.EditMode {
       Assert.AreEqual(3, NetworkMobBrainLogic.SecondsToTicks(3f, 0));
       Assert.AreEqual(3, NetworkMobBrainLogic.SecondsToTicks(3f, -5));
     }
+
+    // --- SelectMobSpeed ---
+
+    [Test]
+    public void SelectMobSpeed_IdleAndWander_ReturnsWalkSpeed() {
+      Assert.AreEqual(3f, NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Idle,   3f, 6f), 1e-5f);
+      Assert.AreEqual(3f, NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Wander, 3f, 6f), 1e-5f);
+    }
+
+    [Test]
+    public void SelectMobSpeed_ChaseAndReturn_ReturnsRunSpeed() {
+      Assert.AreEqual(6f, NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Chase,  3f, 6f), 1e-5f);
+      Assert.AreEqual(6f, NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Return, 3f, 6f), 1e-5f);
+    }
+
+    [Test]
+    public void SelectMobSpeed_NegativeWalkSpeed_ClampedToZero() {
+      Assert.AreEqual(0f, NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Wander, -5f, 6f), 1e-5f);
+    }
+
+    [Test]
+    public void SelectMobSpeed_NegativeRunSpeed_ClampedToZero() {
+      Assert.AreEqual(0f, NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Chase, 3f, -6f), 1e-5f);
+    }
+
+    [Test]
+    public void SelectMobSpeed_RunSpeedDoubleWalk_MatchesExpected() {
+      float walk = 3f;
+      float run  = 6f;
+      Assert.AreEqual(run, walk * 2f, 1e-5f,
+        "Default run speed should be twice the walk speed.");
+      Assert.AreEqual(walk,
+        NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Wander, walk, run), 1e-5f);
+      Assert.AreEqual(run,
+        NetworkMobBrainLogic.SelectMobSpeed(NetworkMobBrainState.Chase,  walk, run), 1e-5f);
+    }
   }
 }

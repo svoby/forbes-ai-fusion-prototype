@@ -9,13 +9,15 @@ public class NetworkMobBrain : NetworkBehaviour {
   const float GravityValue = -9.81f;
 
   public float WanderRadius = 8f;
-  public float MoveSpeed = 6f;
+  /// <summary>Wander / idle movement speed (half of run by default).</summary>
+  public float WalkSpeed = 3f;
+  /// <summary>Chase and leash-return movement speed.</summary>
+  public float RunSpeed = 6f;
   public float ArrivalThreshold = 0.3f;
   public float MinLegDistance = 1f;
   public int IdleTicksMin = 8;
   public int IdleTicksMax = 24;
 
-  public float ChaseSpeed = 7f;
   public float LeashRadius = 12f;
   public float StopDistanceBuffer = 0.15f;
 
@@ -120,7 +122,8 @@ public class NetworkMobBrain : NetworkBehaviour {
 
         if (NetworkMobBrainLogic.TryGetHorizontalDirection(posW, _destination, out var dirW)) {
           transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirW, transform.rotation);
-          Vector3 planarW = dirW * (MoveSpeed * dt);
+          float wanderSpeed = NetworkMobBrainLogic.SelectMobSpeed(_state, WalkSpeed, RunSpeed);
+          Vector3 planarW = dirW * (wanderSpeed * dt);
           _controller.Move(planarW + _velocity * dt);
         } else {
           _controller.Move(_velocity * dt);
@@ -178,7 +181,7 @@ public class NetworkMobBrain : NetworkBehaviour {
 
     if (NetworkMobBrainLogic.TryGetHorizontalDirection(mobPos, tpos, out var dirC)) {
       transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirC, transform.rotation);
-      float speed = Mathf.Max(0f, ChaseSpeed);
+      float speed = NetworkMobBrainLogic.SelectMobSpeed(_state, WalkSpeed, RunSpeed);
       Vector3 planarC = dirC * (speed * dt);
       _controller.Move(planarC + _velocity * dt);
     } else {
@@ -201,9 +204,7 @@ public class NetworkMobBrain : NetworkBehaviour {
 
     if (NetworkMobBrainLogic.TryGetHorizontalDirection(pos, _spawnPosition, out var dirR)) {
       transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirR, transform.rotation);
-      // Wander uses MoveSpeed; chase uses ChaseSpeed. When MoveSpeed is zeroed to pin wander (tests / dummies),
-      // return must still use a positive speed — take the max so leash-return matches chase mobility.
-      float speed = Mathf.Max(Mathf.Max(0f, MoveSpeed), Mathf.Max(0f, ChaseSpeed));
+      float speed = NetworkMobBrainLogic.SelectMobSpeed(_state, WalkSpeed, RunSpeed);
       Vector3 planarR = dirR * (speed * dt);
       _controller.Move(planarR + _velocity * dt);
     } else {
