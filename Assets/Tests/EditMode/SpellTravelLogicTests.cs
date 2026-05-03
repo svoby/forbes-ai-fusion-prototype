@@ -31,7 +31,7 @@ namespace Forbes.Tests.EditMode {
 
     [Test]
     public void ComputeImpactTick_IsReleasePlusTravel_And_TravelFloorsAtZero() {
-      Assert.AreEqual(100, SpellTravelLogic.ComputeImpactTick(100, 24));
+      Assert.AreEqual(124, SpellTravelLogic.ComputeImpactTick(100, 24));
       Assert.AreEqual(100, SpellTravelLogic.ComputeImpactTick(100, -3));
     }
 
