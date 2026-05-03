@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -6,10 +7,30 @@ using UnityEngine;
 /// dimensions at runtime, so they adapt to any capsule height / radius.
 /// Falls back to standard 2 m capsule defaults when no CharacterController
 /// is present (e.g. Training Dummy).
+/// Subscribes to <see cref="Health.IsDeadChanged"/> and hides/shows the eyes
+/// on death/respawn so they don't float after the body is hidden.
 /// </summary>
 [DisallowMultipleComponent]
 public class FacingIndicator : MonoBehaviour {
   static readonly Color EyeColor = new Color(0.05f, 0.85f, 0.95f);
+
+  readonly List<GameObject> _eyes = new List<GameObject>();
+  Health _health;
+
+  void OnEnable() {
+    _health = GetComponent<Health>();
+    if (_health != null) _health.IsDeadChanged += OnDeadChanged;
+  }
+
+  void OnDisable() {
+    if (_health != null) _health.IsDeadChanged -= OnDeadChanged;
+  }
+
+  void OnDeadChanged(bool isDead) {
+    foreach (var eye in _eyes) {
+      if (eye != null) eye.SetActive(!isDead);
+    }
+  }
 
   void Start() {
     // ---- Read capsule geometry ----
@@ -55,6 +76,7 @@ public class FacingIndicator : MonoBehaviour {
     eye.transform.localScale    = Vector3.one * (eyeRadius * 2f);
     Destroy(eye.GetComponent<Collider>());
     eye.GetComponent<MeshRenderer>().sharedMaterial = mat;
+    _eyes.Add(eye);
   }
 
   static Material BuildMaterial() {

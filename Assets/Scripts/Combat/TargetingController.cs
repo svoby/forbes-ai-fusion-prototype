@@ -219,7 +219,7 @@ public class TargetingController : MonoBehaviour {
     // FindAnyObjectByType may return a non-running temporary runner.
     // Iterate all runners and pick the first one that is actively running.
     _runner = null;
-    foreach (var r in Object.FindObjectsByType<NetworkRunner>(FindObjectsSortMode.None)) {
+    foreach (var r in Object.FindObjectsByType<NetworkRunner>()) {
       if (r.IsRunning) {
         _runner = r;
         return;

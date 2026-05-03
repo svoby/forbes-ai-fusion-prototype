@@ -18,7 +18,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 [DisallowMultipleComponent]
 public class KeyboardInputSource : MonoBehaviour, IInputSource {
-  const float TurnRateDegPerSec = 120f;
+  const float TurnRateDegPerSec = 60f;
 
   bool _pendingJump;
   bool _pendingSpell1;

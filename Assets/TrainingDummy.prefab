@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 991001001008}
   - component: {fileID: 991001001009}
   - component: {fileID: 991001001020}
+  - component: {fileID: 2864031344629190355}
   m_Layer: 0
   m_Name: TrainingDummy
   m_TagString: Untagged
@@ -170,7 +171,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 498bba355bb64694818d68379b9e20f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  StartingHealth: 500
+  StartingHealth: 100
   RespawnDelaySeconds: 3
   _NetworkedHealth: 0
   _IsDead:
@@ -202,3 +203,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _renderer: {fileID: 991001001004}
+--- !u!114 &2864031344629190355
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 991001001001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6b6a532b678d024595a3ae3360d50fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Targetable
+  _displayName: Training Dummy
