@@ -33,6 +33,8 @@ namespace Forbes.Tests.EditMode {
     public void ShouldLeaveIdle_WhenTickReached_ReturnsTrue() {
       Assert.IsTrue(NetworkMobBrainLogic.ShouldLeaveIdle(NetworkMobBrainState.Idle, 10, 10));
       Assert.IsFalse(NetworkMobBrainLogic.ShouldLeaveIdle(NetworkMobBrainState.Wander, 10, 10));
+      Assert.IsFalse(NetworkMobBrainLogic.ShouldLeaveIdle(NetworkMobBrainState.Chase, 10, 10));
+      Assert.IsFalse(NetworkMobBrainLogic.ShouldLeaveIdle(NetworkMobBrainState.Return, 10, 10));
     }
 
     [Test]
@@ -126,6 +128,59 @@ namespace Forbes.Tests.EditMode {
       Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(0.001f, 60));
       Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(1f, 1));
       Assert.AreEqual(60, NetworkMobBrainLogic.SecondsToTicks(1f, 60));
+    }
+
+    [Test]
+    public void HasArrivedHorizontally_ReturnIgnoresY() {
+      var spawn = new Vector3(10f, 0f, -5f);
+      var mob = new Vector3(10.02f, 99f, -4.98f);
+      Assert.IsTrue(NetworkMobBrainLogic.HasArrivedHorizontally(mob, spawn, 0.15f));
+    }
+
+    [Test]
+    public void IsBeyondLeash_IgnoresY() {
+      var spawn = new Vector3(0f, 0f, 0f);
+      var p = new Vector3(3f, 100f, 4f);
+      Assert.IsFalse(NetworkMobBrainLogic.IsBeyondLeash(spawn, p, 5f));
+      Assert.IsTrue(NetworkMobBrainLogic.IsBeyondLeash(spawn, p, 4.9f));
+    }
+
+    [Test]
+    public void IsBeyondLeash_NegativeRadius_ClampedToZero() {
+      var spawn = Vector3.zero;
+      var p = new Vector3(0.1f, 0f, 0f);
+      Assert.IsTrue(NetworkMobBrainLogic.IsBeyondLeash(spawn, p, -3f));
+    }
+
+    [Test]
+    public void IsBeyondLeash_AtBoundary_NotBeyond() {
+      var spawn = Vector3.zero;
+      var p = new Vector3(3f, 0f, 4f);
+      Assert.IsFalse(NetworkMobBrainLogic.IsBeyondLeash(spawn, p, 5f));
+    }
+
+    [Test]
+    public void ShouldAbortChaseAndReturn_InvalidTarget_ReturnsTrue() {
+      Assert.IsTrue(NetworkMobBrainLogic.ShouldAbortChaseAndReturn(
+        Vector3.zero, Vector3.zero, new Vector3(1f, 0f, 0f), 10f, false));
+    }
+
+    [Test]
+    public void ShouldAbortChaseAndReturn_MobPastLeash_ReturnsTrue() {
+      Assert.IsTrue(NetworkMobBrainLogic.ShouldAbortChaseAndReturn(
+        Vector3.zero, new Vector3(11f, 0f, 0f), new Vector3(1f, 0f, 0f), 10f, true));
+    }
+
+    [Test]
+    public void ShouldAbortChaseAndReturn_TargetPastLeash_ReturnsTrue() {
+      Assert.IsTrue(NetworkMobBrainLogic.ShouldAbortChaseAndReturn(
+        Vector3.zero, new Vector3(1f, 0f, 0f), new Vector3(11f, 0f, 0f), 10f, true));
+    }
+
+    [Test]
+    public void ShouldAbortChaseAndReturn_ValidInsideLeash_ReturnsFalse() {
+      Assert.IsFalse(NetworkMobBrainLogic.ShouldAbortChaseAndReturn(
+        Vector3.zero, new Vector3(3f, 0f, 0f), new Vector3(-2f, 0f, 2f), 10f, true));
     }
 
     [Test]

@@ -2,7 +2,7 @@ using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// Minimal authority-only wander on the XZ plane. Position replication uses
+/// Authority-only wander / chase / leash on the XZ plane. Position replication uses
 /// <see cref="NetworkTransform"/> on the same <see cref="NetworkObject"/>.
 /// </summary>
 public class NetworkMobBrain : NetworkBehaviour {
@@ -14,6 +14,10 @@ public class NetworkMobBrain : NetworkBehaviour {
   public float MinLegDistance = 1f;
   public int IdleTicksMin = 8;
   public int IdleTicksMax = 24;
+
+  public float ChaseSpeed = 7f;
+  public float LeashRadius = 12f;
+  public float StopDistanceBuffer = 0.15f;
 
   public float AttackRange = 2f;
   public float AttackDamage = 10f;
@@ -28,6 +32,7 @@ public class NetworkMobBrain : NetworkBehaviour {
   NetworkMobBrainState _state;
   int _idleUntilTick;
   int _nextAttackTick;
+  NetworkId _currentTargetId;
 
   /// <summary>Authority: record wander origin on tick+1 so <see cref="NetworkTransform"/> spawn pose is applied first.</summary>
   int _spawnRecordDueTick = -1;
@@ -44,6 +49,7 @@ public class NetworkMobBrain : NetworkBehaviour {
     _state = NetworkMobBrainState.Idle;
     _idleUntilTick = Runner.Tick;
     _nextAttackTick = Runner.Tick;
+    _currentTargetId = default;
   }
 
   /// <summary>
@@ -53,6 +59,7 @@ public class NetworkMobBrain : NetworkBehaviour {
     if (!HasStateAuthority) {
       return;
     }
+
     _spawnPosition = transform.position;
   }
 
@@ -83,6 +90,12 @@ public class NetworkMobBrain : NetworkBehaviour {
       return;
     }
 
+    if (_state == NetworkMobBrainState.Idle || _state == NetworkMobBrainState.Wander) {
+      if (TryAcquireAggroTargetAuthority()) {
+        _state = NetworkMobBrainState.Chase;
+      }
+    }
+
     switch (_state) {
       case NetworkMobBrainState.Idle:
         if (NetworkMobBrainLogic.ShouldLeaveIdle(_state, Runner.Tick, _idleUntilTick)) {
@@ -95,27 +108,174 @@ public class NetworkMobBrain : NetworkBehaviour {
         break;
 
       case NetworkMobBrainState.Wander:
-        var pos = transform.position;
-        if (NetworkMobBrainLogic.HasArrivedHorizontally(pos, _destination, ArrivalThreshold)) {
+        var posW = transform.position;
+        if (NetworkMobBrainLogic.HasArrivedHorizontally(posW, _destination, ArrivalThreshold)) {
           _state = NetworkMobBrainState.Idle;
           int span = Mathf.Max(0, IdleTicksMax - IdleTicksMin);
           int jitter = span > 0 ? Random.Range(0, span + 1) : 0;
           _idleUntilTick = Runner.Tick + Mathf.Max(1, IdleTicksMin + jitter);
+          _controller.Move(_velocity * dt);
           break;
         }
 
-        if (NetworkMobBrainLogic.TryGetHorizontalDirection(pos, _destination, out var dir)) {
-          transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dir, transform.rotation);
-          Vector3 planar = dir * (MoveSpeed * dt);
-          _controller.Move(planar + _velocity * dt);
+        if (NetworkMobBrainLogic.TryGetHorizontalDirection(posW, _destination, out var dirW)) {
+          transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirW, transform.rotation);
+          Vector3 planarW = dirW * (MoveSpeed * dt);
+          _controller.Move(planarW + _velocity * dt);
         } else {
           _controller.Move(_velocity * dt);
         }
 
         break;
+
+      case NetworkMobBrainState.Chase:
+        TickChaseAuthority(dt);
+        break;
+
+      case NetworkMobBrainState.Return:
+        TickReturnAuthority(dt);
+        break;
     }
 
-    TryMeleeAuthority();
+    if (_state != NetworkMobBrainState.Return) {
+      TryMeleeAuthority();
+    }
+  }
+
+  void BeginReturnAuthority() {
+    _currentTargetId = default;
+    _state = NetworkMobBrainState.Return;
+  }
+
+  void TickChaseAuthority(float dt) {
+    if (!TryResolveChaseTargetAuthority(out Health target)) {
+      BeginReturnAuthority();
+      _controller.Move(_velocity * dt);
+      return;
+    }
+
+    Vector3 mobPos = transform.position;
+    Vector3 tpos = target.transform.position;
+    bool alive = !target.IsDead &&
+                 target.Object != null &&
+                 target.Object.IsValid;
+
+    if (NetworkMobBrainLogic.ShouldAbortChaseAndReturn(_spawnPosition, mobPos, tpos, LeashRadius, alive)) {
+      BeginReturnAuthority();
+      _controller.Move(_velocity * dt);
+      return;
+    }
+
+    float attackR = Mathf.Max(0f, AttackRange);
+    bool holdPosition = attackR <= Mathf.Epsilon
+      ? NetworkMobBrainLogic.HorizontalSqrDistance(mobPos, tpos) <= 1e-6f
+      : NetworkMobBrainLogic.IsWithinHorizontalRange(mobPos, tpos, attackR);
+
+    if (holdPosition) {
+      _controller.Move(_velocity * dt);
+      return;
+    }
+
+    if (NetworkMobBrainLogic.TryGetHorizontalDirection(mobPos, tpos, out var dirC)) {
+      transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirC, transform.rotation);
+      float speed = Mathf.Max(0f, ChaseSpeed);
+      Vector3 planarC = dirC * (speed * dt);
+      _controller.Move(planarC + _velocity * dt);
+    } else {
+      _controller.Move(_velocity * dt);
+    }
+  }
+
+  void TickReturnAuthority(float dt) {
+    Vector3 pos = transform.position;
+    float homeTh = ArrivalThreshold + Mathf.Max(0f, StopDistanceBuffer);
+    if (NetworkMobBrainLogic.HasArrivedHorizontally(pos, _spawnPosition, homeTh)) {
+      _state = NetworkMobBrainState.Idle;
+      _currentTargetId = default;
+      int span = Mathf.Max(0, IdleTicksMax - IdleTicksMin);
+      int jitter = span > 0 ? Random.Range(0, span + 1) : 0;
+      _idleUntilTick = Runner.Tick + Mathf.Max(1, IdleTicksMin + jitter);
+      _controller.Move(_velocity * dt);
+      return;
+    }
+
+    if (NetworkMobBrainLogic.TryGetHorizontalDirection(pos, _spawnPosition, out var dirR)) {
+      transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dirR, transform.rotation);
+      float speed = Mathf.Max(0f, MoveSpeed);
+      Vector3 planarR = dirR * (speed * dt);
+      _controller.Move(planarR + _velocity * dt);
+    } else {
+      _controller.Move(_velocity * dt);
+    }
+  }
+
+  /// <summary>
+  /// Prototype: scene scan for <see cref="Health"/>. Kept in one place for a future spatial/query replacement.
+  /// </summary>
+  static Health[] LoadHealthScanSnapshot() {
+    return UnityEngine.Object.FindObjectsByType<Health>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+  }
+
+  bool TryAcquireAggroTargetAuthority() {
+    Vector3 pos = transform.position;
+    float aggro = Mathf.Max(0f, AggroRadius);
+    Health best = null;
+    float bestSqr = float.MaxValue;
+
+    Health[] candidates = LoadHealthScanSnapshot();
+    for (var i = 0; i < candidates.Length; i++) {
+      Health h = candidates[i];
+      if (h == null || h == _health) {
+        continue;
+      }
+
+      if (h.Object == null || !h.Object.IsValid) {
+        continue;
+      }
+
+      if (h.IsDead) {
+        continue;
+      }
+
+      Vector3 hp = h.transform.position;
+      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hp, aggro)) {
+        continue;
+      }
+
+      float sqr = NetworkMobBrainLogic.HorizontalSqrDistance(pos, hp);
+      if (sqr < bestSqr) {
+        bestSqr = sqr;
+        best = h;
+      }
+    }
+
+    if (best == null) {
+      return false;
+    }
+
+    _currentTargetId = best.Object.Id;
+    return true;
+  }
+
+  bool TryResolveChaseTargetAuthority(out Health target) {
+    target = null;
+    if (!_currentTargetId.IsValid || Runner == null) {
+      return false;
+    }
+
+    if (!Runner.TryFindObject(_currentTargetId, out NetworkObject obj) || obj == null) {
+      return false;
+    }
+
+    if (!obj.TryGetComponent(out target) || target == null || target == _health) {
+      return false;
+    }
+
+    if (target.Object == null || !target.Object.IsValid) {
+      return false;
+    }
+
+    return true;
   }
 
   void TryMeleeAuthority() {
@@ -125,10 +285,26 @@ public class NetworkMobBrain : NetworkBehaviour {
 
     Vector3 pos = transform.position;
     float attackR = Mathf.Max(0f, AttackRange);
+
+    if (_state == NetworkMobBrainState.Chase) {
+      if (!TryResolveChaseTargetAuthority(out Health chase) || chase.IsDead) {
+        return;
+      }
+
+      Vector3 hp = chase.transform.position;
+      if (NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hp, attackR)) {
+        chase.DealDamageRpc(AttackDamage);
+        int cooldownTicks = NetworkMobBrainLogic.SecondsToTicks(AttackIntervalSeconds, Runner.TickRate);
+        _nextAttackTick = Runner.Tick + cooldownTicks;
+      }
+
+      return;
+    }
+
     float considerR = Mathf.Max(Mathf.Max(0f, AggroRadius), attackR);
     Health best = null;
     float bestSqr = float.MaxValue;
-    Health[] candidates = UnityEngine.Object.FindObjectsByType<Health>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+    Health[] candidates = LoadHealthScanSnapshot();
     for (var i = 0; i < candidates.Length; i++) {
       Health h = candidates[i];
       if (h == null || h == _health) {
@@ -143,16 +319,16 @@ public class NetworkMobBrain : NetworkBehaviour {
         continue;
       }
 
-      Vector3 hp = h.transform.position;
-      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hp, considerR)) {
+      Vector3 hpos = h.transform.position;
+      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hpos, considerR)) {
         continue;
       }
 
-      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hp, attackR)) {
+      if (!NetworkMobBrainLogic.IsWithinHorizontalRange(pos, hpos, attackR)) {
         continue;
       }
 
-      float sqr = NetworkMobBrainLogic.HorizontalSqrDistance(pos, hp);
+      float sqr = NetworkMobBrainLogic.HorizontalSqrDistance(pos, hpos);
       if (sqr < bestSqr) {
         bestSqr = sqr;
         best = h;
@@ -164,8 +340,8 @@ public class NetworkMobBrain : NetworkBehaviour {
     }
 
     best.DealDamageRpc(AttackDamage);
-    int cooldownTicks = NetworkMobBrainLogic.SecondsToTicks(AttackIntervalSeconds, Runner.TickRate);
-    _nextAttackTick = Runner.Tick + cooldownTicks;
+    int cd = NetworkMobBrainLogic.SecondsToTicks(AttackIntervalSeconds, Runner.TickRate);
+    _nextAttackTick = Runner.Tick + cd;
   }
 
   void PickNewDestination() {

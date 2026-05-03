@@ -6,6 +6,8 @@ using UnityEngine;
 public enum NetworkMobBrainState {
   Idle,
   Wander,
+  Chase,
+  Return,
 }
 
 public static class NetworkMobBrainLogic {
@@ -49,6 +51,39 @@ public static class NetworkMobBrainLogic {
   public static bool IsWithinHorizontalRange(Vector3 a, Vector3 b, float range) {
     float r = Mathf.Max(0f, range);
     return HorizontalSqrDistance(a, b) <= r * r;
+  }
+
+  /// <summary>
+  /// True when horizontal distance from <paramref name="position"/> to <paramref name="spawnOrigin"/>
+  /// exceeds clamped non-negative <paramref name="leashRadius"/>; Y is ignored.
+  /// </summary>
+  public static bool IsBeyondLeash(Vector3 spawnOrigin, Vector3 position, float leashRadius) {
+    float r = Mathf.Max(0f, leashRadius);
+    return HorizontalSqrDistance(spawnOrigin, position) > r * r;
+  }
+
+  /// <summary>
+  /// Pure chase abort: invalid/dead target, mob pulled past leash, or target kited past leash from spawn.
+  /// </summary>
+  public static bool ShouldAbortChaseAndReturn(
+    Vector3 mobSpawnOrigin,
+    Vector3 mobPosition,
+    Vector3 targetPosition,
+    float leashRadius,
+    bool targetIsValidAlive) {
+    if (!targetIsValidAlive) {
+      return true;
+    }
+
+    if (IsBeyondLeash(mobSpawnOrigin, mobPosition, leashRadius)) {
+      return true;
+    }
+
+    if (IsBeyondLeash(mobSpawnOrigin, targetPosition, leashRadius)) {
+      return true;
+    }
+
+    return false;
   }
 
   public static bool CanAttackAtTick(int currentTick, int nextAttackTick) {
