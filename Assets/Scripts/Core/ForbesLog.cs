@@ -23,4 +23,9 @@ public static class ForbesLog {
   public static void Health(string message, UnityEngine.Object context = null) {
     UnityEngine.Debug.Log("[ForbesHealth] " + message, context);
   }
+
+  [Conditional("FORBES_LOG")]
+  public static void Targeting(string message, UnityEngine.Object context = null) {
+    UnityEngine.Debug.Log("[ForbesTargeting] " + message, context);
+  }
 }
