@@ -115,6 +115,77 @@ namespace Forbes.Tests.EditMode {
     }
 
     [Test]
+    public void GcdActive_BeatsOnCooldown_WhenBothWouldFail() {
+      var caster = NewTransform("caster", Vector3.zero);
+      var target = NewTransform("target", Vector3.zero);
+      var spell  = MakeSpell(triggersGcd: true);
+
+      bool ok = CombatValidator.TryValidate(
+        caster, ValidId(1), spell,
+        currentTick: 5, gcdEndTick: 100, cooldownEndTick: 50,
+        isAlreadyCasting: false,
+        targetTransform: target, isTargetDead: false,
+        out var failReason);
+
+      Assert.IsFalse(ok);
+      Assert.AreEqual(CombatFailReason.GcdActive, failReason,
+        "GCD must be evaluated before spell cooldown.");
+    }
+
+    [Test]
+    public void OnCooldown_BeatsNoTarget_WhenCooldownActiveAndTargetUnresolved() {
+      var caster = NewTransform("caster", Vector3.zero);
+      var spell  = MakeSpell();
+
+      bool ok = CombatValidator.TryValidate(
+        caster, ValidId(99), spell,
+        currentTick: 1, gcdEndTick: 0, cooldownEndTick: 10,
+        isAlreadyCasting: false,
+        targetTransform: null, isTargetDead: false,
+        out var failReason);
+
+      Assert.IsFalse(ok);
+      Assert.AreEqual(CombatFailReason.OnCooldown, failReason,
+        "Cooldown must be evaluated before target resolution checks.");
+    }
+
+    [Test]
+    public void OnCooldown_BeatsTargetDead_WhenCooldownActive() {
+      var caster = NewTransform("caster", Vector3.zero);
+      var target = NewTransform("target", Vector3.zero);
+      var spell  = MakeSpell();
+
+      bool ok = CombatValidator.TryValidate(
+        caster, ValidId(2), spell,
+        currentTick: 1, gcdEndTick: 0, cooldownEndTick: 10,
+        isAlreadyCasting: false,
+        targetTransform: target, isTargetDead: true,
+        out var failReason);
+
+      Assert.IsFalse(ok);
+      Assert.AreEqual(CombatFailReason.OnCooldown, failReason,
+        "Cooldown must be evaluated before TargetDead.");
+    }
+
+    [Test]
+    public void TargetDead_BeatsOutOfRange_WhenTargetDeadAndFarAway() {
+      var caster = NewTransform("caster", Vector3.zero);
+      var target = NewTransform("target", new Vector3(500f, 0f, 0f));
+      var spell  = MakeSpell(range: 30f);
+
+      bool ok = CombatValidator.TryValidate(
+        caster, ValidId(3), spell,
+        currentTick: 100, gcdEndTick: 0, cooldownEndTick: 0,
+        isAlreadyCasting: false,
+        targetTransform: target, isTargetDead: true,
+        out var failReason);
+
+      Assert.IsFalse(ok);
+      Assert.AreEqual(CombatFailReason.TargetDead, failReason,
+        "TargetDead must short-circuit before range checks.");
+    }
+
+    [Test]
     public void NoTarget_WhenTargetIdInvalid() {
       var caster = NewTransform("caster", Vector3.zero);
       var spell  = MakeSpell();
@@ -128,6 +199,23 @@ namespace Forbes.Tests.EditMode {
 
       Assert.IsFalse(ok);
       Assert.AreEqual(CombatFailReason.NoTarget, failReason);
+    }
+
+    [Test]
+    public void NoTarget_WhenTargetIdValidButTransformUnresolved() {
+      var caster = NewTransform("caster", Vector3.zero);
+      var spell  = MakeSpell();
+
+      bool ok = CombatValidator.TryValidate(
+        caster, ValidId(12345), spell,
+        currentTick: 100, gcdEndTick: 0, cooldownEndTick: 0,
+        isAlreadyCasting: false,
+        targetTransform: null, isTargetDead: false,
+        out var failReason);
+
+      Assert.IsFalse(ok);
+      Assert.AreEqual(CombatFailReason.NoTarget, failReason,
+        "Simulates runner.TryFindObject miss or missing Health on resolved object.");
     }
 
     [Test]
@@ -179,6 +267,28 @@ namespace Forbes.Tests.EditMode {
 
       Assert.IsTrue(ok);
       Assert.AreEqual(CombatFailReason.None, failReason);
+    }
+
+    [Test]
+    public void Success_WhenCasterAndTargetAreSameTransform_RealSpellFromRegistry() {
+      var selfGo = new GameObject("selfCasterTarget");
+      selfGo.transform.position = Vector3.zero;
+      _spawned.Add(selfGo);
+      Transform self = selfGo.transform;
+
+      SpellData spell = SpellRegistry.Get(2);
+      Assert.IsTrue(spell.IsValid, "Arcane Shot must remain defined for this regression.");
+
+      bool ok = CombatValidator.TryValidate(
+        self, ValidId(200), spell,
+        currentTick: 100, gcdEndTick: 0, cooldownEndTick: 0,
+        isAlreadyCasting: false,
+        targetTransform: self, isTargetDead: false,
+        out var failReason);
+
+      Assert.IsTrue(ok);
+      Assert.AreEqual(CombatFailReason.None, failReason,
+        "Distance-zero self overlap must succeed when GCD/cooldown/target gates pass.");
     }
   }
 }
