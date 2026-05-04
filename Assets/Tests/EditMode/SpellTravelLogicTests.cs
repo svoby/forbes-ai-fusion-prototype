@@ -120,5 +120,78 @@ namespace Forbes.Tests.EditMode {
       Assert.IsFalse(SpellTravelLogic.HasMissileArrived(pos, pos, 20f,  0f));
       Assert.IsFalse(SpellTravelLogic.HasMissileArrived(pos, pos, -5f,  1f / 60f));
     }
+
+    // ── Advance-then-check production pattern ───────────────────────────────
+    // NetworkCombatController.TryResolvePendingImpact calls AdvanceMissilePosition
+    // and then HasMissileArrived with the POST-ADVANCE position.  These tests
+    // document the actual arrival semantics used in production: a missile between
+    // 1× and 2× one tick's step from the target is detected as arrived on the
+    // same tick it advances (post-advance distance falls within the step threshold).
+
+    [Test]
+    public void AdvanceThenCheck_MissileAtOnePlusStep_ArrivesOnSameTick() {
+      // Missile at exactly 1.5 × step from target.
+      // Pre-advance: NOT arrived (1.5 steps > threshold 1 step).
+      // Post-advance: arrived (moves 1 step → 0.5 steps from target ≤ threshold).
+      float speed = 20f;
+      float dt    = 1f / 60f;
+      float step  = speed * dt;
+
+      var target  = new Vector3(10f, 0f, 0f);
+      var missile = target - new Vector3(1.5f * step, 0f, 0f);
+
+      Assert.IsFalse(SpellTravelLogic.HasMissileArrived(missile, target, speed, dt),
+        "Pre-advance: 1.5 steps away should not register as arrived.");
+
+      var advanced = SpellTravelLogic.AdvanceMissilePosition(missile, target, speed, dt);
+      Assert.IsTrue(SpellTravelLogic.HasMissileArrived(advanced, target, speed, dt),
+        "Post-advance (production pattern): missile at 1.5 steps arrives on the same tick.");
+    }
+
+    [Test]
+    public void AdvanceThenCheck_MissileAtMoreThanTwoSteps_DoesNotArriveSameTick() {
+      // Missile at 2.1 × step: after advancing by 1 step it is still 1.1 steps
+      // away, which exceeds the threshold — impact is deferred to the next tick.
+      float speed = 20f;
+      float dt    = 1f / 60f;
+      float step  = speed * dt;
+
+      var target  = new Vector3(10f, 0f, 0f);
+      var missile = target - new Vector3(2.1f * step, 0f, 0f);
+
+      var advanced = SpellTravelLogic.AdvanceMissilePosition(missile, target, speed, dt);
+      Assert.IsFalse(SpellTravelLogic.HasMissileArrived(advanced, target, speed, dt),
+        "Post-advance: 2.1 steps means post-advance distance is 1.1 steps, still above threshold.");
+    }
+
+    [Test]
+    public void AdvanceThenCheck_MissileAtExactlyTwoSteps_ArrivesSameTick() {
+      // Missile at exactly 2 steps: advances to exactly 1 step → arrived.
+      float speed = 20f;
+      float dt    = 1f / 60f;
+      float step  = speed * dt;
+
+      var target  = new Vector3(10f, 0f, 0f);
+      var missile = target - new Vector3(2f * step, 0f, 0f);
+
+      var advanced = SpellTravelLogic.AdvanceMissilePosition(missile, target, speed, dt);
+      Assert.IsTrue(SpellTravelLogic.HasMissileArrived(advanced, target, speed, dt),
+        "Post-advance: exactly 2 steps → post-advance distance equals threshold → arrived.");
+    }
+
+    [Test]
+    public void AdvanceThenCheck_MissileAtTarget_ArrivesSameTick() {
+      // Edge case: missile already at target (distance 0). Advance is a no-op;
+      // HasMissileArrived returns true because 0 ≤ step.
+      float speed = 20f;
+      float dt    = 1f / 60f;
+
+      var pos = new Vector3(10f, 0f, 0f);
+
+      var advanced = SpellTravelLogic.AdvanceMissilePosition(pos, pos, speed, dt);
+      Assert.AreEqual(pos, advanced, "No movement when already at target.");
+      Assert.IsTrue(SpellTravelLogic.HasMissileArrived(advanced, pos, speed, dt),
+        "Missile already at target must arrive immediately.");
+    }
   }
 }

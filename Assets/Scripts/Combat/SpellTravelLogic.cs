@@ -64,9 +64,12 @@ public static class SpellTravelLogic {
   }
 
   /// <summary>
-  /// Returns true when the missile is within one simulation step of the target —
-  /// i.e. it will reach the target this tick. Always false when speed or deltaTime
-  /// are non-positive.
+  /// Returns true when the missile's distance to the target is within one
+  /// simulation step. The check is intentionally designed to be called with the
+  /// <b>post-advance</b> position (as <see cref="NetworkCombatController"/> does):
+  /// advance first, then call this; a missile that was between 1× and 2× one
+  /// step away before advancing will arrive on the same tick it advances.
+  /// Always returns false when speed or deltaTime are non-positive.
   /// </summary>
   public static bool HasMissileArrived(
     Vector3 missilePos, Vector3 targetPos, float speedMPS, float deltaTime) {

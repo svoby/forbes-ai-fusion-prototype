@@ -7,5 +7,10 @@ public enum CombatFailReason : byte {
   OnCooldown    = 4,
   GcdActive     = 5,
   AlreadyCasting = 6,
+  /// <summary>
+  /// Reserved — byte value pinned for wire compatibility.
+  /// No production code path emits this value today; runtime caster-death
+  /// interrupts use <see cref="CastCancelReason.Death"/> instead.
+  /// </summary>
   CasterDead    = 7,
 }

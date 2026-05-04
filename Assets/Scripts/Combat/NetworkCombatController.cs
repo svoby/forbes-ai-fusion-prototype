@@ -56,9 +56,12 @@ public class NetworkCombatController : NetworkBehaviour {
   [Networked] public int Cooldown3EndTick { get; set; }
 
   // ── PENDING MISSILE SLOT ─────────────────────────────────────────────────────
-  // ONE-SLOT MODEL: only one in-flight missile at a time. Safe with the current
-  // spell table (Fireball is the only projectile spell, cast-time, so its
-  // impact resolves before a second cast could complete).
+  // ONE-SLOT MODEL: only one in-flight missile at a time.
+  // With a stationary target at max range (30 m / 20 m·s⁻¹ = 1.5 s) a second
+  // Fireball cast (also 1.5 s) resolves exactly as the first arrives. However
+  // if the target flees during flight the travel time EXCEEDS the cast time and
+  // SchedulePendingImpact will silently overwrite the first missile (logged as a
+  // warning). This is an acknowledged prototype limitation; see PROJECTILE_POLICY.md.
   // Upgrade path: extract to a sibling TargetedMissileSlot : NetworkBehaviour
   // with a small NetworkLinkedList when multi-missile support is needed.
 

@@ -263,7 +263,97 @@ namespace Forbes.Tests.PlayMode {
     }
 
     /// <summary>
-    /// NEW: Target runs far away after missile is released but stays within the
+    /// Case 6: Moving while a cast-time spell is in progress must cancel the cast.
+    /// Uses Heavy Blast (spell 3, castTimeSec=2.5 s) — a cast-time non-projectile
+    /// spell — so there is no pending missile to confuse the assertion.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator CastTimedSpell_MovementDuringCast_CancelsCast_NoDamageApplied() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(CastTimedSpell_MovementDuringCast_CancelsCast_NoDamageApplied));
+
+        var combat      = _player.GetComponent<NetworkCombatController>();
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp   = dummyHealth.NetworkedHealth;
+
+        Assert.IsFalse(SpellTravelLogic.HasProjectile(SpellRegistry.Get(3)),
+          "Heavy Blast (spell 3) must be a non-projectile cast-time spell for this test.");
+
+        // Start Heavy Blast cast (2.5 s cast, no projectile, 8 s cooldown).
+        _session.InputRelay.TargetNetworkId = _dummy.Id;
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell3;
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => combat.CurrentSpellId == 3,
+          maxFrames: 120,
+          messageOnFail: "Heavy Blast cast did not start within timeout");
+
+        // Inject sustained movement so the cast-cancel path fires.
+        _session.InputRelay.StickyMove = new Vector2(1f, 0f);
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => combat.CurrentSpellId == 0,
+          maxFrames: 120,
+          messageOnFail: "Cast was not cancelled by movement input within timeout");
+
+        _session.InputRelay.StickyMove = Vector2.zero;
+
+        // Wait well past the original 2.5 s cast window — no damage must arrive.
+        yield return FusionPlayModeTestHelpers.WaitFrames(200);
+
+        Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
+          "No damage must be applied after a movement-cancelled cast-time spell.");
+        Assert.AreEqual(0, combat.PendingImpactSpellId,
+          "No missile must be in flight after a non-projectile cancelled cast.");
+      }
+    }
+
+    /// <summary>
+    /// Case 7: Moving after a projectile is already in flight must NOT cancel the missile.
+    /// After ResolveCast + ClearCastState, IsCasting=false; the movement-cancel guard
+    /// only fires when IsCasting is true, so the missile advances and impacts normally.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator ProjectileSpell_MovementAfterRelease_DoesNotCancelMissile() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(ProjectileSpell_MovementAfterRelease_DoesNotCancelMissile));
+
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp   = dummyHealth.NetworkedHealth;
+        float dmg       = SpellRegistry.Get(1).Damage;
+
+        // Fire Fireball and wait for the missile to be in flight.
+        yield return FireFireball();
+
+        Assert.AreNotEqual(0, _player.GetComponent<NetworkCombatController>().PendingImpactSpellId,
+          "Missile must be in flight before movement is injected.");
+
+        // Inject continuous movement AFTER missile is in flight.
+        _session.InputRelay.StickyMove = new Vector2(1f, 0f);
+
+        // Missile must still arrive and deal damage despite caster movement.
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - dmg)) < 0.36f,
+          maxFrames: 960,
+          messageOnFail:
+            $"Missile did not land after caster moved. hp={dummyHealth.NetworkedHealth} expected~{startHp - dmg}");
+
+        _session.InputRelay.StickyMove = Vector2.zero;
+
+        Assert.AreEqual(0, _player.GetComponent<NetworkCombatController>().PendingImpactSpellId,
+          "Missile slot must be cleared after impact.");
+        Assert.IsFalse(dummyHealth.IsDead, "Target must survive a single Fireball.");
+      }
+    }
+
+    /// <summary>
+    /// Target runs far away after missile is released but stays within the
     /// missile's reachable distance. Validates that the missile follows the target
     /// and impact is delayed but still resolves.
     /// </summary>

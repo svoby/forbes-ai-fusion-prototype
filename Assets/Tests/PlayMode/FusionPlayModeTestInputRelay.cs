@@ -23,6 +23,13 @@ namespace Forbes.Tests.PlayMode {
 
     internal FusionPlayModeSpellPulse PendingPulse = FusionPlayModeSpellPulse.None;
 
+    /// <summary>
+    /// Held movement vector injected into every tick's <see cref="GameplayInput.Move"/>
+    /// until the test resets it to <see cref="Vector2.zero"/>.
+    /// Use this to simulate a player walking during a cast or missile flight.
+    /// </summary>
+    internal Vector2 StickyMove = Vector2.zero;
+
     void Awake() {
       _runner = GetComponent<NetworkRunner>();
       if (_runner != null) {
@@ -38,7 +45,7 @@ namespace Forbes.Tests.PlayMode {
 
     public void OnInput(NetworkRunner runner, NetworkInput input) {
       var gi = new GameplayInput {
-        Move      = Vector2.zero,
+        Move      = StickyMove,
         LookYaw   = 0f,
         TargetId  = TargetNetworkId,
       };
