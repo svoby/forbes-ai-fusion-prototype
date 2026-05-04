@@ -34,11 +34,37 @@ public class Health : NetworkBehaviour {
   [Networked]
   public Vector3 SpawnPosition { get; set; }
 
+  // ── COMBAT HIT EVENT ────────────────────────────────────────────────────────
+  // Replicated: monotonic sequence counter + event data. State Authority
+  // increments LastHitEventSeq each time damage is successfully applied.
+  // OnChangedRender fires CombatHitReceived so local cosmetic components
+  // (e.g. HitImpactView) can react without writing any gameplay state.
+
+  /// <summary>
+  /// Incremented by State Authority each time damage is applied (wraps at 256 — acceptable for a cosmetic trigger).
+  /// <see cref="OnCombatHitEventRender"/> fires <see cref="CombatHitReceived"/> on every client when this changes.
+  /// </summary>
+  [Networked, OnChangedRender(nameof(OnCombatHitEventRender))]
+  public byte LastHitEventSeq { get; set; }
+
+  /// <summary>Raw damage requested in the last successful hit (written by State Authority).</summary>
+  [Networked] public float LastHitDamage { get; set; }
+
+  /// <summary>Simulation tick of the last successful hit (State Authority).</summary>
+  [Networked] public int LastHitTick { get; set; }
+
   /// <summary>Render-side notification fired by Fusion when <see cref="IsDead"/> changes.</summary>
   public event Action<bool> IsDeadChanged;
 
   /// <summary>Render-side: fired when replicated <see cref="NetworkedHealth"/> updates on this client's view.</summary>
   public event Action<float> NetworkedHealthRenderChanged;
+
+  /// <summary>
+  /// Render-side notification fired when <see cref="LastHitEventSeq"/> changes (i.e. damage was applied).
+  /// Cosmetic subscribers only — no damage, no authoritative state writes.
+  /// See <c>docs/COMBAT_FEEDBACK_POLICY.md</c>.
+  /// </summary>
+  public event Action<float> CombatHitReceived;
 
   CharacterController _controller;
 
@@ -59,6 +85,10 @@ public class Health : NetworkBehaviour {
 
   void OnNetworkedHealthRenderChanged() {
     NetworkedHealthRenderChanged?.Invoke(NetworkedHealth);
+  }
+
+  void OnCombatHitEventRender() {
+    CombatHitReceived?.Invoke(LastHitDamage);
   }
 
   public override void Spawned() {
@@ -180,6 +210,13 @@ public class Health : NetworkBehaviour {
     }
 
     NetworkedHealth = Mathf.Max(0f, NetworkedHealth - damage);
+
+    // Record authoritative hit event so all clients can play cosmetic feedback.
+    // Written after HP is applied so LastHitDamage reflects a real impact.
+    unchecked { LastHitEventSeq++; }
+    LastHitDamage = damage;
+    LastHitTick   = Runner.Tick;
+
     if (NetworkedHealth <= 0f) {
       ApplyDeathAuthority();
     }
