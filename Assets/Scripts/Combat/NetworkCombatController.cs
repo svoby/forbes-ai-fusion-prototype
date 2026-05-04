@@ -98,6 +98,16 @@ public class NetworkCombatController : NetworkBehaviour {
     _health = GetComponent<Health>();
   }
 
+  public override void Spawned() {
+    if (HasStateAuthority && PendingImpactSpellId != 0) {
+      // Authority transferred while a missile was in flight. _missileVirtualPos is
+      // non-networked, so the new authority starts with Vector3.zero. Re-init to the
+      // caster's current position so the missile homes correctly from here onward.
+      _missileVirtualPos = transform.position;
+      ForbesLog.Net($"Spawned with missile in flight — re-init missileVirtualPos={_missileVirtualPos}", this);
+    }
+  }
+
   public override void FixedUpdateNetwork() {
     if (!HasStateAuthority) {
       return;
