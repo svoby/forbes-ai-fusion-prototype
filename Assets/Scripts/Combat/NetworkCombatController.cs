@@ -247,7 +247,6 @@ public class NetworkCombatController : NetworkBehaviour {
       } else {
         targetHealth.DealDamageRpc(spell.Damage);
         DispatchImpactVisual(spellId, targetId);
-        ForbesLog.Net($"Instant cast: {spell.Name} -> dmg {spell.Damage}", this);
       }
     } else {
       // Cast-time spell: set networked state; damage fires in ResolveCast.
@@ -284,7 +283,6 @@ public class NetworkCombatController : NetworkBehaviour {
     } else {
       targetHealth.DealDamageRpc(spell.Damage);
       DispatchImpactVisual(CurrentSpellId, CastTarget);
-      ForbesLog.Net($"Cast resolved: {spell.Name} -> dmg {spell.Damage}", this);
     }
 
     ClearCastState();
@@ -362,7 +360,6 @@ public class NetworkCombatController : NetworkBehaviour {
     ClearPendingImpact();
     impactHealth.DealDamageRpc(spell.Damage);
     DispatchImpactVisual(arrivalSpellId, arrivalTarget);
-    ForbesLog.Net($"Missile arrived: {spell.Name} dmg={spell.Damage}", this);
   }
 
   void SetFailReason(CombatFailReason reason) {

@@ -40,12 +40,8 @@ public class CosmeticProjectileView : MonoBehaviour {
       Destroy(col);
     }
 
-    // renderer.material creates an instance copy of the default material (one sphere, no pooling needed)
-    var mat = _sphere.GetComponent<Renderer>().material;
-    mat.color = SpellVisualColors.Fireball;
-    if (mat.HasProperty("_BaseColor")) {
-      mat.SetColor("_BaseColor", SpellVisualColors.Fireball);
-    }
+    var rend = _sphere.GetComponent<Renderer>();
+    rend.material = SpellVisualColors.NewFireballOrbMaterial();
 
     _sphere.SetActive(false);
   }

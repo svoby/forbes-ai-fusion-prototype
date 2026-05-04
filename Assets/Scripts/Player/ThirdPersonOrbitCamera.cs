@@ -1,5 +1,3 @@
-using System.Text;
-using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -46,10 +44,6 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   float _rmbDragAccum;
   float _zoomVelocity;
 
-  int  _diagNoTargetFrames;
-  bool _loggedTargetOnce;
-  bool _loggedMouseNullOnce;
-
   /// <summary>
   /// Character-facing yaw in world-space degrees.
   /// Q/E keyboard rotation and RMB drag modify this.
@@ -71,7 +65,6 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   static void AutoAddToMainCamera() {
     var cam = Camera.main;
     if (cam == null) {
-      Debug.LogWarning("[ThirdPersonOrbitCamera] Camera.main not found at scene load — add ThirdPersonOrbitCamera manually.");
       return;
     }
 
@@ -80,34 +73,18 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     }
 
     cam.gameObject.AddComponent<ThirdPersonOrbitCamera>();
-    ForbesLog.Diag("Camera", "Auto-added ThirdPersonOrbitCamera to Main Camera (scene had none).");
   }
 
   void Awake() {
     _distance = _startDistance;
-    bool isMain = gameObject.CompareTag("MainCamera");
-    ForbesLog.Diag("Camera", $"Awake on '{gameObject.name}' CompareTag(MainCamera)={isMain}", this);
   }
 
   void LateUpdate() {
     if (_target == null) {
-      _loggedTargetOnce = false;
       TryFindLocalPlayer();
       if (_target == null) {
-        _diagNoTargetFrames++;
-        if (_diagNoTargetFrames == 1 || _diagNoTargetFrames % 90 == 0) {
-          LogNoFollowTargetDiag();
-        }
         return;
       }
-    }
-
-    _diagNoTargetFrames = 0;
-
-    if (!_loggedTargetOnce) {
-      _loggedTargetOnce = true;
-      string mainCamName = Camera.main != null ? Camera.main.name : "NULL";
-      ForbesLog.Diag("Camera", $"Follow target ok name={_target.name} pos={_target.position:F2} mainCam={mainCamName}", this);
     }
 
     // Follow + look-at must run even when Mouse.current is null (input device not ready yet,
@@ -117,7 +94,6 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     bool rmb = false;
 
     if (mouse != null) {
-      _loggedMouseNullOnce = false;
       lmb = mouse.leftButton.isPressed;
       rmb = mouse.rightButton.isPressed;
 
@@ -183,10 +159,6 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
     } else {
       MouseMode = CameraMouseMode.None;
       ManageCursor(false);
-      if (!_loggedMouseNullOnce) {
-        _loggedMouseNullOnce = true;
-        ForbesLog.Diag("Camera", "Mouse.current is NULL — orbit/scroll skipped; camera follow still runs. (Input System device not paired yet?)", this);
-      }
     }
 
     // Apply and decay zoom velocity (runs every frame regardless of mouse state).
@@ -248,46 +220,5 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
         return;
       }
     }
-  }
-
-  void LogNoFollowTargetDiag() {
-    var pms  = Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude);
-    var cols = new StringBuilder(384);
-    cols.Append("NO_FOLLOW_TARGET frame=").Append(Time.frameCount)
-      .Append(" t=").Append(Time.time.ToString("F2"))
-      .Append(" PlayerMovement count=").Append(pms.Length);
-
-    NetworkRunner runningRunner = null;
-    foreach (var r in Object.FindObjectsByType<NetworkRunner>(FindObjectsInactive.Exclude)) {
-      if (r != null && r.IsRunning) {
-        runningRunner = r;
-        break;
-      }
-    }
-
-    if (runningRunner == null) {
-      cols.Append(" | NetworkRunner: none running — spusť Host/Client z Fusion-bootstrap UI (F1 toggles HUD).");
-    } else {
-      cols.Append(" | runner OK LocalPlayer=").Append(runningRunner.LocalPlayer.ToString());
-      if (runningRunner.TryGetPlayerObject(runningRunner.LocalPlayer, out var lp) && lp != null) {
-        cols.Append(" SetPlayerObject=").Append(lp.name);
-      } else {
-        cols.Append(" SetPlayerObject=NOT_SET");
-      }
-    }
-
-    for (int i = 0; i < pms.Length; i++) {
-      var pm = pms[i];
-      cols.Append(" |[").Append(i).Append(']').Append(pm.name)
-        .Append(" In=").Append(pm.HasInputAuthority)
-        .Append(" St=").Append(pm.HasStateAuthority);
-      if (pm.Object != null && pm.Object.IsValid) {
-        cols.Append(" NetIn=").Append(pm.Object.InputAuthority.ToString());
-      }
-    }
-
-    cols.Append(" | Mouse=").Append(Mouse.current != null ? "ok" : "NULL");
-    cols.Append(" CamMain=").Append(Camera.main != null ? Camera.main.name : "NULL");
-    ForbesLog.Diag("Camera", cols.ToString(), this);
   }
 }

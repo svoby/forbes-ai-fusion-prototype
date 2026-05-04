@@ -29,6 +29,9 @@ public class NetworkMobBrain : NetworkBehaviour {
   CharacterController _controller;
   Health _health;
   Vector3 _spawnPosition;
+  // #region agent log
+  bool _wasMobDead;
+  // #endregion
   Vector3 _velocity;
   Vector3 _destination;
   NetworkMobBrainState _state;
@@ -70,7 +73,14 @@ public class NetworkMobBrain : NetworkBehaviour {
       return;
     }
 
-    if (_health != null && _health.IsDead) {
+    bool mobDead = _health != null && _health.IsDead;
+    // #region agent log
+    if (!mobDead && _wasMobDead) {
+      MobDbgLog("E", "MobBrain:FirstAliveTick", "mob first tick after respawn", "\"pos\":\"" + transform.position + "\",\"spawnOrigin\":\"" + _spawnPosition + "\",\"velY\":" + _velocity.y + ",\"state\":\"" + _state + "\",\"obj\":\"" + name + "\"");
+    }
+    _wasMobDead = mobDead;
+    // #endregion
+    if (mobDead) {
       return;
     }
 
@@ -346,6 +356,15 @@ public class NetworkMobBrain : NetworkBehaviour {
     int cd = NetworkMobBrainLogic.SecondsToTicks(AttackIntervalSeconds, Runner.TickRate);
     _nextAttackTick = Runner.Tick + cd;
   }
+
+  // #region agent log
+  static void MobDbgLog(string hyp, string loc, string msg, string data) {
+    try {
+      var line = "{\"sessionId\":\"3fa301\",\"hypothesisId\":\"" + hyp + "\",\"location\":\"" + loc + "\",\"message\":\"" + msg + "\",\"data\":{" + data + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}";
+      System.IO.File.AppendAllText(System.IO.Path.Combine(UnityEngine.Application.dataPath, "..", "debug-3fa301.log"), line + "\n");
+    } catch { }
+  }
+  // #endregion
 
   void PickNewDestination() {
     const int maxAttempts = 12;

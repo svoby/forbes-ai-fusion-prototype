@@ -45,21 +45,12 @@ public class KeyboardInputSource : MonoBehaviour, IInputSource {
     return true;
   }
 
-  int _missingCameraWarnFrame = -1;
-
   void EnsureCamera() {
     if (_camera != null) return;
 
     _camera = Object.FindAnyObjectByType<ThirdPersonOrbitCamera>();
     if (_camera != null) {
       LookYaw = _camera.Yaw;
-      Debug.Log("[KeyboardInputSource] ThirdPersonOrbitCamera found.");
-      return;
-    }
-
-    if (Time.frameCount != _missingCameraWarnFrame && Time.frameCount % 60 == 0) {
-      _missingCameraWarnFrame = Time.frameCount;
-      Debug.LogWarning("[KeyboardInputSource] ThirdPersonOrbitCamera not found — LookYaw=0. Run 'Tools/Fusion/Scene/Apply Full Combat Setup'.");
     }
   }
 

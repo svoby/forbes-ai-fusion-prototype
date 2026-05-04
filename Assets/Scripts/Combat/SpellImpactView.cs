@@ -67,11 +67,7 @@ public class SpellImpactView : MonoBehaviour {
       Destroy(col);
     }
 
-    var mat = sphere.GetComponent<Renderer>().material;
-    mat.color = SpellVisualColors.Fireball;
-    if (mat.HasProperty("_BaseColor")) {
-      mat.SetColor("_BaseColor", SpellVisualColors.Fireball);
-    }
+    sphere.GetComponent<Renderer>().material = SpellVisualColors.NewFireballOrbMaterial();
 
     Destroy(sphere, FlashDuration);
   }
