@@ -88,8 +88,9 @@ public class NetworkCombatController : NetworkBehaviour {
     }
   }
 
-  Health         _health;
-  NetworkButtons _prevButtons;
+  Health          _health;
+  SpellImpactView _impactView;
+  NetworkButtons  _prevButtons;
 
   // Non-networked; state authority only. Tracks the missile's logical position
   // each tick so it can home toward the target's current position. Reset to
@@ -98,7 +99,8 @@ public class NetworkCombatController : NetworkBehaviour {
   Vector3 _missileVirtualPos;
 
   void Awake() {
-    _health = GetComponent<Health>();
+    _health     = GetComponent<Health>();
+    _impactView = GetComponent<SpellImpactView>();
   }
 
   public override void Spawned() {
@@ -244,6 +246,7 @@ public class NetworkCombatController : NetworkBehaviour {
         ForbesLog.Net($"Instant cast (missile): {spell.Name} releaseTick={Runner.Tick}", this);
       } else {
         targetHealth.DealDamageRpc(spell.Damage);
+        DispatchImpactVisual(spellId, targetId);
         ForbesLog.Net($"Instant cast: {spell.Name} -> dmg {spell.Damage}", this);
       }
     } else {
@@ -280,6 +283,7 @@ public class NetworkCombatController : NetworkBehaviour {
       ForbesLog.Net($"Cast resolved (missile): {spell.Name} releaseTick={Runner.Tick}", this);
     } else {
       targetHealth.DealDamageRpc(spell.Damage);
+      DispatchImpactVisual(CurrentSpellId, CastTarget);
       ForbesLog.Net($"Cast resolved: {spell.Name} -> dmg {spell.Damage}", this);
     }
 
@@ -353,8 +357,11 @@ public class NetworkCombatController : NetworkBehaviour {
       return;
     }
 
+    byte     arrivalSpellId = PendingImpactSpellId;
+    NetworkId arrivalTarget  = PendingImpactTarget;
     ClearPendingImpact();
     impactHealth.DealDamageRpc(spell.Damage);
+    DispatchImpactVisual(arrivalSpellId, arrivalTarget);
     ForbesLog.Net($"Missile arrived: {spell.Name} dmg={spell.Damage}", this);
   }
 
@@ -391,5 +398,26 @@ public class NetworkCombatController : NetworkBehaviour {
   /// </summary>
   internal static int SecsToTicks(int tickRate, float seconds) {
     return Mathf.CeilToInt(seconds * tickRate);
+  }
+
+  // ── Cosmetic impact visual ────────────────────────────────────────────────────
+
+  /// <summary>
+  /// Sends a cosmetic impact RPC to all clients immediately after authoritative
+  /// damage is dispatched. Called only on State Authority; never mutates gameplay
+  /// state on any client.
+  /// </summary>
+  void DispatchImpactVisual(byte spellId, NetworkId targetId) {
+    RpcOnSpellImpact(spellId, targetId);
+  }
+
+  /// <summary>
+  /// Received on every client (including host) after a spell successfully damages
+  /// its target. Delegates to <see cref="SpellImpactView"/> for the local visual;
+  /// if the component is absent the call is a no-op.
+  /// </summary>
+  [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+  void RpcOnSpellImpact(byte spellId, NetworkId targetId) {
+    _impactView?.OnSpellImpact(spellId, targetId);
   }
 }
