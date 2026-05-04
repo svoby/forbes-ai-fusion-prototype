@@ -25,7 +25,7 @@ namespace Forbes.Tests.EditMode {
     [TearDown]
     public void TearDown() {
       if (_go != null) {
-        Object.DestroyImmediate(_go);
+        UnityEngine.Object.DestroyImmediate(_go);
       }
     }
 
