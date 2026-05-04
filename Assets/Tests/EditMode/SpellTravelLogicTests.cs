@@ -42,5 +42,83 @@ namespace Forbes.Tests.EditMode {
       Assert.IsTrue(SpellTravelLogic.HasProjectile(projectile));
       Assert.IsFalse(SpellTravelLogic.HasProjectile(instant));
     }
+
+    // ── AdvanceMissilePosition ──────────────────────────────────────────
+
+    [Test]
+    public void AdvanceMissilePosition_MovesTowardTarget_ByStepDistance() {
+      var missile = new Vector3(0f, 0f, 0f);
+      var target  = new Vector3(10f, 0f, 0f);
+      // speed 20 m/s, deltaTime 1/60 s → step = 1/3 m
+      float speed = 20f;
+      float dt    = 1f / 60f;
+
+      var result = SpellTravelLogic.AdvanceMissilePosition(missile, target, speed, dt);
+
+      Assert.AreEqual(speed * dt, result.x, 0.0001f, "Missile should advance exactly one step.");
+      Assert.AreEqual(0f, result.y, 0.0001f);
+      Assert.AreEqual(0f, result.z, 0.0001f);
+    }
+
+    [Test]
+    public void AdvanceMissilePosition_DoesNotOvershoot() {
+      // Missile is already closer than one step — should clamp at target.
+      var missile = new Vector3(9.99f, 0f, 0f);
+      var target  = new Vector3(10f, 0f, 0f);
+      float speed = 20f;
+      float dt    = 1f / 60f; // step ≈ 0.333 m, distance = 0.01 m
+
+      var result = SpellTravelLogic.AdvanceMissilePosition(missile, target, speed, dt);
+
+      Assert.AreEqual(target.x, result.x, 0.0001f, "Should clamp to target, not overshoot.");
+    }
+
+    [Test]
+    public void AdvanceMissilePosition_ZeroSpeedOrDeltaTime_NoMovement() {
+      var missile = new Vector3(5f, 0f, 0f);
+      var target  = new Vector3(10f, 0f, 0f);
+
+      var zeroSpeed = SpellTravelLogic.AdvanceMissilePosition(missile, target, 0f, 1f / 60f);
+      var zeroDt    = SpellTravelLogic.AdvanceMissilePosition(missile, target, 20f, 0f);
+      var negSpeed  = SpellTravelLogic.AdvanceMissilePosition(missile, target, -5f, 1f / 60f);
+
+      Assert.AreEqual(missile, zeroSpeed, "Zero speed must not move missile.");
+      Assert.AreEqual(missile, zeroDt,    "Zero deltaTime must not move missile.");
+      Assert.AreEqual(missile, negSpeed,  "Negative speed must not move missile.");
+    }
+
+    // ── HasMissileArrived ───────────────────────────────────────────────
+
+    [Test]
+    public void HasMissileArrived_WhenWithinStep_ReturnsTrue() {
+      // Missile is 0.1 m from target; step is 0.333 m → arrived.
+      var missile = new Vector3(9.9f, 0f, 0f);
+      var target  = new Vector3(10f,  0f, 0f);
+      float speed = 20f;
+      float dt    = 1f / 60f;
+
+      Assert.IsTrue(SpellTravelLogic.HasMissileArrived(missile, target, speed, dt));
+    }
+
+    [Test]
+    public void HasMissileArrived_WhenBeyondStep_ReturnsFalse() {
+      // Missile is 5 m from target; step is 0.333 m → not arrived.
+      var missile = new Vector3(5f,  0f, 0f);
+      var target  = new Vector3(10f, 0f, 0f);
+      float speed = 20f;
+      float dt    = 1f / 60f;
+
+      Assert.IsFalse(SpellTravelLogic.HasMissileArrived(missile, target, speed, dt));
+    }
+
+    [Test]
+    public void HasMissileArrived_ZeroSpeed_NeverArrives() {
+      // Even if missile is exactly at target, zero speed means no valid step.
+      var pos = new Vector3(10f, 0f, 0f);
+
+      Assert.IsFalse(SpellTravelLogic.HasMissileArrived(pos, pos, 0f,   1f / 60f));
+      Assert.IsFalse(SpellTravelLogic.HasMissileArrived(pos, pos, 20f,  0f));
+      Assert.IsFalse(SpellTravelLogic.HasMissileArrived(pos, pos, -5f,  1f / 60f));
+    }
   }
 }

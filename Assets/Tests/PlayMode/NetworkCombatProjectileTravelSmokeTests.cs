@@ -7,7 +7,9 @@ using UnityEngine.TestTools;
 
 namespace Forbes.Tests.PlayMode {
   /// <summary>
-  /// Fusion Single-player smokes for logical projectile travel on cast-time spells (<see cref="SpellRegistry"/> id 1).
+  /// Fusion Single-player smokes for moving-target missile logic (<see cref="SpellRegistry"/> id 1,
+  /// Fireball). The missile is a homing logical projectile that advances toward the target's
+  /// current position each tick; it is not bound to a fixed impact tick.
   /// </summary>
   [TestFixture]
   public class NetworkCombatProjectileTravelSmokeTests {
@@ -28,341 +30,263 @@ namespace Forbes.Tests.PlayMode {
       PlayModeTargetingCleanup.DestroyAutoCreatedTargetingSystem();
     }
 
-    [UnityTest]
-    [Timeout(120000)]
-    public IEnumerator ProjectileSpell_DamageNotAppliedBeforeImpactTick() {
+    // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    IEnumerator SpawnBoth(string context = "") {
+      var runner = _session.Runner;
+      Assert.IsNotNull(runner, $"{context}: runner null");
+      yield return FusionPlayModeTestHelpers.WaitFrames(5);
+
       var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
       var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
-      Assert.IsNotNull(playerPrefab);
-      Assert.IsNotNull(dummyPrefab);
+      Assert.IsNotNull(playerPrefab, $"{context}: playerPrefab null");
+      Assert.IsNotNull(dummyPrefab,  $"{context}: dummyPrefab null");
 
-      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+      var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
 
-      IEnumerator Body() {
-        var runner = _session.Runner;
-        Assert.IsNotNull(runner);
+      yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
+        runner, playerPrefab, new Vector3(-2f, 1f, 0f), Quaternion.identity, spawnFlags, o => _player = o);
 
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+      runner.SetPlayerObject(runner.LocalPlayer, _player);
+      Assert.IsTrue(runner.TryGetPlayerObject(runner.LocalPlayer, out _));
 
-        var spawnPlayer = new Vector3(-2f, 1f, 0f);
-        var spawnDummy  = new Vector3(6f, 0f, 6f); // planar distance sqrt(64+36)=10m (< Fireball range)
+      yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
+        runner, dummyPrefab, new Vector3(6f, 0f, 6f), Quaternion.identity,
+        PlayerRef.None, spawnFlags, o => _dummy = o);
 
-        var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+      if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
+        FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
+      }
+      if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
+        mobNt.DisableSharedModeInterpolation = true;
+      }
 
-        yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
-          runner, playerPrefab, spawnPlayer, Quaternion.identity, spawnFlags, o => _player = o);
+      yield return FusionPlayModeTestHelpers.WaitFrames(3);
 
-        runner.SetPlayerObject(runner.LocalPlayer, _player);
-        Assert.IsTrue(runner.TryGetPlayerObject(runner.LocalPlayer, out var registered));
-        Assert.AreEqual(_player.Id, registered.Id);
-
-        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
-          runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
-
-        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
-          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
-        }
-
-        if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
-          mobNt.DisableSharedModeInterpolation = true;
-        }
-
-        yield return FusionPlayModeTestHelpers.WaitFrames(3);
-
-        Assert.IsTrue(_player.TryGetComponent(out NetworkCombatController combat));
-        Assert.IsTrue(_player.TryGetComponent(out Health playerHealth));
-        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
-
+      if (_player.TryGetComponent(out Health playerHealth)) {
         playerHealth.AuthorityApplyStartingHealthIfUnset();
-        dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
-
-        float startDummyHp = dummyHealth.NetworkedHealth;
-
-        Assert.IsFalse(SpellTravelLogic.HasProjectile(SpellRegistry.Get(2)));
-
-        Assert.Greater(SpellRegistry.Get(1).ProjectileSpeedMetersPerSecond, 0f);
-        Assert.IsTrue(SpellTravelLogic.HasProjectile(SpellRegistry.Get(1)));
-
-        _session.InputRelay.TargetNetworkId = _dummy.Id;
-        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => combat.PendingImpactSpellId != 0, 1200,
-          messageOnFail:
-          $"Fireball pending not scheduled ticks={runner.Tick} casting={combat.CurrentSpellId} end={combat.CastEndTick}");
-
-        int pendingTick = combat.PendingImpactTick;
-
-        while (runner.Tick < pendingTick) {
-          Assert.AreEqual(startDummyHp, dummyHealth.NetworkedHealth, 0.35f,
-            $"tick={runner.Tick} waited impact={pendingTick} hpBeforeImpact");
-          yield return FusionPlayModeTestHelpers.WaitFrames(1);
-        }
-
-        Assert.Greater(playerHealth.NetworkedHealth, 0.5f, "Caster should stay alive for this smoke.");
       }
+      if (_dummy.TryGetComponent(out Health dummyHealth)) {
+        dummyHealth.AuthorityApplyStartingHealthIfUnset();
+      }
+
+      yield return FusionPlayModeTestHelpers.WaitFrames(5);
     }
 
+    IEnumerator FireFireball() {
+      _session.InputRelay.TargetNetworkId = _dummy.Id;
+      _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
+      yield return FusionPlayModeTestHelpers.WaitUntil(
+        () => _player.GetComponent<NetworkCombatController>().PendingImpactSpellId != 0,
+        maxFrames: 1200,
+        messageOnFail: "Fireball missile not scheduled within timeout");
+    }
+
+    // ── Tests ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Missile-in-flight: HP must not change until the missile arrives.
+    /// We wait for a short window well below the expected travel time at initial
+    /// distance (~10 m / 20 m·s⁻¹ ≈ 0.5 s → ~30 ticks at 60 Hz) and assert HP is
+    /// still at the start value.
+    /// </summary>
     [UnityTest]
     [Timeout(120000)]
-    public IEnumerator ProjectileSpell_DamageAppliedAfterImpactTick() {
-      var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
-      var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
-      Assert.IsNotNull(playerPrefab);
-      Assert.IsNotNull(dummyPrefab);
-
+    public IEnumerator ProjectileSpell_DamageNotAppliedDuringFlight() {
       yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
 
       IEnumerator Body() {
-        var runner = _session.Runner;
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+        yield return SpawnBoth(nameof(ProjectileSpell_DamageNotAppliedDuringFlight));
 
-        var spawnPlayer = new Vector3(-2f, 1f, 0f);
-        var spawnDummy  = new Vector3(6f, 0f, 6f);
-        var spawnFlags  = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+        var combat     = _player.GetComponent<NetworkCombatController>();
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp  = dummyHealth.NetworkedHealth;
 
-        yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
-          runner, playerPrefab, spawnPlayer, Quaternion.identity, spawnFlags, o => _player = o);
-        runner.SetPlayerObject(runner.LocalPlayer, _player);
+        Assert.IsFalse(SpellTravelLogic.HasProjectile(SpellRegistry.Get(2)), "Spell 2 must be hitscan for this test to be meaningful.");
+        Assert.IsTrue(SpellTravelLogic.HasProjectile(SpellRegistry.Get(1)),  "Spell 1 (Fireball) must be a projectile.");
 
-        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
-          runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
+        yield return FireFireball();
 
-        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
-          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
-        }
+        // Wait a handful of ticks — significantly less than the expected travel
+        // time so the missile is still in flight.
+        yield return FusionPlayModeTestHelpers.WaitFrames(8);
 
-        if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
-          mobNt.DisableSharedModeInterpolation = true;
-        }
+        Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
+          "Dummy HP must not change while missile is still in flight.");
+        Assert.AreNotEqual(0, combat.PendingImpactSpellId,
+          "Missile slot must still be occupied during flight.");
 
-        yield return FusionPlayModeTestHelpers.WaitFrames(3);
-
-        Assert.IsTrue(_player.TryGetComponent(out NetworkCombatController combat));
-        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
-
-        dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
-
-        float startDummyHp = dummyHealth.NetworkedHealth;
-        float fireballDmg  = SpellRegistry.Get(1).Damage;
-
-        _session.InputRelay.TargetNetworkId = _dummy.Id;
-        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => combat.PendingImpactSpellId != 0, 1200);
-
-        int impactTick = combat.PendingImpactTick;
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => runner.Tick >= impactTick, 960,
-          messageOnFail: $"impactWait tick={runner.Tick} need>={impactTick}");
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() =>
-            Mathf.Abs(dummyHealth.NetworkedHealth - (startDummyHp - fireballDmg)) < 0.36f,
-          480,
-          messageOnFail:
-          $"post-impact hp={dummyHealth.NetworkedHealth} expected ~{startDummyHp - fireballDmg}");
-
-        Assert.AreEqual(0, combat.PendingImpactSpellId);
+        Assert.Greater(_player.GetComponent<Health>().NetworkedHealth, 0.5f,
+          "Caster should stay alive for this smoke.");
       }
     }
 
+    /// <summary>
+    /// Missile eventually resolves and applies the correct damage.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator ProjectileSpell_DamageAppliedAfterMissileArrives() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(ProjectileSpell_DamageAppliedAfterMissileArrives));
+
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp   = dummyHealth.NetworkedHealth;
+        float fireballDmg = SpellRegistry.Get(1).Damage;
+
+        yield return FireFireball();
+
+        // Poll until HP drops by the expected damage amount.
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - fireballDmg)) < 0.36f,
+          maxFrames: 960,
+          messageOnFail: $"post-impact hp={dummyHealth.NetworkedHealth} expected ~{startHp - fireballDmg}");
+
+        Assert.AreEqual(0, _player.GetComponent<NetworkCombatController>().PendingImpactSpellId,
+          "Missile slot must be cleared after impact.");
+      }
+    }
+
+    /// <summary>
+    /// Target dies while missile is in flight → missile is cancelled, no extra damage applied.
+    /// </summary>
     [UnityTest]
     [Timeout(120000)]
     public IEnumerator ProjectileSpell_DeadTarget_NoDelayedDamage_ClearPendingSafely() {
-      var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
-      var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
-      Assert.IsNotNull(playerPrefab);
-      Assert.IsNotNull(dummyPrefab);
-
       yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
 
       IEnumerator Body() {
-        var runner = _session.Runner;
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+        yield return SpawnBoth(nameof(ProjectileSpell_DeadTarget_NoDelayedDamage_ClearPendingSafely));
 
-        var spawnPlayer = new Vector3(-2f, 1f, 0f);
-        var spawnDummy  = new Vector3(6f, 0f, 6f);
-        var spawnFlags  = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+        var combat     = _player.GetComponent<NetworkCombatController>();
+        var dummyHealth = _dummy.GetComponent<Health>();
 
-        yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
-          runner, playerPrefab, spawnPlayer, Quaternion.identity, spawnFlags, o => _player = o);
-        runner.SetPlayerObject(runner.LocalPlayer, _player);
+        yield return FireFireball();
 
-        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
-          runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
-
-        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
-          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
-        }
-
-        if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
-          mobNt.DisableSharedModeInterpolation = true;
-        }
-
-        yield return FusionPlayModeTestHelpers.WaitFrames(3);
-
-        Assert.IsTrue(_player.TryGetComponent(out NetworkCombatController combat));
-        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
-
-        dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
-
-        float startHp = dummyHealth.NetworkedHealth;
-
-        _session.InputRelay.TargetNetworkId = _dummy.Id;
-        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => combat.PendingImpactSpellId != 0, 1200);
-        int impactTick = combat.PendingImpactTick;
-
-        dummyHealth.DealDamageRpc(startHp + 100f);
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => dummyHealth.IsDead, 240);
+        // Kill the target while the missile is in flight.
+        dummyHealth.DealDamageRpc(dummyHealth.NetworkedHealth + 100f);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => dummyHealth.IsDead, maxFrames: 240,
+          messageOnFail: "Dummy did not die from lethal damage RPC.");
 
         Assert.AreEqual(0f, dummyHealth.NetworkedHealth, 0.01f);
 
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => runner.Tick > impactTick + 2, 600,
-          messageOnFail: $"tick={runner.Tick} impactWas={impactTick}");
+        // Wait well past normal travel time; missile must be discarded, not applied.
+        yield return FusionPlayModeTestHelpers.WaitFrames(120);
 
-        Assert.IsTrue(dummyHealth.IsDead);
+        Assert.IsTrue(dummyHealth.IsDead,     "Target must stay dead — no missile resurrection.");
         Assert.AreEqual(0f, dummyHealth.NetworkedHealth, 0.01f,
-          "Dead target should not accept delayed projectile damage.");
-        Assert.AreEqual(0, combat.PendingImpactSpellId);
+          "Dead target must not receive delayed projectile damage.");
+        Assert.AreEqual(0, combat.PendingImpactSpellId,
+          "Missile slot must be cleared when target is dead.");
       }
     }
 
+    /// <summary>
+    /// Caster dies before the missile arrives → pending missile is cleared by
+    /// TryCancelCast(Death) and the target is unharmed.
+    /// </summary>
     [UnityTest]
     [Timeout(120000)]
     public IEnumerator ProjectileSpell_CasterDiesBeforeImpact_PendingImpactCleared_TargetUnharmed() {
-      var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
-      var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
-      Assert.IsNotNull(playerPrefab);
-      Assert.IsNotNull(dummyPrefab);
-
       yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
 
       IEnumerator Body() {
-        var runner = _session.Runner;
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+        yield return SpawnBoth(nameof(ProjectileSpell_CasterDiesBeforeImpact_PendingImpactCleared_TargetUnharmed));
 
-        var spawnPlayer = new Vector3(-2f, 1f, 0f);
-        var spawnDummy  = new Vector3(6f, 0f, 6f);
-        var spawnFlags  = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+        var combat      = _player.GetComponent<NetworkCombatController>();
+        var playerHealth = _player.GetComponent<Health>();
+        var dummyHealth  = _dummy.GetComponent<Health>();
+        float startDummyHp = dummyHealth.NetworkedHealth;
 
-        yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
-          runner, playerPrefab, spawnPlayer, Quaternion.identity, spawnFlags, o => _player = o);
-        runner.SetPlayerObject(runner.LocalPlayer, _player);
+        yield return FireFireball();
 
-        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
-          runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
-
-        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
-          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
-        }
-
-        if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
-          mobNt.DisableSharedModeInterpolation = true;
-        }
-
-        yield return FusionPlayModeTestHelpers.WaitFrames(3);
-
-        Assert.IsTrue(_player.TryGetComponent(out NetworkCombatController combat));
-        Assert.IsTrue(_player.TryGetComponent(out Health playerHealth));
-        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
-
-        playerHealth.AuthorityApplyStartingHealthIfUnset();
-        dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
-
-        float startDummyHp  = dummyHealth.NetworkedHealth;
-        float startPlayerHp = playerHealth.NetworkedHealth;
-
-        // Fire Fireball (cast-time projectile) so a pending impact is scheduled.
-        _session.InputRelay.TargetNetworkId = _dummy.Id;
-        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => combat.PendingImpactSpellId != 0, 1200,
-          messageOnFail:
-          $"Fireball pending not scheduled ticks={runner.Tick} casting={combat.CurrentSpellId} end={combat.CastEndTick}");
-
-        int impactTick = combat.PendingImpactTick;
-
-        // Kill the caster while the projectile is in flight.
-        // TryCancelCast(Death) clears both cast state and pending impact.
-        playerHealth.DealDamageRpc(startPlayerHp + 100f);
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => playerHealth.IsDead, 240,
+        // Kill the caster while the missile is in flight.
+        playerHealth.DealDamageRpc(playerHealth.NetworkedHealth + 100f);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => playerHealth.IsDead, maxFrames: 240,
           messageOnFail: "Caster did not die after lethal DealDamageRpc.");
 
-        // Tick past where impact would have landed.
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => runner.Tick > impactTick + 2, 600,
-          messageOnFail: $"tick={runner.Tick} expected to pass impactTick={impactTick}");
+        // Wait well past normal travel time; cleared missile must not land.
+        yield return FusionPlayModeTestHelpers.WaitFrames(120);
 
         Assert.AreEqual(0, combat.PendingImpactSpellId,
-          "Pending impact must be cleared when the caster dies.");
+          "Pending missile must be cleared when the caster dies.");
         Assert.AreEqual(startDummyHp, dummyHealth.NetworkedHealth, 0.35f,
-          "Target must be undamaged: in-flight projectile abandoned on caster death.");
+          "Target must be undamaged: in-flight missile abandoned on caster death.");
         Assert.IsFalse(dummyHealth.IsDead,
           "Target should be alive — no projectile damage was applied.");
       }
     }
 
+    /// <summary>
+    /// Target moves a moderate distance (5 m) after missile release — the missile
+    /// homes, catches up, and damage is still applied. Validates the moving-target
+    /// missile model: flight is extended by target movement but impact still lands.
+    /// </summary>
     [UnityTest]
     [Timeout(120000)]
-    public IEnumerator ProjectileSpell_TargetMovesOutOfCastRange_StillDamagedByNetworkId() {
-      var playerPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.PlayerCharacterPrefabPath);
-      var dummyPrefab  = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
-      Assert.IsNotNull(playerPrefab);
-      Assert.IsNotNull(dummyPrefab);
-
+    public IEnumerator ProjectileSpell_TargetMovesModerately_MissileCatches_StillDamaged() {
       yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
 
       IEnumerator Body() {
-        var runner = _session.Runner;
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+        yield return SpawnBoth(nameof(ProjectileSpell_TargetMovesModerately_MissileCatches_StillDamaged));
 
-        var spawnPlayer = new Vector3(-2f, 1f, 0f);
-        var spawnDummy  = new Vector3(6f, 0f, 6f);
-        var spawnFlags  = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp   = dummyHealth.NetworkedHealth;
+        float dmg       = SpellRegistry.Get(1).Damage;
 
-        yield return FusionPlayModeTestHelpers.SpawnPlayerPrefabBlocking(
-          runner, playerPrefab, spawnPlayer, Quaternion.identity, spawnFlags, o => _player = o);
-        runner.SetPlayerObject(runner.LocalPlayer, _player);
+        yield return FireFireball();
 
-        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
-          runner, dummyPrefab, spawnDummy, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
+        // Move the target 5 m away after missile is launched. At 20 m/s missile
+        // speed the missile will still catch a stationary target at ≤ 30 m range.
+        Vector3 nudged = _dummy.transform.position + new Vector3(5f, 0f, 0f);
+        FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_dummy, nudged);
 
-        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
-          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
-        }
-
-        if (_dummy.TryGetComponent(out NetworkTransform mobNt)) {
-          mobNt.DisableSharedModeInterpolation = true;
-        }
-
-        yield return FusionPlayModeTestHelpers.WaitFrames(3);
-
-        Assert.IsTrue(_player.TryGetComponent(out NetworkCombatController combat));
-        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
-
-        dummyHealth.AuthorityApplyStartingHealthIfUnset();
-        yield return FusionPlayModeTestHelpers.WaitFrames(5);
-
-        float startHp = dummyHealth.NetworkedHealth;
-        float dmg     = SpellRegistry.Get(1).Damage;
-
-        _session.InputRelay.TargetNetworkId = _dummy.Id;
-        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() => combat.PendingImpactSpellId != 0, 1200);
-
-        FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_dummy, new Vector3(420f, 0f, 420f));
-
-        yield return FusionPlayModeTestHelpers.WaitUntil(() =>
-            Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - dmg)) < 0.36f,
-          960,
+        // Give the missile enough time to home and arrive.
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - dmg)) < 0.36f,
+          maxFrames: 960,
           messageOnFail:
-          $"After distant teleport, dmg not applied hp={dummyHealth.NetworkedHealth} expect~{startHp - dmg}");
+          $"After 5 m move, damage not applied. hp={dummyHealth.NetworkedHealth} expect~{startHp - dmg}");
 
-        Assert.IsFalse(dummyHealth.IsDead);
+        Assert.IsFalse(dummyHealth.IsDead, "Target must survive a Fireball hit.");
+      }
+    }
+
+    /// <summary>
+    /// NEW: Target runs far away after missile is released but stays within the
+    /// missile's reachable distance. Validates that the missile follows the target
+    /// and impact is delayed but still resolves.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator ProjectileSpell_TargetRunsFarAway_MissileFollows_ImpactDelayedButLands() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(ProjectileSpell_TargetRunsFarAway_MissileFollows_ImpactDelayedButLands));
+
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp   = dummyHealth.NetworkedHealth;
+        float dmg       = SpellRegistry.Get(1).Damage;
+
+        yield return FireFireball();
+
+        // Teleport to 20 m away — well within Fireball range (30 m) so the
+        // missile can still home in and catch the stationary target.
+        Vector3 farPos = _dummy.transform.position + new Vector3(20f, 0f, 0f);
+        FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_dummy, farPos);
+
+        // Missile must still arrive — give it generous time (target is stationary
+        // after teleport, missile at 20 m/s needs ≤ 1 s additional at 60 Hz).
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - dmg)) < 0.36f,
+          maxFrames: 960,
+          messageOnFail:
+          $"After 20 m teleport, missile did not land. hp={dummyHealth.NetworkedHealth} expect~{startHp - dmg}");
+
+        Assert.IsFalse(dummyHealth.IsDead, "Target must survive a single Fireball.");
       }
     }
   }

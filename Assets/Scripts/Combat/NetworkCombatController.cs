@@ -23,7 +23,8 @@ public class NetworkCombatController : NetworkBehaviour {
   /// <summary>Squared move magnitude above this cancels a cast-time spell (state authority).</summary>
   const float MovementCancelSqr = 1e-6f;
 
-  // --- Networked cast state ---
+  // ── CAST STATE ──────────────────────────────────────────────────────────────
+  // Networked; written only on state authority. Clients observe for cast bar UI.
 
   /// <summary>Spell ID currently being cast; 0 = idle.</summary>
   [Networked] public byte      CurrentSpellId  { get; set; }
@@ -37,30 +38,38 @@ public class NetworkCombatController : NetworkBehaviour {
   /// <summary>Tick when the current cast resolves; if Tick >= CastEndTick the spell fires.</summary>
   [Networked] public int       CastEndTick     { get; set; }
 
-  /// <summary>Tick when the global cooldown expires.</summary>
-  [Networked] public int       GcdEndTick      { get; set; }
-
-  // Individual spell cooldowns (three spells; extend if more are added).
-  [Networked] public int Cooldown1EndTick { get; set; }
-  [Networked] public int Cooldown2EndTick { get; set; }
-  [Networked] public int Cooldown3EndTick { get; set; }
-
   /// <summary>Last cast failure reason; shown in HUD for a few seconds.</summary>
   [Networked] public byte LastFailReason { get; set; }
 
   /// <summary>Tick at which <see cref="LastFailReason"/> was set; HUD hides after ~2 s.</summary>
   [Networked] public int LastFailTick { get; set; }
 
-  /// <summary>0 = no delayed impact queued.</summary>
+  // ── COOLDOWN / GCD ──────────────────────────────────────────────────────────
+  // All tick-based; derived from Runner.TickRate at cast time. Observed by UI.
+
+  /// <summary>Tick when the global cooldown expires.</summary>
+  [Networked] public int GcdEndTick { get; set; }
+
+  // Individual spell cooldowns (three spells; extend if more are added).
+  [Networked] public int Cooldown1EndTick { get; set; }
+  [Networked] public int Cooldown2EndTick { get; set; }
+  [Networked] public int Cooldown3EndTick { get; set; }
+
+  // ── PENDING MISSILE SLOT ─────────────────────────────────────────────────────
+  // ONE-SLOT MODEL: only one in-flight missile at a time. Safe with the current
+  // spell table (Fireball is the only projectile spell, cast-time, so its
+  // impact resolves before a second cast could complete).
+  // Upgrade path: extract to a sibling TargetedMissileSlot : NetworkBehaviour
+  // with a small NetworkLinkedList when multi-missile support is needed.
+
+  /// <summary>0 = no missile in flight.</summary>
   [Networked] public byte PendingImpactSpellId { get; set; }
 
-  /// <summary>Logical projectile target lock (<see cref="NetworkId"/>).</summary>
+  /// <summary>Target locked at missile release (<see cref="NetworkId"/>); resolved each tick.</summary>
   [Networked] public NetworkId PendingImpactTarget { get; set; }
 
-  /// <summary>Simulation tick when <see cref="PendingImpactSpellId"/> resolves.</summary>
-  [Networked] public int PendingImpactTick { get; set; }
-
-  // ---
+  /// <summary>Simulation tick when the missile was released; retained for diagnostics.</summary>
+  [Networked] public int PendingMissileReleaseTick { get; set; }
 
   /// <summary>True while a cast-time spell is in flight; <see cref="PlayerMovement"/> uses this to freeze movement.</summary>
   public bool IsCasting => CurrentSpellId != 0 && Runner != null && Runner.Tick < CastEndTick;
@@ -78,6 +87,12 @@ public class NetworkCombatController : NetworkBehaviour {
 
   Health         _health;
   NetworkButtons _prevButtons;
+
+  // Non-networked; state authority only. Tracks the missile's logical position
+  // each tick so it can home toward the target's current position. Reset to
+  // default by ClearPendingImpact. Lost on authority transfer — acceptable for
+  // prototype (a future fix can re-derive from PendingMissileReleaseTick on Spawned).
+  Vector3 _missileVirtualPos;
 
   void Awake() {
     _health = GetComponent<Health>();
@@ -123,6 +138,7 @@ public class NetworkCombatController : NetworkBehaviour {
       }
     }
 
+    // ── INPUT DISPATCH ───────────────────────────────────────────────────────
     if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell1)) {
       TryCastOrInterrupt(1, input.TargetId);
     } else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell2)) {
@@ -133,6 +149,8 @@ public class NetworkCombatController : NetworkBehaviour {
 
     _prevButtons = input.Buttons;
   }
+
+  // ── CAST LIFECYCLE ───────────────────────────────────────────────────────────
 
   /// <summary>
   /// Authoritative cast interrupt. Only mutates networked cast fields on state authority.
@@ -209,13 +227,8 @@ public class NetworkCombatController : NetworkBehaviour {
       SetCooldownEndTick(spellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
       if (SpellTravelLogic.HasProjectile(spell)) {
-        float distanceMeters = Vector3.Distance(transform.position, targetHealth.transform.position);
-        int travelTicks =
-          SpellTravelLogic.ComputeTravelTicks(distanceMeters, spell.ProjectileSpeedMetersPerSecond, TickRateRounded);
-        int impactTick =
-          SpellTravelLogic.ComputeImpactTick(Runner.Tick, travelTicks);
-        SchedulePendingImpact(spellId, targetId, impactTick);
-        ForbesLog.Net($"Instant cast (projectile): {spell.Name} impactTick={impactTick} travelTicks={travelTicks}", this);
+        SchedulePendingImpact(spellId, targetId);
+        ForbesLog.Net($"Instant cast (missile): {spell.Name} releaseTick={Runner.Tick}", this);
       } else {
         targetHealth.DealDamageRpc(spell.Damage);
         ForbesLog.Net($"Instant cast: {spell.Name} -> dmg {spell.Damage}", this);
@@ -250,13 +263,8 @@ public class NetworkCombatController : NetworkBehaviour {
     }
 
     if (SpellTravelLogic.HasProjectile(spell)) {
-      float distanceMeters = Vector3.Distance(transform.position, targetHealth.transform.position);
-      int travelTicks =
-        SpellTravelLogic.ComputeTravelTicks(distanceMeters, spell.ProjectileSpeedMetersPerSecond, TickRateRounded);
-      int impactTick =
-        SpellTravelLogic.ComputeImpactTick(Runner.Tick, travelTicks);
-      SchedulePendingImpact(CurrentSpellId, CastTarget, impactTick);
-      ForbesLog.Net($"Cast resolved (projectile): {spell.Name} impactTick={impactTick}", this);
+      SchedulePendingImpact(CurrentSpellId, CastTarget);
+      ForbesLog.Net($"Cast resolved (missile): {spell.Name} releaseTick={Runner.Tick}", this);
     } else {
       targetHealth.DealDamageRpc(spell.Damage);
       ForbesLog.Net($"Cast resolved: {spell.Name} -> dmg {spell.Damage}", this);
@@ -275,68 +283,66 @@ public class NetworkCombatController : NetworkBehaviour {
   }
 
   void ClearPendingImpact() {
-    PendingImpactSpellId = 0;
-    PendingImpactTarget  = default;
-    PendingImpactTick    = 0;
+    PendingImpactSpellId      = 0;
+    PendingImpactTarget       = default;
+    PendingMissileReleaseTick = 0;
+    _missileVirtualPos        = default;
   }
 
-  // SpellTravelLogic takes int tickRate; RoundToInt matches the precision
-  // used by SecsToTicks (CeilToInt on float). At 60 Hz both are equal.
-  int TickRateRounded => Mathf.RoundToInt(Runner.TickRate);
-
-  // ONE-SLOT MODEL: only one pending impact at a time. Safe with the current
-  // spell table because the only projectile spell (Fireball) is cast-time and
-  // its impact always fires before a second cast could complete. If an instant
-  // projectile spell is ever added, upgrade to a small queue (NetworkLinkedList).
-  void SchedulePendingImpact(byte spellId, NetworkId targetId, int impactTick) {
+  void SchedulePendingImpact(byte spellId, NetworkId targetId) {
     if (PendingImpactSpellId != 0) {
-      ForbesLog.Net($"SchedulePendingImpact: overwriting pending impact spellId={PendingImpactSpellId} — one-slot limit.", this);
+      ForbesLog.Net($"SchedulePendingImpact: overwriting in-flight missile spellId={PendingImpactSpellId} — one-slot limit.", this);
     }
-    PendingImpactSpellId = spellId;
-    PendingImpactTarget  = targetId;
-    PendingImpactTick    = impactTick;
-    if (Runner.Tick >= impactTick) {
-      TryResolvePendingImpact();
-    }
+    PendingImpactSpellId      = spellId;
+    PendingImpactTarget       = targetId;
+    PendingMissileReleaseTick = Runner.Tick;
+    _missileVirtualPos        = transform.position; // missile starts at caster position
   }
 
-  // Impact validates only existence and liveness — not range or LoS.
-  // Once scheduled, a projectile tracks the target by NetworkId only.
-  // Covered by smoke: ProjectileSpell_TargetMovesOutOfCastRange_StillDamagedByNetworkId.
+  // Per-tick missile advance. Runs every FixedUpdateNetwork while a missile is in
+  // flight. The missile homes toward the target's current position — movement by
+  // the target extends or shortens flight time. Validates only existence and
+  // liveness at each tick; range / LoS are not re-checked after release.
   void TryResolvePendingImpact() {
     if (PendingImpactSpellId == 0) {
       return;
     }
 
-    if (Runner.Tick < PendingImpactTick) {
-      return;
-    }
-
-    byte sid = PendingImpactSpellId;
-    NetworkId nid = PendingImpactTarget;
-    ClearPendingImpact();
-
-    var spell = SpellRegistry.Get(sid);
+    var spell = SpellRegistry.Get(PendingImpactSpellId);
     if (!spell.IsValid) {
+      ClearPendingImpact();
       return;
     }
 
-    if (!Runner.TryFindObject(nid, out var targetObj)
+    if (!Runner.TryFindObject(PendingImpactTarget, out var targetObj)
         || targetObj == null
         || !targetObj.TryGetComponent(out Health impactHealth)) {
       SetFailReason(CombatFailReason.NoTarget);
-      ForbesLog.Net("Pending impact: target missing -> NoTarget", this);
+      ForbesLog.Net("Missile: target missing -> NoTarget", this);
+      ClearPendingImpact();
       return;
     }
 
     if (impactHealth.IsDead) {
       SetFailReason(CombatFailReason.TargetDead);
-      ForbesLog.Net("Pending impact: target dead", this);
+      ForbesLog.Net("Missile: target dead — impact cancelled", this);
+      ClearPendingImpact();
       return;
     }
 
+    Vector3 targetPos = targetObj.transform.position;
+    float   speed     = spell.ProjectileSpeedMetersPerSecond;
+    float   dt        = Runner.DeltaTime;
+
+    _missileVirtualPos = SpellTravelLogic.AdvanceMissilePosition(_missileVirtualPos, targetPos, speed, dt);
+
+    if (!SpellTravelLogic.HasMissileArrived(_missileVirtualPos, targetPos, speed, dt)) {
+      return;
+    }
+
+    ClearPendingImpact();
     impactHealth.DealDamageRpc(spell.Damage);
-    ForbesLog.Net($"Pending impact resolved: {spell.Name} dmg={spell.Damage}", this);
+    ForbesLog.Net($"Missile arrived: {spell.Name} dmg={spell.Damage}", this);
   }
 
   void SetFailReason(CombatFailReason reason) {

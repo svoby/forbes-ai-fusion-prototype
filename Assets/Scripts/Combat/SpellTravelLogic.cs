@@ -28,4 +28,26 @@ public static class SpellTravelLogic {
   public static int ComputeImpactTick(int releaseTick, int travelTicks) {
     return releaseTick + Mathf.Max(0, travelTicks);
   }
+
+  /// <summary>
+  /// Advances a homing missile one simulation step toward the target's current position.
+  /// Returns the new missile position. Returns <paramref name="missilePos"/> unchanged when
+  /// <paramref name="speedMPS"/> or <paramref name="deltaTime"/> are non-positive.
+  /// </summary>
+  public static Vector3 AdvanceMissilePosition(
+    Vector3 missilePos, Vector3 targetPos, float speedMPS, float deltaTime) {
+    float step = speedMPS * deltaTime;
+    return step <= 0f ? missilePos : Vector3.MoveTowards(missilePos, targetPos, step);
+  }
+
+  /// <summary>
+  /// Returns true when the missile is within one simulation step of the target —
+  /// i.e. it will reach the target this tick. Always false when speed or deltaTime
+  /// are non-positive.
+  /// </summary>
+  public static bool HasMissileArrived(
+    Vector3 missilePos, Vector3 targetPos, float speedMPS, float deltaTime) {
+    float step = speedMPS * deltaTime;
+    return step > 0f && Vector3.Distance(missilePos, targetPos) <= step;
+  }
 }
