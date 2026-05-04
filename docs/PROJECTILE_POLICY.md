@@ -41,7 +41,7 @@ Range and line-of-sight are **not** rechecked after the missile is released. If 
 - **`_missileVirtualPos` is non-networked and authority-only.** Clients do not receive the missile position as networked state. Any future cosmetic visual must derive position from replicated parameters (origin, target, tick), not from this field.
 - **Authority transfer during in-flight missile is only prototype-safe.** If state authority transfers while a missile is in flight, the missile state (non-networked) will be lost. This is acceptable for the prototype but must be addressed before shipping.
 - **No `TargetedMissileManager`.** A dedicated world-level manager for multiple simultaneous missiles does not exist yet.
-- **No visual projectile.** No cosmetic mesh or particle moves across the screen for in-flight missiles.
+- **Cosmetic projectile visual is minimal.** `CosmeticProjectileView` (plain `MonoBehaviour` on the player prefab) shows a small orange sphere that lerps from the caster toward the target while `PendingImpactSpellId != 0`. It reads only the three already-replicated `[Networked]` properties (`PendingImpactSpellId`, `PendingImpactTarget`, `PendingMissileReleaseTick`) and never writes networked state or applies damage. The visual position is approximate (lerp from current caster position, not release-tick position) — acceptable for a cosmetic indicator.
 - **No pooling.** Missile "objects" are inline fields; no pool or collection management exists.
 - **No miss/resist/immune combat-result logic.** All missiles that arrive apply full damage. Miss chances, resistances, and immune states are out of scope for the prototype.
 
