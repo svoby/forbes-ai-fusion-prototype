@@ -25,8 +25,6 @@ using UnityEngine;
 public class CosmeticProjectileView : MonoBehaviour {
   const float VisualDiameter = 0.3f;
 
-  static readonly Color FireballColor = new Color(1f, 0.45f, 0.05f);
-
   NetworkCombatController _ncc;
   GameObject              _sphere;
 
@@ -44,9 +42,9 @@ public class CosmeticProjectileView : MonoBehaviour {
 
     // renderer.material creates an instance copy of the default material (one sphere, no pooling needed)
     var mat = _sphere.GetComponent<Renderer>().material;
-    mat.color = FireballColor;
+    mat.color = SpellVisualColors.Fireball;
     if (mat.HasProperty("_BaseColor")) {
-      mat.SetColor("_BaseColor", FireballColor);
+      mat.SetColor("_BaseColor", SpellVisualColors.Fireball);
     }
 
     _sphere.SetActive(false);

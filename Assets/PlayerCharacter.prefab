@@ -195,7 +195,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   MeshRenderer: {fileID: 6851675763452951295}
-  _NetworkedColor: {r: 0, g: 0, b: 0, a: 0}
+  _NetworkedColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &451230012
 MonoBehaviour:
   m_ObjectHideFlags: 0

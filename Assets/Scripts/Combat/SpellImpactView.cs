@@ -23,8 +23,6 @@ public class SpellImpactView : MonoBehaviour {
   const float FlashDiameter  = 0.8f;
   const float CenterMassOffset = 1.0f;
 
-  static readonly Color FlashColor = new Color(1f, 0.95f, 0.4f);
-
   NetworkCombatController _ncc;
 
   void Awake() {
@@ -70,9 +68,9 @@ public class SpellImpactView : MonoBehaviour {
     }
 
     var mat = sphere.GetComponent<Renderer>().material;
-    mat.color = FlashColor;
+    mat.color = SpellVisualColors.Fireball;
     if (mat.HasProperty("_BaseColor")) {
-      mat.SetColor("_BaseColor", FlashColor);
+      mat.SetColor("_BaseColor", SpellVisualColors.Fireball);
     }
 
     Destroy(sphere, FlashDuration);

@@ -4,9 +4,21 @@ using UnityEngine;
 /// Visual marker for editor training targets (no gameplay logic).
 /// </summary>
 public class TrainingDummy : MonoBehaviour {
+  static readonly Color BodyTint = new Color(0.9f, 0.14f, 0.12f, 1f);
+
   void Awake() {
-    if (TryGetComponent(out MeshRenderer r) && r.sharedMaterial != null) {
-      r.material.color = new Color(0.9f, 0.35f, 0.15f, 1f);
+    if (TryGetComponent(out MeshRenderer body) && body.sharedMaterial != null) {
+      ApplyColor(body, BodyTint);
+    }
+
+    var facing = transform.Find("FacingVisual");
+    if (facing != null) {
+      foreach (var eyeName in new[] { "Eye_L", "Eye_R" }) {
+        var t = facing.Find(eyeName);
+        if (t != null && t.TryGetComponent<MeshRenderer>(out var eye)) {
+          ApplyColor(eye, Color.white);
+        }
+      }
     }
 
     // Ensure a physics collider exists so click-targeting raycasts can hit this object.
@@ -20,6 +32,14 @@ public class TrainingDummy : MonoBehaviour {
 
     if (GetComponent<Targetable>() == null) {
       gameObject.AddComponent<Targetable>();
+    }
+  }
+
+  static void ApplyColor(MeshRenderer renderer, Color color) {
+    var mat = renderer.material;
+    mat.color = color;
+    if (mat.HasProperty("_BaseColor")) {
+      mat.SetColor("_BaseColor", color);
     }
   }
 }
