@@ -18,9 +18,9 @@ using UnityEngine;
 [RequireComponent(typeof(Health))]
 [DisallowMultipleComponent]
 public class HitImpactView : MonoBehaviour {
-  const float FlashDuration    = 0.2f;
-  const float FlashDiameter    = 0.65f;
-  const float CenterMassOffset = 1.0f;
+  const float FlashDuration   = 0.3f;
+  const float FlashDiameter   = 0.55f;
+  const float AboveHeadOffset = 0.25f; // metres above the top of the collider bounds
 
   static readonly Color HitColor = new Color(1f, 0.08f, 0.08f);
 
@@ -49,7 +49,7 @@ public class HitImpactView : MonoBehaviour {
   void SpawnHitFlash() {
     var sphere  = GameObject.CreatePrimitive(PrimitiveType.Sphere);
     sphere.name = "HitImpactFlash";
-    sphere.transform.position   = ComputeCenterMass(transform);
+    sphere.transform.position   = ComputeAboveHead(transform);
     sphere.transform.localScale = Vector3.one * FlashDiameter;
 
     // Collider rule (COMBAT_FEEDBACK_POLICY.md §collider-rule): disable synchronously
@@ -64,10 +64,13 @@ public class HitImpactView : MonoBehaviour {
     Destroy(sphere, FlashDuration);
   }
 
-  static Vector3 ComputeCenterMass(Transform target) {
+  static Vector3 ComputeAboveHead(Transform target) {
     if (target.TryGetComponent<Collider>(out var col) && col.enabled) {
-      return col.bounds.center;
+      // Spawn just above the top of the collider so the flash is never hidden
+      // inside an opaque capsule mesh.
+      var b = col.bounds;
+      return new Vector3(b.center.x, b.max.y + AboveHeadOffset, b.center.z);
     }
-    return target.position + Vector3.up * CenterMassOffset;
+    return target.position + Vector3.up * 2.3f;
   }
 }
