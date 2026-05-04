@@ -107,9 +107,17 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FireFireball();
 
-        // Wait a handful of ticks — significantly less than the expected travel
-        // time so the missile is still in flight.
-        yield return FusionPlayModeTestHelpers.WaitFrames(8);
+        // Wait well under the expected travel time so the missile is still in flight.
+        // Derived from spell data so the assertion survives speed tuning:
+        //   spawn positions are (-2,1,0) and (6,0,6) → dist ≈ 10.2 m
+        //   at 20 m/s / 60 Hz → ~31 ticks; we wait at most travelTicks/4.
+        var  spell1        = SpellRegistry.Get(1);
+        var  runner        = _session.Runner;
+        float spawnDist    = Vector3.Distance(new Vector3(-2f, 1f, 0f), new Vector3(6f, 0f, 6f));
+        int  travelTicks   = SpellTravelLogic.ComputeTravelTicks(
+          spawnDist, spell1.ProjectileSpeedMetersPerSecond, Mathf.RoundToInt(runner.TickRate));
+        int  inFlightFrames = Mathf.Max(3, travelTicks / 4);
+        yield return FusionPlayModeTestHelpers.WaitFrames(inFlightFrames);
 
         Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
           "Dummy HP must not change while missile is still in flight.");
@@ -278,8 +286,10 @@ namespace Forbes.Tests.PlayMode {
         Vector3 farPos = _dummy.transform.position + new Vector3(20f, 0f, 0f);
         FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_dummy, farPos);
 
-        // Missile must still arrive — give it generous time (target is stationary
-        // after teleport, missile at 20 m/s needs ≤ 1 s additional at 60 Hz).
+        // Missile must still arrive — give it generous time. The missile starts at
+        // the caster (~-2,1,0) and the target teleports to ~(26,0,6): total distance
+        // ≈ 28.6 m at 20 m/s ≈ 1.43 s / ~86 ticks at 60 Hz. The 960-frame budget
+        // (16 s) is well above that; target is stationary after the teleport.
         yield return FusionPlayModeTestHelpers.WaitUntil(
           () => Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - dmg)) < 0.36f,
           maxFrames: 960,

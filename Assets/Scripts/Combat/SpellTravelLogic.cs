@@ -3,6 +3,14 @@ using UnityEngine;
 /// <summary>
 /// Pure projectile travel math — no Fusion runner dependency.
 /// Logical projectiles only; used by <see cref="NetworkCombatController"/> on state authority.
+/// <para>Public surface:</para>
+/// <list type="bullet">
+/// <item><see cref="HasProjectile"/> — true when a spell has a projectile speed.</item>
+/// <item><see cref="ComputeTravelTicks"/> — retained utility / tests; not the active resolution mechanism.</item>
+/// <item><see cref="ComputeImpactTick"/> — retained utility / tests; not the active resolution mechanism.</item>
+/// <item><see cref="AdvanceMissilePosition"/> — per-tick homing step used by NCC.</item>
+/// <item><see cref="HasMissileArrived"/> — per-tick impact gate used by NCC.</item>
+/// </list>
 /// </summary>
 public static class SpellTravelLogic {
   public static bool HasProjectile(SpellData spell) {
@@ -11,6 +19,12 @@ public static class SpellTravelLogic {
 
   /// <summary>
   /// Computes simulation ticks until impact: ceil(distance / speed * tickRate), with guards.
+  /// <para>
+  /// Retained as a utility and for EditMode tests.
+  /// <b>Not called by <see cref="NetworkCombatController"/>.</b>
+  /// Missile resolution now uses <see cref="AdvanceMissilePosition"/> and
+  /// <see cref="HasMissileArrived"/> per simulation tick.
+  /// </para>
   /// </summary>
   public static int ComputeTravelTicks(float distanceMeters, float speedMetersPerSecond, int tickRate) {
     if (speedMetersPerSecond <= 0f || tickRate <= 0) {
@@ -25,6 +39,15 @@ public static class SpellTravelLogic {
     return Mathf.CeilToInt(d / speedMetersPerSecond * tickRate);
   }
 
+  /// <summary>
+  /// Returns <paramref name="releaseTick"/> + max(0, <paramref name="travelTicks"/>).
+  /// <para>
+  /// Retained as a utility and for EditMode tests.
+  /// <b>Not called by <see cref="NetworkCombatController"/>.</b>
+  /// Missile resolution now uses <see cref="AdvanceMissilePosition"/> and
+  /// <see cref="HasMissileArrived"/> per simulation tick.
+  /// </para>
+  /// </summary>
   public static int ComputeImpactTick(int releaseTick, int travelTicks) {
     return releaseTick + Mathf.Max(0, travelTicks);
   }
