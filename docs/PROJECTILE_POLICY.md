@@ -58,6 +58,25 @@ The following approaches are **not** part of this project's projectile design fo
 
 ---
 
+## 4a. Cosmetic visual — collider rule
+
+**Cosmetic visual objects must never have an active physics collider.**
+
+`GameObject.CreatePrimitive` (used for placeholder spheres in `CosmeticProjectileView` and `SpellImpactView`) always attaches a collider as a Unity side effect — even though we never asked for one. `Destroy(collider)` is **deferred to end-of-frame**: the collider remains live for the entire physics step in which the object is created, and during that step `CharacterController.Move()` will deflect off it, producing a visible jump on the target.
+
+**Rule:** whenever a cosmetic primitive is created, disable the collider **synchronously** before doing anything else:
+
+```csharp
+if (go.TryGetComponent<Collider>(out var col)) {
+    col.enabled = false;  // synchronous — removes from physics immediately
+    Destroy(col);          // deferred cleanup — memory only
+}
+```
+
+Do not rely on `Destroy` alone. The `enabled = false` line is mandatory and must come first. This applies to every cosmetic `GameObject.CreatePrimitive` call in this codebase, present and future.
+
+---
+
 ## 5. Long-term direction
 
 When NPC casters, multiple simultaneous in-flight missiles, better visual synchronization, or pooling are required, the missile state should migrate out of `NetworkCombatController` into a dedicated **`TargetedMissileManager`** (world-level authority component). Key considerations for that transition:

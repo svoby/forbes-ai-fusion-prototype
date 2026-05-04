@@ -35,8 +35,10 @@ public class CosmeticProjectileView : MonoBehaviour {
     _sphere.name = "FireballVisual";
     _sphere.transform.localScale = Vector3.one * VisualDiameter;
 
-    // Cosmetic only — must not trigger physics events
+    // Cosmetic only — must not trigger physics events.
+    // Disable immediately (synchronous) before Destroy's deferred removal.
     if (_sphere.TryGetComponent<Collider>(out var col)) {
+      col.enabled = false;
       Destroy(col);
     }
 

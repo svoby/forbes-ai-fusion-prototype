@@ -29,9 +29,8 @@ public class NetworkMobBrain : NetworkBehaviour {
   CharacterController _controller;
   Health _health;
   Vector3 _spawnPosition;
-  // #region agent log
+  Vector3 _initialSpawnPos;
   bool _wasMobDead;
-  // #endregion
   Vector3 _velocity;
   Vector3 _destination;
   NetworkMobBrainState _state;
@@ -50,6 +49,7 @@ public class NetworkMobBrain : NetworkBehaviour {
       return;
     }
 
+    _initialSpawnPos = transform.position;
     _spawnRecordDueTick = Runner != null ? Runner.Tick + 1 : -1;
     _state = NetworkMobBrainState.Idle;
     _idleUntilTick = Runner.Tick;
@@ -74,12 +74,25 @@ public class NetworkMobBrain : NetworkBehaviour {
     }
 
     bool mobDead = _health != null && _health.IsDead;
-    // #region agent log
+    // Disable CC on death so the body doesn't get pushed by other CCs or register
+    // targeting raycasts while invisible.
+    if (mobDead && !_wasMobDead) {
+      if (_controller != null) {
+        _controller.enabled = false;
+      }
+    }
     if (!mobDead && _wasMobDead) {
-      MobDbgLog("E", "MobBrain:FirstAliveTick", "mob first tick after respawn", "\"pos\":\"" + transform.position + "\",\"spawnOrigin\":\"" + _spawnPosition + "\",\"velY\":" + _velocity.y + ",\"state\":\"" + _state + "\",\"obj\":\"" + name + "\"");
+      // Re-enable CC (Health.Respawn also does this; guard for order variance).
+      if (_controller != null && !_controller.enabled) {
+        _controller.enabled = true;
+      }
+      // Reset accumulated fall velocity and stale AI state from death period (H-E fix).
+      _velocity = new Vector3(0f, -1f, 0f);
+      _state = NetworkMobBrainState.Idle;
+      _idleUntilTick = Runner.Tick;
+      _currentTargetId = default;
     }
     _wasMobDead = mobDead;
-    // #endregion
     if (mobDead) {
       return;
     }
@@ -93,7 +106,12 @@ public class NetworkMobBrain : NetworkBehaviour {
     _velocity.y += GravityValue * dt;
 
     if (_spawnRecordDueTick >= 0 && Runner.Tick >= _spawnRecordDueTick) {
-      _spawnPosition = transform.position;
+      var newPos = transform.position;
+      // Same XZ drift guard as Health.SpawnPosition: accept Y correction from CC
+      // floor settling, but reject if NT applied its default state overriding XZ (H-A fix).
+      float dxz2 = (newPos.x - _initialSpawnPos.x) * (newPos.x - _initialSpawnPos.x)
+                 + (newPos.z - _initialSpawnPos.z) * (newPos.z - _initialSpawnPos.z);
+      _spawnPosition = dxz2 < 0.25f ? newPos : _initialSpawnPos;
       _spawnRecordDueTick = -1;
     }
 
@@ -356,15 +374,6 @@ public class NetworkMobBrain : NetworkBehaviour {
     int cd = NetworkMobBrainLogic.SecondsToTicks(AttackIntervalSeconds, Runner.TickRate);
     _nextAttackTick = Runner.Tick + cd;
   }
-
-  // #region agent log
-  static void MobDbgLog(string hyp, string loc, string msg, string data) {
-    try {
-      var line = "{\"sessionId\":\"3fa301\",\"hypothesisId\":\"" + hyp + "\",\"location\":\"" + loc + "\",\"message\":\"" + msg + "\",\"data\":{" + data + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}";
-      System.IO.File.AppendAllText(System.IO.Path.Combine(UnityEngine.Application.dataPath, "..", "debug-3fa301.log"), line + "\n");
-    } catch { }
-  }
-  // #endregion
 
   void PickNewDestination() {
     const int maxAttempts = 12;

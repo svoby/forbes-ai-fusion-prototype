@@ -64,6 +64,10 @@ public class SpellImpactView : MonoBehaviour {
     sphere.transform.localScale = Vector3.one * FlashDiameter;
 
     if (sphere.TryGetComponent<Collider>(out var col)) {
+      // Disable immediately (synchronous) so the collider never participates in
+      // physics — Destroy() is deferred and would leave it live for one FixedUpdate,
+      // deflecting nearby CharacterControllers.
+      col.enabled = false;
       Destroy(col);
     }
 

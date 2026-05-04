@@ -57,11 +57,21 @@ public class PlayerMovement : NetworkBehaviour {
 
     bool dead = _health != null && _health.IsDead;
 
+    // Disable CC on death: stops other CCs from pushing the body and prevents
+    // the CC collider from registering targeting raycasts on an invisible corpse.
+    if (dead && !_wasDead) {
+      _controller.enabled = false;
+    }
+
     // Respawn teleports the body but this controller keeps simulating; wipe fall velocity
     // so the next tick does not shoot the player downward through the floor / kill plane.
     // Do not trust isGrounded on the first tick after teleport — always apply grounded baseline.
     if (!dead && _wasDead) {
       _velocity = new Vector3(0f, -1f, 0f);
+      // Health.Respawn() re-enables the CC during teleport; guard in case order varies.
+      if (!_controller.enabled) {
+        _controller.enabled = true;
+      }
     }
 
     _wasDead = dead;

@@ -67,9 +67,6 @@ public class Health : NetworkBehaviour {
       NetworkedHealth = StartingHealth;
       _spawnRecordDueTick = Runner != null ? Runner.Tick + 1 : -1;
       ForbesLog.Health($"Spawned authority spawnPos={SpawnPosition} startHP={StartingHealth} obj={name}", this);
-      // #region agent log
-      DbgLog("A", "Health:Spawned", "SpawnPos initial capture", "\"spawnPos\":\"" + SpawnPosition + "\",\"tpos\":\"" + transform.position + "\",\"tick\":" + (Runner != null ? Runner.Tick : -1) + ",\"obj\":\"" + name + "\"");
-      // #endregion
     }
 
     // Networked props are now safe to read; let view subscribers (HealthView) apply the initial value.
@@ -120,10 +117,17 @@ public class Health : NetworkBehaviour {
     }
 
     if (_spawnRecordDueTick >= 0 && Runner.Tick >= _spawnRecordDueTick) {
-      // #region agent log
-      DbgLog("A", "Health:SpawnRecordDue", "SpawnPos delayed capture", "\"before\":\"" + SpawnPosition + "\",\"tpos\":\"" + transform.position + "\",\"tick\":" + Runner.Tick + ",\"obj\":\"" + name + "\"");
-      // #endregion
-      SpawnPosition = transform.position;
+      var newPos = transform.position;
+      // Accept only if XZ didn't drift beyond CC movement range (~0.5 m).
+      // Fusion's NetworkTransform can apply its default-state snapshot at tick+1,
+      // overriding transform.position to world origin. Rejecting large XZ drift
+      // keeps the correct position from Spawned() while still allowing the Y
+      // correction from CharacterController floor settling.
+      float dxz2 = (newPos.x - SpawnPosition.x) * (newPos.x - SpawnPosition.x)
+                 + (newPos.z - SpawnPosition.z) * (newPos.z - SpawnPosition.z);
+      if (dxz2 < 0.25f) {
+        SpawnPosition = newPos;
+      }
       _spawnRecordDueTick = -1;
       ForbesLog.Health($"SpawnPosition finalized after NT spawn tick={Runner.Tick} pos={SpawnPosition} obj={name}", this);
     }
@@ -145,9 +149,6 @@ public class Health : NetworkBehaviour {
 
   void Respawn() {
     ForbesLog.Health($"Respawn at {SpawnPosition} obj={name}", this);
-    // #region agent log
-    DbgLog("B", "Health:Respawn:Start", "respawn target vs death pos", "\"spawnPos\":\"" + SpawnPosition + "\",\"currentPos\":\"" + transform.position + "\",\"obj\":\"" + name + "\"");
-    // #endregion
 
     if (_controller != null) {
       _controller.enabled = false;
@@ -162,10 +163,6 @@ public class Health : NetworkBehaviour {
     } else {
       transform.SetPositionAndRotation(pos, rot);
     }
-
-    // #region agent log
-    DbgLog("B", "Health:Respawn:PostTeleport", "pos after teleport", "\"posAfter\":\"" + transform.position + "\",\"targetWas\":\"" + pos + "\",\"ccEnabled\":" + (_controller != null && _controller.enabled).ToString().ToLower() + ",\"obj\":\"" + name + "\"");
-    // #endregion
 
     if (_controller != null) {
       _controller.enabled = true;
@@ -193,10 +190,6 @@ public class Health : NetworkBehaviour {
       return;
     }
 
-    // #region agent log
-    DbgLog("A", "Health:ApplyDeath", "death position vs spawnPos", "\"deathPos\":\"" + transform.position + "\",\"spawnPos\":\"" + SpawnPosition + "\",\"obj\":\"" + name + "\"");
-    // #endregion
-
     NetworkedHealth = 0f;
     IsDead = true;
     int delayTicks = Mathf.CeilToInt(RespawnDelaySeconds * Runner.TickRate);
@@ -204,12 +197,4 @@ public class Health : NetworkBehaviour {
     ForbesLog.Health($"Killed respawnAtTick={RespawnAtTick} obj={name}", this);
   }
 
-  // #region agent log
-  static void DbgLog(string hyp, string loc, string msg, string data) {
-    try {
-      var line = "{\"sessionId\":\"3fa301\",\"hypothesisId\":\"" + hyp + "\",\"location\":\"" + loc + "\",\"message\":\"" + msg + "\",\"data\":{" + data + "},\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}";
-      System.IO.File.AppendAllText(System.IO.Path.Combine(Application.dataPath, "..", "debug-3fa301.log"), line + "\n");
-    } catch { }
-  }
-  // #endregion
 }

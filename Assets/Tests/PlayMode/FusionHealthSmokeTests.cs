@@ -118,6 +118,80 @@ namespace Forbes.Tests.PlayMode {
         float snapTol = 0.28f;
         Assert.LessOrEqual(Vector3.Distance(_dummy.transform.position, dummyHealth.SpawnPosition), snapTol,
           "Respawn should snap the dummy back to networked SpawnPosition.");
+
+        // SpawnPosition XZ must remain close to the intended spawn location.
+        // Regression for NT default-state corruption: Fusion can apply an internal (0,0,0)
+        // snapshot at tick+1, overriding SpawnPosition to world origin, which makes the mob
+        // wander around origin and collide with players there.
+        float spawnXzTol = 0.5f;
+        float spawnXzDist = Mathf.Sqrt(
+          Mathf.Pow(dummyHealth.SpawnPosition.x - spawnDummy.x, 2f) +
+          Mathf.Pow(dummyHealth.SpawnPosition.z - spawnDummy.z, 2f));
+        Assert.LessOrEqual(spawnXzDist, spawnXzTol,
+          $"SpawnPosition XZ should match intended spawn location {spawnDummy}; " +
+          $"got {dummyHealth.SpawnPosition}. NT default-state may have corrupted it.");
+      }
+    }
+
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator FusionSingle_DeadEntity_CharacterController_DisabledDuringDeath_ReenabledOnRespawn() {
+      var dummyPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
+      Assert.IsNotNull(dummyPrefab);
+
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        var runner    = _session.Runner;
+        var spawnPos  = new Vector3(6f, 0f, -4f);
+        var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
+
+        yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
+          runner, dummyPrefab, spawnPos, Quaternion.identity, PlayerRef.None, spawnFlags, o => _dummy = o);
+
+        if (_dummy.TryGetComponent<NetworkMobBrain>(out var mobBrain)) {
+          FusionPlayModeTestHelpers.PinMobBrainNoCombat(mobBrain);
+        }
+
+        if (_dummy.TryGetComponent<NetworkTransform>(out var mobNt)) {
+          mobNt.DisableSharedModeInterpolation = true;
+        }
+
+        yield return null;
+
+        Assert.IsTrue(_dummy.TryGetComponent(out Health dummyHealth));
+        Assert.IsTrue(_dummy.TryGetComponent(out CharacterController cc),
+          "Training dummy must have a CharacterController.");
+
+        dummyHealth.AuthorityApplyStartingHealthIfUnset();
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => Mathf.Approximately(dummyHealth.NetworkedHealth, dummyHealth.StartingHealth), 480);
+
+        Assert.IsTrue(cc.enabled,
+          "CharacterController must be enabled while entity is alive.");
+
+        // Kill the entity.
+        dummyHealth.DealDamageRpc(dummyHealth.StartingHealth + 25f);
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => dummyHealth.IsDead, 480,
+          messageOnFail: "Entity did not die after lethal DealDamageRpc.");
+
+        yield return FusionPlayModeTestHelpers.WaitFrames(4);
+
+        // CharacterController must be disabled on death:
+        // an active CC on a dead entity gets pushed by nearby CCs (causing visible jumps)
+        // and registers targeting raycasts on an invisible corpse.
+        Assert.IsFalse(cc.enabled,
+          "CharacterController must be disabled while entity is dead.");
+
+        // Wait for automatic respawn.
+        yield return FusionPlayModeTestHelpers.WaitUntil(() => !dummyHealth.IsDead, 1200,
+          messageOnFail: $"Respawn timeout: IsDead={dummyHealth.IsDead} hp={dummyHealth.NetworkedHealth} " +
+          $"respawnAt={dummyHealth.RespawnAtTick} tick={(int)runner.Tick} sa={dummyHealth.HasStateAuthority}");
+
+        yield return FusionPlayModeTestHelpers.WaitFrames(4);
+
+        Assert.IsTrue(cc.enabled,
+          "CharacterController must be re-enabled after respawn.");
       }
     }
   }
