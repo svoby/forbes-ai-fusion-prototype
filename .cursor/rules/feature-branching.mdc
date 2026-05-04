@@ -28,4 +28,5 @@ git checkout -b feature/mob-aggro-radius
 
 ## When the feature is done
 
-Remind the user to open a PR / merge the branch; do **not** merge to `main` automatically.
+- Do **not** merge the feature branch into `main` or `master` from the agent session (no `git merge`, no push of a merge to the default branch).
+- Remind the user to open a PR and complete the merge through their usual review flow when they choose to.

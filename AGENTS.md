@@ -22,6 +22,7 @@ This repository is a Unity multiplayer prototype using Photon Fusion.
 1. Smallest working change first.
 2. Validate with host + one client when behavior is networked.
 3. One feature at a time; keep behaviours focused.
+4. Do **not** merge feature branches into `main`/`master` from the agent (no automatic merge); the user opens a PR and merges when ready (see `.cursor/rules/feature-branching.mdc`).
 
 ## Definition of done (per task)
 - Works **host + one client** where relevant.
