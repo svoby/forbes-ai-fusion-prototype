@@ -47,11 +47,12 @@ Constants are inlined: `PlayerSpeed = 10f`, `JumpForce = 5f`, `GravityValue = -9
 
 [`NetworkCombatController`](../Assets/Scripts/Combat/NetworkCombatController.cs):
 
-- `[Networked]`: `CurrentSpellId` (byte), `CastTarget` (NetworkId), `CastStartTick`, `CastEndTick`, `GcdEndTick`, `Cooldown1/2/3EndTick`, `LastFailReason`, `LastFailTick`.
+- `[Networked]`: `CurrentSpellId` (byte), `CastTarget` (NetworkId), `CastStartTick`, `CastEndTick`, `GcdEndTick`, `Cooldown1/2/3EndTick`, `LastFailReason`, `LastFailTick`, `PendingMissileReleaseTick`.
 - `IsCasting => CurrentSpellId != 0 && Runner.Tick < CastEndTick`.
-- `FixedUpdateNetwork`: state-auth only; if dead → `ClearCastState`; if casting and `Tick >= CastEndTick` → `ResolveCast`; else read input and dispatch on `Spell1/2/3` edge.
-- `TryStartCast(spellId, targetId)` calls [`CombatValidator.TryValidate`](../Assets/Scripts/Combat/CombatValidator.cs); on success arms GCD, then for instant spells calls `targetHealth.DealDamageRpc(spell.Damage)` and sets the per-spell cooldown end tick; for cast-time spells stores cast state and pre-bakes cooldown that begins at cast start (matches WoW: cancellation does not bypass CD).
-- `ResolveCast` re-validates (target may have died/walked) and applies damage at completion.
+- `FixedUpdateNetwork`: state-auth only; if dead → `ClearCastState`; if casting and `Tick >= CastEndTick` → `ResolveCast`; advances any in-flight missile each tick via `SpellTravelLogic.AdvanceMissilePosition` (updating the authority-only `_missileVirtualPos`); when `SpellTravelLogic.HasMissileArrived` returns true, clears the missile slot and calls `Health.DealDamageRpc`; else reads input and dispatches on `Spell1/2/3` edge.
+- `TryStartCast(spellId, targetId)` calls [`CombatValidator.TryValidate`](../Assets/Scripts/Combat/CombatValidator.cs); on success arms GCD, then for instant spells calls `targetHealth.DealDamageRpc(spell.Damage)` directly; for projectile spells sets `PendingMissileReleaseTick` and initialises `_missileVirtualPos` at the caster position (damage is deferred until missile arrival, not applied at cast completion); for cast-time spells stores cast state and pre-bakes cooldown that begins at cast start (matches WoW: cancellation does not bypass CD).
+- `ResolveCast` re-validates (target may have died/walked) and either applies damage immediately (instant/cast-time) or releases the missile (projectile spells).
+- `_missileVirtualPos` is **non-networked and authority-only**; clients do not receive the missile position directly. See [`docs/PROJECTILE_POLICY.md`](PROJECTILE_POLICY.md).
 - `SecsToTicks(seconds) => Mathf.CeilToInt(seconds * Runner.TickRate)` (private).
 - Constant: `GcdSec = 1.0f`.
 
@@ -105,6 +106,7 @@ Constants are inlined: `PlayerSpeed = 10f`, `JumpForce = 5f`, `GravityValue = -9
 - `CombatValidatorPureTests` — pin the rejection order for everything that does NOT need a `NetworkRunner`.
 - `HealthDefaultsTests` — pin `StartingHealth = 100`, `RespawnDelaySeconds = 3`, and the public surface (`StartingHealth`, `RespawnDelaySeconds`, `IsDeadChanged` event signature).
 - `CombatFailReasonEnumTests` — pin numeric values of `CombatFailReason` because it crosses the network as `byte` (see `LastFailReason`).
+- `SpellTravelLogicTests` — pin pure missile math in `SpellTravelLogic`: `AdvanceMissilePosition` step size given speed/delta, `HasMissileArrived` threshold boundary cases, behavior when target moves between advance calls. No runner required. These are the primary regression guard for the authoritative missile math; see [`docs/PROJECTILE_POLICY.md`](PROJECTILE_POLICY.md).
 
 ### P1 — should add next (component scope)
 - `TargetableTests` (PlayMode) — `DisplayName` fallback to `gameObject.name`; respects serialised override.
@@ -115,6 +117,7 @@ Constants are inlined: `PlayerSpeed = 10f`, `JumpForce = 5f`, `GravityValue = -9
 
 ### P2 — Fusion vertical slice smoke
 - `FusionVerticalSliceSmokeTests` (PlayMode) — start runner in `GameMode.Single`, spawn `PlayerCharacter.prefab` and `TrainingDummy.prefab`, deal lethal damage via `Health.DealDamageRpc(100)`, await `IsDead == true`, await `RespawnAtTick`, assert HP restored at `SpawnPosition`. Use `LogAssert.NoUnexpectedReceived()`.
+- **Moving-target projectile smoke** — release a projectile spell against a target that moves during flight; assert that `PendingMissileReleaseTick` is set after cast resolution, that `_missileVirtualPos` (via an `internal` seam or observable side-effect) advances each tick, and that `Health.NetworkedHealth` decreases only after `HasMissileArrived` becomes true (not at cast completion). Confirm damage is applied by State Authority. See [`docs/PROJECTILE_POLICY.md`](PROJECTILE_POLICY.md) for the full missile model.
 
 ### Manual-only (not automated)
 - Camera feel, mouse drag thresholds, cursor lock policy.
