@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Cosmetic-only hit feedback: subscribes to <see cref="Health.CombatHitReceived"/>
-/// and spawns a brief local-only flash at the target's center mass whenever damage lands.
+/// and spawns a floating damage number above the target whenever damage lands.
 /// <para>
 /// Authority contract: this component never applies damage, never writes a networked
 /// field, and spawns no <see cref="Fusion.NetworkObject"/>. The visual is local-only
@@ -10,19 +10,17 @@ using UnityEngine;
 /// See <c>docs/COMBAT_FEEDBACK_POLICY.md</c> for the full pipeline.
 /// </para>
 /// <para>
-/// The flash is intentionally minimal (primitive sphere, no pooling) so it is easy
-/// to replace later with a real VFX prefab or particle system: swap the body of
-/// <see cref="SpawnHitFlash"/> and keep the rest unchanged.
+/// To replace the visual: swap the body of <see cref="SpawnDamageText"/> and keep
+/// the subscription wiring unchanged.
 /// </para>
 /// </summary>
 [RequireComponent(typeof(Health))]
 [DisallowMultipleComponent]
 public class HitImpactView : MonoBehaviour {
-  const float FlashDuration   = 0.3f;
-  const float FlashDiameter   = 0.55f;
-  const float AboveHeadOffset = 0.25f; // metres above the top of the collider bounds
+  const float TextLifetimeSec = 0.9f;
+  const float AboveHeadOffset = 0.25f; // metres above top of collider bounds
 
-  static readonly Color HitColor = new Color(1f, 0.08f, 0.08f);
+  static readonly Color HitColor = new Color(1f, 0.15f, 0.15f);
 
   Health _health;
 
@@ -43,34 +41,61 @@ public class HitImpactView : MonoBehaviour {
   }
 
   void OnHit(float damage) {
-    SpawnHitFlash();
+    SpawnDamageText(damage);
   }
 
-  void SpawnHitFlash() {
-    var sphere  = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-    sphere.name = "HitImpactFlash";
-    sphere.transform.position   = ComputeAboveHead(transform);
-    sphere.transform.localScale = Vector3.one * FlashDiameter;
+  void SpawnDamageText(float damage) {
+    var go       = new GameObject("HitDamageText");
+    go.transform.position = ComputeAboveHead(transform);
 
-    // Collider rule (COMBAT_FEEDBACK_POLICY.md §collider-rule): disable synchronously
-    // before physics runs — Destroy() is deferred and leaves the collider live for one
-    // FixedUpdate, which can deflect nearby CharacterControllers.
-    if (sphere.TryGetComponent<Collider>(out var col)) {
-      col.enabled = false;
-      Destroy(col);
-    }
+    var tm       = go.AddComponent<TextMesh>();
+    tm.text      = Mathf.RoundToInt(damage).ToString();
+    tm.fontSize  = 60;
+    tm.color     = HitColor;
+    tm.alignment = TextAlignment.Center;
+    tm.anchor    = TextAnchor.MiddleCenter;
 
-    sphere.GetComponent<Renderer>().material = SpellVisualColors.NewUnlitOrbMaterial(HitColor);
-    Destroy(sphere, FlashDuration);
+    var floater  = go.AddComponent<DamageFloatText>();
+    floater.Init(TextLifetimeSec);
   }
 
   static Vector3 ComputeAboveHead(Transform target) {
     if (target.TryGetComponent<Collider>(out var col) && col.enabled) {
-      // Spawn just above the top of the collider so the flash is never hidden
-      // inside an opaque capsule mesh.
       var b = col.bounds;
       return new Vector3(b.center.x, b.max.y + AboveHeadOffset, b.center.z);
     }
     return target.position + Vector3.up * 2.3f;
+  }
+}
+
+/// <summary>
+/// Internal helper spawned by <see cref="HitImpactView"/>: floats the damage text
+/// upward and keeps it facing the camera (billboard). Self-destructs after lifetime.
+/// Cosmetic only — no gameplay state, no networked fields.
+/// </summary>
+class DamageFloatText : MonoBehaviour {
+  const float FloatSpeed = 1.2f; // metres per second upward
+
+  float _lifetime;
+  float _elapsed;
+
+  internal void Init(float lifetime) {
+    _lifetime = lifetime;
+  }
+
+  void LateUpdate() {
+    _elapsed += Time.deltaTime;
+
+    if (_elapsed >= _lifetime) {
+      Destroy(gameObject);
+      return;
+    }
+
+    transform.position += Vector3.up * (FloatSpeed * Time.deltaTime);
+
+    var cam = Camera.main;
+    if (cam != null) {
+      transform.forward = cam.transform.forward;
+    }
   }
 }

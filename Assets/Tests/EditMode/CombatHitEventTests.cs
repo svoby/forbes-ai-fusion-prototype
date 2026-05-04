@@ -7,9 +7,10 @@ using UnityEngine;
 namespace Forbes.Tests.EditMode {
   /// <summary>
   /// Pins the public surface of the combat hit event on <see cref="Health"/>:
-  /// <see cref="Health.CombatHitReceived"/>, and the three replicated feedback
+  /// <see cref="Health.CombatHitReceived"/> and the three replicated feedback
   /// properties — <see cref="Health.LastHitEventSeq"/>, <see cref="Health.LastHitDamage"/>,
-  /// <see cref="Health.LastHitTick"/>. Does not require a NetworkRunner.
+  /// <see cref="Health.LastHitTick"/>. Also covers <see cref="HitImpactView"/> and the
+  /// internal <see cref="DamageFloatText"/> helper. Does not require a NetworkRunner.
   /// </summary>
   [TestFixture]
   public class CombatHitEventTests {
@@ -28,6 +29,8 @@ namespace Forbes.Tests.EditMode {
         UnityEngine.Object.DestroyImmediate(_go);
       }
     }
+
+    // ── Health event surface ──────────────────────────────────────────────────
 
     [Test]
     public void CombatHitReceived_IsPublicEventActionOfFloat() {
@@ -54,6 +57,8 @@ namespace Forbes.Tests.EditMode {
         $"Health.{name} setter must be public.");
     }
 
+    // ── HitImpactView ─────────────────────────────────────────────────────────
+
     [Test]
     public void HitImpactView_CanBeAddedToGameObjectAlongsideHealth() {
       _go.AddComponent<HitImpactView>();
@@ -62,13 +67,64 @@ namespace Forbes.Tests.EditMode {
     }
 
     [Test]
-    public void HitImpactView_CombatHitReceived_SubscribeAndUnsubscribe_DoesNotThrow() {
+    public void HitImpactView_EnableDisableCycle_DoesNotThrow() {
       var view = _go.AddComponent<HitImpactView>();
-      // Enable/disable cycle exercises the subscribe/unsubscribe paths.
       Assert.DoesNotThrow(() => {
         view.enabled = false;
         view.enabled = true;
       }, "HitImpactView enable/disable should not throw even without a runner.");
+    }
+
+    [Test]
+    public void HitImpactView_OnCombatHitReceived_CreatesTextMeshGameObject() {
+      _go.AddComponent<HitImpactView>();
+
+      // Fire CombatHitReceived via reflection — test-only; avoids adding
+      // production hooks to Health just for tests.
+      var backingField = typeof(Health).GetField(
+        "CombatHitReceived",
+        BindingFlags.NonPublic | BindingFlags.Instance);
+      Assert.IsNotNull(backingField, "Cannot find CombatHitReceived backing field.");
+
+      var del = backingField.GetValue(_health) as Action<float>;
+      Assert.IsNotNull(del, "No subscribers registered; HitImpactView.OnEnable may have failed.");
+
+      int beforeCount = UnityEngine.Object.FindObjectsByType<TextMesh>(
+        FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
+
+      del.Invoke(42f);
+
+      int afterCount = UnityEngine.Object.FindObjectsByType<TextMesh>(
+        FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
+
+      Assert.Greater(afterCount, beforeCount,
+        "HitImpactView should create a TextMesh GameObject when CombatHitReceived fires.");
+
+      // Verify the text shows the rounded damage value.
+      var textMesh = UnityEngine.Object.FindFirstObjectByType<TextMesh>();
+      Assert.IsNotNull(textMesh);
+      Assert.AreEqual("42", textMesh.text,
+        "Damage text should show the rounded damage value.");
+
+      UnityEngine.Object.DestroyImmediate(textMesh.gameObject);
+    }
+
+    // ── DamageFloatText helper ────────────────────────────────────────────────
+
+    [Test]
+    public void DamageFloatText_CanBeAddedAndInitialized_DoesNotThrow() {
+      var go = new GameObject("FloatTextTest");
+      try {
+        DamageFloatText floater = null;
+        Assert.DoesNotThrow(() => {
+          floater = go.AddComponent<DamageFloatText>();
+          floater.Init(1.0f);
+        }, "DamageFloatText.Init should not throw.");
+        Assert.IsNotNull(go.GetComponent<DamageFloatText>(),
+          "DamageFloatText must remain on the GameObject after Init.");
+      } finally {
+        UnityEngine.Object.DestroyImmediate(go);
+      }
     }
   }
 }
