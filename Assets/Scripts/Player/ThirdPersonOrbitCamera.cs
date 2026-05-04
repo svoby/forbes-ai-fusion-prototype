@@ -30,8 +30,10 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   [SerializeField] float _minDistance = 1.5f;
   [SerializeField] float _maxDistance = 20f;
   [SerializeField] float _startDistance = 5f;
-  /// <summary>Distance change per scroll notch (120 units per notch in the new Input System).</summary>
-  [SerializeField] float _zoomSpeed = 0.03f;
+  /// <summary>Impulse added to zoom velocity per scroll notch (120 units in the new Input System).</summary>
+  [SerializeField] float _zoomSpeed = 0.02f;
+  /// <summary>How quickly zoom velocity bleeds off each second (0 = no deceleration, 1 = stops instantly).</summary>
+  [SerializeField] [Range(0f, 1f)] float _zoomDamping = 0.97f;
   [SerializeField] Vector3 _pivotOffset = new Vector3(0f, 1.5f, 0f);
   [SerializeField] float _dragThresholdPixels = 20f;
 
@@ -42,6 +44,7 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   float _distance;
   float _lmbDragAccum;
   float _rmbDragAccum;
+  float _zoomVelocity;
 
   int  _diagNoTargetFrames;
   bool _loggedTargetOnce;
@@ -170,11 +173,12 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
         }
       }
 
-      // Scroll-wheel zoom. scroll.y is ~120 units per notch in the new Input System.
+      // Scroll-wheel zoom with deceleration.
+      // Each notch (~120 units) adds an impulse to _zoomVelocity; the velocity
+      // coasts and decays every frame so zoom eases to a stop naturally.
       float scroll = mouse.scroll.ReadValue().y;
       if (Mathf.Abs(scroll) > 0.01f) {
-        _distance -= scroll * _zoomSpeed;
-        _distance  = Mathf.Clamp(_distance, _minDistance, _maxDistance);
+        _zoomVelocity -= scroll * _zoomSpeed;
       }
     } else {
       MouseMode = CameraMouseMode.None;
@@ -183,6 +187,15 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
         _loggedMouseNullOnce = true;
         ForbesLog.Diag("Camera", "Mouse.current is NULL — orbit/scroll skipped; camera follow still runs. (Input System device not paired yet?)", this);
       }
+    }
+
+    // Apply and decay zoom velocity (runs every frame regardless of mouse state).
+    if (Mathf.Abs(_zoomVelocity) > 0.0001f) {
+      _distance     += _zoomVelocity;
+      _distance      = Mathf.Clamp(_distance, _minDistance, _maxDistance);
+      _zoomVelocity *= Mathf.Pow(1f - _zoomDamping, Time.deltaTime);
+    } else {
+      _zoomVelocity = 0f;
     }
 
     // Position camera behind and above the pivot.
