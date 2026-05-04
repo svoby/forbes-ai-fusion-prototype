@@ -9,8 +9,8 @@ namespace Forbes.Tests.EditMode {
   /// Pins the public surface of the combat hit event on <see cref="Health"/>:
   /// <see cref="Health.CombatHitReceived"/> and the three replicated feedback
   /// properties — <see cref="Health.LastHitEventSeq"/>, <see cref="Health.LastHitDamage"/>,
-  /// <see cref="Health.LastHitTick"/>. Also covers <see cref="HitImpactView"/> and the
-  /// internal <see cref="DamageFloatText"/> helper. Does not require a NetworkRunner.
+  /// <see cref="Health.LastHitTick"/>. Also covers <see cref="HitImpactView"/>.
+  /// Does not require a NetworkRunner.
   /// </summary>
   [TestFixture]
   public class CombatHitEventTests {
@@ -75,12 +75,17 @@ namespace Forbes.Tests.EditMode {
       }, "HitImpactView enable/disable should not throw even without a runner.");
     }
 
+    /// <summary>
+    /// Firing CombatHitReceived must not throw and must NOT create any world-space
+    /// TextMesh. Floating damage numbers are now rendered via
+    /// <see cref="FloatingCombatTextCanvas"/> (screen-space UI).
+    /// Camera.main is null in EditMode tests, so ShowDamage returns immediately
+    /// and no canvas is created — verifying the null-camera guard.
+    /// </summary>
     [Test]
-    public void HitImpactView_OnCombatHitReceived_CreatesTextMeshGameObject() {
+    public void HitImpactView_OnCombatHitReceived_DoesNotCreateWorldSpaceTextMesh() {
       _go.AddComponent<HitImpactView>();
 
-      // Fire CombatHitReceived via reflection — test-only; avoids adding
-      // production hooks to Health just for tests.
       var backingField = typeof(Health).GetField(
         "CombatHitReceived",
         BindingFlags.NonPublic | BindingFlags.Instance);
@@ -89,42 +94,18 @@ namespace Forbes.Tests.EditMode {
       var del = backingField.GetValue(_health) as Action<float>;
       Assert.IsNotNull(del, "No subscribers registered; HitImpactView.OnEnable may have failed.");
 
-      int beforeCount = UnityEngine.Object.FindObjectsByType<TextMesh>(
+      int meshCountBefore = UnityEngine.Object.FindObjectsByType<TextMesh>(
         FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
 
-      del.Invoke(42f);
+      Assert.DoesNotThrow(() => del.Invoke(42f),
+        "HitImpactView.OnHit should not throw when Camera.main is null.");
 
-      int afterCount = UnityEngine.Object.FindObjectsByType<TextMesh>(
+      int meshCountAfter = UnityEngine.Object.FindObjectsByType<TextMesh>(
         FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
 
-      Assert.Greater(afterCount, beforeCount,
-        "HitImpactView should create a TextMesh GameObject when CombatHitReceived fires.");
-
-      // Verify the text shows the rounded damage value.
-      var textMesh = UnityEngine.Object.FindFirstObjectByType<TextMesh>();
-      Assert.IsNotNull(textMesh);
-      Assert.AreEqual("42", textMesh.text,
-        "Damage text should show the rounded damage value.");
-
-      UnityEngine.Object.DestroyImmediate(textMesh.gameObject);
-    }
-
-    // ── DamageFloatText helper ────────────────────────────────────────────────
-
-    [Test]
-    public void DamageFloatText_CanBeAddedAndInitialized_DoesNotThrow() {
-      var go = new GameObject("FloatTextTest");
-      try {
-        DamageFloatText floater = null;
-        Assert.DoesNotThrow(() => {
-          floater = go.AddComponent<DamageFloatText>();
-          floater.Init(1.0f);
-        }, "DamageFloatText.Init should not throw.");
-        Assert.IsNotNull(go.GetComponent<DamageFloatText>(),
-          "DamageFloatText must remain on the GameObject after Init.");
-      } finally {
-        UnityEngine.Object.DestroyImmediate(go);
-      }
+      Assert.AreEqual(meshCountBefore, meshCountAfter,
+        "HitImpactView must not create world-space TextMesh objects; " +
+        "floating damage text is now screen-space UI via FloatingCombatTextCanvas.");
     }
   }
 }
