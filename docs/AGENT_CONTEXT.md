@@ -11,7 +11,6 @@ current sources of truth and how to pick the smallest useful context bundle for 
 |---|---|
 | `docs/PROJECTILE_POLICY.md` | Combat, spells, targeted missiles, projectile visuals, missile manager discussions |
 | `docs/TEST_HARNESS.md` | Running EditMode/PlayMode tests; understanding test commands and results |
-| `docs/TEST_COVERAGE_PLAN.md` | Planning test coverage or refactor safety; not needed for every small change |
 | `docs/architecture.md` | Broad system orientation; prefer more specific docs for concrete coding tasks |
 
 ---
@@ -46,23 +45,9 @@ current sources of truth and how to pick the smallest useful context bundle for 
 
 ### Testing / harness
 - `docs/TEST_HARNESS.md`
-- `docs/TEST_COVERAGE_PLAN.md`
 - `Assets/Tests/EditMode/`
 - `Assets/Tests/PlayMode/`
 - `tools/` (test runner scripts)
-
----
-
-## Current projectile / missile summary
-
-- Normal targeted spell projectiles are **authoritative targeted missiles**.
-- **State Authority** owns missile simulation and damage application.
-- The missile follows a moving target each simulation tick.
-- Cosmetic projectile visuals are future/local-only and must **never apply damage**.
-- No Counter-Strike-style hitscan bullets.
-- No `Runner.Spawn` NetworkObject projectiles for normal targeted spells.
-- No object pooling yet.
-- No global `TargetedMissileManager` yet; current storage is prototype-level inside `NetworkCombatController`.
 
 ---
 
@@ -82,5 +67,9 @@ current sources of truth and how to pick the smallest useful context bundle for 
 
 ## Removed / historical docs
 
-Older cleanup and checkpoint documents may have existed in `docs/` historically. They should
-**not** be recreated or used as current guidance unless explicitly requested by the user.
+The following documents existed in `docs/` at various points and were removed as part of documentation hygiene. Do **not** recreate or treat them as current guidance.
+
+- `docs/TEST_COVERAGE_PLAN.md` — historical test planning and backlog; the tests it described are now implemented.
+- `docs/CODE_CLEANUP_AUDIT.md` — one-time audit; findings resolved.
+- `docs/FusionSharedTutorial-Plan.md` — implementation plan; feature complete.
+- `docs/combat-travel-checkpoint.md` — mid-feature checkpoint; superseded.

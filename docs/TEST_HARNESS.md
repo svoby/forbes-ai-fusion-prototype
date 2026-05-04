@@ -67,4 +67,4 @@ Outputs:
 
 ## More detail
 
-See `docs/TEST_COVERAGE_PLAN.md` for planned coverage and naming of test fixtures.
+See `AGENTS.md` for the definition of done and test obligations per task. See `docs/PROJECTILE_POLICY.md` for the testing policy specific to the missile/projectile layer.

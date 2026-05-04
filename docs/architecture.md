@@ -35,16 +35,22 @@ Assets/Scripts/
 │   ├── KeyboardInputSource.cs    — reads keyboard/mouse → IInputSource each frame
 │   ├── ThirdPersonOrbitCamera.cs — WoW orbit camera, cursor management
 │   ├── Health.cs                 — networked HP, death, respawn (NetworkBehaviour)
-│   └── HealthView.cs             — render-side HP bar (subscribes to Health.IsDeadChanged)
+│   ├── HealthView.cs             — render-side HP bar (subscribes to Health.IsDeadChanged)
+│   └── PlayerColor.cs            — cosmetic player color randomization
 │
 ├── Combat/
 │   ├── Targetable.cs             — marker: this object can be targeted
 │   ├── TargetingController.cs    — local client target selection (Tab, LMB click)
 │   ├── TargetHighlight.cs        — golden ring under current target (LineRenderer)
-│   ├── NetworkCombatController.cs— authoritative cast, GCD, per-spell cooldowns
+│   ├── NetworkCombatController.cs— authoritative cast, GCD, per-spell cooldowns, missile state
 │   ├── SpellRegistry.cs          — hardcoded spell definitions (SpellData structs)
+│   ├── SpellTravelLogic.cs       — pure missile math (AdvanceMissilePosition, HasMissileArrived)
 │   ├── CombatValidator.cs        — stateless range/cooldown/target checks
 │   └── CombatFailReason.cs       — enum: why a cast was rejected
+│
+├── Mobs/
+│   ├── NetworkMobBrain.cs        — NetworkBehaviour: authoritative mob AI tick (wander, aggro, chase, melee, leash)
+│   └── NetworkMobBrainLogic.cs   — pure stateless mob logic (no MonoBehaviour); testable in EditMode
 │
 ├── Networking/
 │   ├── PlayerSpawner.cs          — spawns local player on join
@@ -55,7 +61,11 @@ Assets/Scripts/
 │   └── TrainingDummy.cs          — colours the dummy, ensures collider + Targetable exist
 │
 └── UI/
-    └── CombatHud.cs              — IMGUI debug overlay: HP, target, cast bar, cooldowns
+    ├── CastBarView.cs            — Canvas cast-bar: progress, spell name, interrupt feedback
+    ├── CombatHud.cs              — IMGUI debug overlay (legacy; coexists with Canvas UI)
+    ├── FusionHudToggle.cs        — toggles Fusion stats overlay
+    ├── SelectedTargetHealthBar.cs— world-space HP bar above the current target
+    └── TargetHealthBarLogic.cs   — pure math for target HP bar (width, color); testable in EditMode
 ```
 
 ---
@@ -112,22 +122,3 @@ NetworkCombatController.FixedUpdateNetwork  (spells, GCD)
 
 ---
 
-## Milestone 1 status — DONE ✓
-
-- [x] Host/client room connect
-- [x] Player spawn
-- [x] Movement + look rotation (WoW mouse modes)
-- [x] Tab + click target selection
-- [x] Spell 1/2/3 (instant damage, cast time stub)
-- [x] HP sync, death, respawn
-- [x] Minimal HUD (HP, target, cast bar, cooldowns)
-- [x] 3×3 checkerboard test floor
-
-## Next steps (Milestone 2)
-
-- [ ] Replace IMGUI HUD with proper Canvas UI
-- [ ] Spell visual effects (particles, projectiles)
-- [ ] Cast-time spells (animation + interrupt)
-- [ ] Second player test (two clients in same room)
-- [ ] Training dummy with basic AI (patrol, aggro radius)
-- [ ] Remove legacy `PlayerCombat.cs` stub
