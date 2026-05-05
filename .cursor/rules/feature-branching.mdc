@@ -10,20 +10,31 @@ Before starting **any new feature**, the agent must:
 1. Check the current branch: `git branch --show-current`
 2. If on `main` (or `master`), create and switch to a feature branch:
    ```
-   git checkout -b feature/<short-kebab-description>
+   git checkout -b feature/<NNN>-<short-kebab-description>
    ```
+   where `<NNN>` is the next sequential three-digit number (e.g. `001`, `002`); check existing branches with `git branch -a` first.
 3. All implementation commits go on that branch — **never commit feature work directly to `main`**.
 
 ## Branch naming
 
-- `feature/<name>` — new functionality
-- `fix/<name>` — bug fixes without new features
-- `chore/<name>` — tooling, refactors, non-functional changes
+Branches include a zero-padded three-digit feature number followed by a short kebab description:
+
+- `feature/<NNN>-<name>` — new functionality
+- `fix/<NNN>-<name>` — bug fixes without new features
+- `chore/<NNN>-<name>` — tooling, refactors, non-functional changes
+
+The number is sequential starting at `001`. Before creating a branch, check existing branch names to determine the next number:
+
+```
+git branch -a
+```
 
 ## Example
 
 ```
-git checkout -b feature/mob-aggro-radius
+git checkout -b feature/001-mob-aggro-radius
+git checkout -b fix/002-projectile-floor-bounds
+git checkout -b chore/003-editmode-test-helpers
 ```
 
 ## When the feature is done
