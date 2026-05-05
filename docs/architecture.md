@@ -36,6 +36,7 @@ Assets/Scripts/
 │   ├── ThirdPersonOrbitCamera.cs — WoW orbit camera, cursor management
 │   ├── Health.cs                 — networked HP, death, respawn (NetworkBehaviour)
 │   ├── HealthView.cs             — render-side HP bar (subscribes to Health.IsDeadChanged)
+│   ├── HitImpactView.cs          — cosmetic-only: subscribes to Health.CombatHitReceived; triggers floating damage number
 │   └── PlayerColor.cs            — cosmetic player color randomization
 │
 ├── Combat/
@@ -46,7 +47,12 @@ Assets/Scripts/
 │   ├── SpellRegistry.cs          — hardcoded spell definitions (SpellData structs)
 │   ├── SpellTravelLogic.cs       — pure missile math (AdvanceMissilePosition, HasMissileArrived)
 │   ├── CombatValidator.cs        — stateless range/cooldown/target checks
-│   └── CombatFailReason.cs       — enum: why a cast was rejected
+│   ├── CombatFailReason.cs       — enum: why a cast was rejected
+│   ├── CastCancelReason.cs       — enum: why an in-progress cast was interrupted (state authority only)
+│   ├── CombatFeedbackReason.cs   — enum + mapping: player-facing feedback reason (reject or interrupt)
+│   ├── CosmeticProjectileView.cs — cosmetic-only: local sphere lerps caster→target during missile flight
+│   ├── SpellImpactView.cs        — cosmetic-only: brief sphere flash at target on spell impact
+│   └── SpellVisualColors.cs      — shared cosmetic colours and URP/Unlit materials for spell primitives
 │
 ├── Mobs/
 │   ├── NetworkMobBrain.cs        — NetworkBehaviour: authoritative mob AI tick (wander, aggro, chase, melee, leash)
@@ -65,7 +71,11 @@ Assets/Scripts/
     ├── CombatHud.cs              — IMGUI debug overlay (legacy; coexists with Canvas UI)
     ├── FusionHudToggle.cs        — toggles Fusion stats overlay
     ├── SelectedTargetHealthBar.cs— world-space HP bar above the current target
-    └── TargetHealthBarLogic.cs   — pure math for target HP bar (width, color); testable in EditMode
+    ├── TargetHealthBarLogic.cs   — pure math for target HP bar (width, color); testable in EditMode
+    ├── CombatWarningText.cs      — pure static: maps CombatFeedbackReason → player-facing warning string
+    ├── FloatingCombatTextCanvas.cs — ScreenSpaceOverlay Canvas; spawns FloatingCombatTextItem per hit
+    ├── FloatingCombatTextItem.cs — single floating damage number: upward animation, fade, self-destructs
+    └── FloatingCombatTextLogic.cs — pure math: world anchor, pixel-offset curve, alpha fade; testable in EditMode
 ```
 
 ---
