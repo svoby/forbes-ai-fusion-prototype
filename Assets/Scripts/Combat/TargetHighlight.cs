@@ -50,9 +50,33 @@ public class TargetHighlight : MonoBehaviour {
       return;
     }
 
-    // Sit just above the floor at the target's feet.
-    transform.position = _target.position + Vector3.up * 0.04f;
+    // Resolve the world-space feet position so the ring sits on the ground
+    // regardless of whether the pivot is at the character's centre or base.
+    Vector3 feet = GetFeetPosition(_target);
+    transform.position = feet + Vector3.up * 0.02f;
     transform.rotation = Quaternion.identity;
+  }
+
+  /// <summary>
+  /// Returns the bottom-of-collider world position for <paramref name="t"/>.
+  /// Falls back to <c>t.position</c> when no recognised collider is present.
+  /// </summary>
+  static Vector3 GetFeetPosition(Transform t) {
+    // CharacterController pivot is at the capsule centre; bottom = pos - up*(height/2 - skinWidth).
+    var cc = t.GetComponentInChildren<CharacterController>();
+    if (cc != null) {
+      return cc.transform.position + cc.center - Vector3.up * (cc.height * 0.5f - cc.skinWidth);
+    }
+
+    // CapsuleCollider pivot may also be at centre.
+    var cap = t.GetComponentInChildren<CapsuleCollider>();
+    if (cap != null) {
+      Vector3 worldCenter = cap.transform.TransformPoint(cap.center);
+      float halfHeight = cap.height * 0.5f * cap.transform.lossyScale.y;
+      return worldCenter - Vector3.up * halfHeight;
+    }
+
+    return t.position;
   }
 
   void BuildRing() {
