@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using NUnit.Framework;
 
 namespace Forbes.Tests.EditMode {
@@ -93,6 +94,60 @@ namespace Forbes.Tests.EditMode {
         feedbackTick: 0,
         currentRunnerTick: 20,
         1f / 60f));
+    }
+  }
+
+  /// <summary>
+  /// Pins the mid-cast cancel policy in
+  /// <see cref="NetworkCombatController.IsMidCastCancelReason"/>.
+  ///
+  /// The rule: <see cref="CombatFailReason.OutOfRange"/> must NOT cancel an
+  /// active cast — the target may re-enter range before the cast resolves.
+  /// All other non-None failures (NoTarget, TargetDead, …) must cancel.
+  /// </summary>
+  [TestFixture]
+  public class MidCastCancelPolicyTests {
+    [Test]
+    public void OutOfRange_DoesNotCancelMidCast() {
+      Assert.IsFalse(
+        NetworkCombatController.IsMidCastCancelReason(CombatFailReason.OutOfRange),
+        "OutOfRange must not interrupt a cast in progress: target may walk back.");
+    }
+
+    [Test]
+    public void None_DoesNotCancelMidCast() {
+      Assert.IsFalse(
+        NetworkCombatController.IsMidCastCancelReason(CombatFailReason.None),
+        "None is a success path and must not trigger a cancel.");
+    }
+
+    [TestCase(CombatFailReason.NoTarget)]
+    [TestCase(CombatFailReason.TargetDead)]
+    [TestCase(CombatFailReason.OnCooldown)]
+    [TestCase(CombatFailReason.GcdActive)]
+    [TestCase(CombatFailReason.AlreadyCasting)]
+    [TestCase(CombatFailReason.CasterDead)]
+    public void OtherFailReasons_DoCancelMidCast(CombatFailReason reason) {
+      Assert.IsTrue(
+        NetworkCombatController.IsMidCastCancelReason(reason),
+        $"{reason} should cancel an in-progress cast immediately.");
+    }
+
+    [Test]
+    public void AllEnumValues_AreCoveredByPolicy() {
+      // Guard: if a new CombatFailReason is added, this test fails until someone
+      // explicitly decides whether it should or should not cancel mid-cast and
+      // updates IsMidCastCancelReason accordingly.
+      var nonCancelling = new[] { CombatFailReason.None, CombatFailReason.OutOfRange };
+      var allValues = (CombatFailReason[])Enum.GetValues(typeof(CombatFailReason));
+
+      foreach (var reason in allValues) {
+        bool expectCancel = !nonCancelling.Contains(reason);
+        Assert.AreEqual(
+          expectCancel,
+          NetworkCombatController.IsMidCastCancelReason(reason),
+          $"Policy not defined for {reason} — update IsMidCastCancelReason or this test.");
+      }
     }
   }
 }

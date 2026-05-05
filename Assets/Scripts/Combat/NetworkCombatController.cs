@@ -147,7 +147,8 @@ public class NetworkCombatController : NetworkBehaviour {
               Runner, transform, CastTarget, castSpell,
               Runner.Tick, gcdEndTick: 0, cooldownEndTick: 0,
               isAlreadyCasting: false,
-              out _, out _)) {
+              out _, out var midCastFailReason)
+            && IsMidCastCancelReason(midCastFailReason)) {
           TryCancelCast(CastCancelReason.InvalidTarget);
         }
       }
@@ -400,6 +401,21 @@ public class NetworkCombatController : NetworkBehaviour {
       case 2: Cooldown2EndTick = tick; break;
       case 3: Cooldown3EndTick = tick; break;
     }
+  }
+
+  /// <summary>
+  /// Returns true when a mid-cast validation failure is severe enough to
+  /// interrupt the cast immediately (e.g. target vanished or died).
+  /// <para>
+  /// <see cref="CombatFailReason.OutOfRange"/> is intentionally excluded: the
+  /// target may re-enter range before the cast finishes. Range is re-checked
+  /// at cast completion inside <see cref="ResolveCast"/>, which will emit an
+  /// <see cref="CombatFeedbackReason.OutOfRange"/> HUD notification if the
+  /// target is still too far away when the cast resolves.
+  /// </para>
+  /// </summary>
+  internal static bool IsMidCastCancelReason(CombatFailReason reason) {
+    return reason != CombatFailReason.None && reason != CombatFailReason.OutOfRange;
   }
 
   /// <summary>Converts seconds to tick count using the runner's fixed tick rate.</summary>

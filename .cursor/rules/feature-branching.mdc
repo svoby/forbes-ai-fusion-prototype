@@ -37,6 +37,16 @@ git checkout -b fix/002-projectile-floor-bounds
 git checkout -b chore/003-editmode-test-helpers
 ```
 
+## Commit policy — stage only, never commit
+
+The agent **must never run `git commit`**. Instead:
+
+1. Stage all relevant files with `git add`.
+2. Display the intended commit message (following the branch naming convention prefix, e.g. `fix: …`, `feat: …`, `chore: …`) as plain text so the user can review it.
+3. Leave the working tree in a staged-but-uncommitted state; the user commits manually.
+
+This applies everywhere — feature work, fixes, chores, cherry-picks, and any other git operations the agent performs.
+
 ## When the feature is done
 
 - Do **not** merge the feature branch into `main` or `master` from the agent session (no `git merge`, no push of a merge to the default branch).
