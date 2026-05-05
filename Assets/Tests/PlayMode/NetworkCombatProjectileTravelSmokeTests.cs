@@ -375,6 +375,12 @@ namespace Forbes.Tests.PlayMode {
         // so without this guard the dummy falls to Y<-50 and FallKill cancels the missile.
         dummyHealth.FallKillEnabled = false;
 
+        // No floor under far X: mob brain still applies gravity → dummy falls indefinitely
+        // in this sparse scene; freeze AI so the case stays a stationary distant target.
+        if (_dummy.TryGetComponent(out NetworkMobBrain mobBrain)) {
+          mobBrain.enabled = false;
+        }
+
         // Teleport to 20 m away — well within Fireball range (30 m) so the
         // missile can still home in and catch the stationary target.
         Vector3 farPos = _dummy.transform.position + new Vector3(20f, 0f, 0f);
