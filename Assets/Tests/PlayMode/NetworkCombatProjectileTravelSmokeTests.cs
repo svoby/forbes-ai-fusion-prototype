@@ -369,10 +369,8 @@ namespace Forbes.Tests.PlayMode {
         float startHp   = dummyHealth.NetworkedHealth;
         float dmg       = SpellRegistry.Get(1).Damage;
 
-        yield return FireFireball();
-
-        // Disable FallKill before teleporting: the floor does not extend 20 m in X,
-        // so without this guard the dummy falls to Y<-50 and FallKill cancels the missile.
+        // Disable FallKill before firing: after teleport the dummy may briefly leave
+        // collider support; we must not kill it (dead target clears the missile).
         dummyHealth.FallKillEnabled = false;
 
         // No floor under far X: mob brain still applies gravity → dummy falls indefinitely
@@ -381,20 +379,24 @@ namespace Forbes.Tests.PlayMode {
           mobBrain.enabled = false;
         }
 
-        // Teleport to 20 m away — well within Fireball range (30 m) so the
-        // missile can still home in and catch the stationary target.
-        Vector3 farPos = _dummy.transform.position + new Vector3(20f, 0f, 0f);
+        yield return FireFireball();
+
+        // Teleport east — far enough to extend flight, but stay over the procedural
+        // checkerboard (5×10 m tiles → usable X/Z roughly ±25 m from origin).
+        const float teleportDeltaXMeters = 17f;
+        Vector3 farPos = _dummy.transform.position + new Vector3(teleportDeltaXMeters, 0f, 0f);
         FusionPlayModeTestHelpers.TeleportNetworkObjectForPlayModeSmokeTest(_dummy, farPos);
 
-        // Missile must still arrive — give it generous time. The missile starts at
-        // the caster (~-2,1,0) and the target teleports to ~(26,0,6): total distance
-        // ≈ 28.6 m at 20 m/s ≈ 1.43 s / ~86 ticks at 60 Hz. The 960-frame budget
-        // (16 s) is well above that; target is stationary after the teleport.
+        // Let NetworkTransform / CharacterController apply before we poll HP.
+        yield return FusionPlayModeTestHelpers.WaitFrames(5);
+
+        // Missile must still arrive — generous frame budget. Rough path length after
+        // teleport is still well under Fireball reach (30 m) at caster (~-2,1,0).
         yield return FusionPlayModeTestHelpers.WaitUntil(
           () => Mathf.Abs(dummyHealth.NetworkedHealth - (startHp - dmg)) < 0.36f,
           maxFrames: 960,
           messageOnFail:
-          $"After 20 m teleport, missile did not land. hp={dummyHealth.NetworkedHealth} expect~{startHp - dmg}");
+          $"After far teleport, missile did not land. hp={dummyHealth.NetworkedHealth} expect~{startHp - dmg}");
 
         Assert.IsFalse(dummyHealth.IsDead, "Target must survive a single Fireball.");
       }

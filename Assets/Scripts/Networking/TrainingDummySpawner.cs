@@ -75,7 +75,7 @@ public class TrainingDummySpawner : MonoBehaviour {
 
   IEnumerator CoSpawnTrainingDummy() {
     if (TrainingDummyPrefab.GetComponent<NetworkObject>() == null) {
-      Debug.LogError("TrainingDummySpawner: TrainingDummyPrefab must be a root object with a NetworkObject.");
+      ForbesLog.Error("TrainingDummySpawner: TrainingDummyPrefab must be a root object with a NetworkObject.");
       _spawnStarted = false;
       yield break;
     }
@@ -111,12 +111,12 @@ public class TrainingDummySpawner : MonoBehaviour {
         yield break;
       }
 
-      Debug.LogError("TrainingDummySpawner: Spawn returned null. Check FusionPrefab label on TrainingDummy and Shared Mode spawn rules.");
+      ForbesLog.Error("TrainingDummySpawner: Spawn returned null. Check FusionPrefab label on TrainingDummy and Shared Mode spawn rules.");
       _spawnStarted = false;
       yield break;
     }
 
-    Debug.LogWarning("TrainingDummySpawner: training dummy not spawned (local player object not ready in time).");
+    ForbesLog.Warn("TrainingDummySpawner: training dummy not spawned (local player object not ready in time).");
     _spawnStarted = false;
   }
 }

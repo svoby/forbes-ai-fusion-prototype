@@ -102,13 +102,19 @@ public static class ForbesFusionSharedSceneSetup {
   static void EnsureFloor() {
     var existing = GameObject.Find(CheckerboardFloor.ParentName);
 
-    // Replace a legacy single-plane Floor with the 3×3 checkerboard.
+    // Replace a legacy single-plane Floor with the checkerboard grid.
     if (existing != null && existing.transform.childCount == 0) {
       Undo.DestroyObjectImmediate(existing);
       existing = null;
     }
 
-    if (existing != null) return; // already a checkerboard parent
+    int expectedTiles = CheckerboardFloor.GridDimension * CheckerboardFloor.GridDimension;
+    if (existing != null && existing.transform.childCount == expectedTiles) return;
+
+    if (existing != null) {
+      Undo.DestroyObjectImmediate(existing);
+      existing = null;
+    }
 
     CheckerboardFloor.Create();
     var created = GameObject.Find(CheckerboardFloor.ParentName);

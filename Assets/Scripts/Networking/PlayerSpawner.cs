@@ -26,7 +26,6 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     }
 
     ForbesLog.Net($"PlayerSpawner Awake runner={(_runner != null)}");
-    ForbesLog.Diag("Net", $"PlayerSpawner Awake runner={(_runner != null)} go={gameObject.name}", this);
   }
 
   void OnDestroy() {
@@ -43,13 +42,12 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks {
     }
 
     if (PlayerPrefab == null) {
-      ForbesLog.Diag("Net", "OnPlayerJoined: LOCAL ref but PlayerPrefab is NULL — player will not spawn.", this);
+      ForbesLog.Warn("OnPlayerJoined: LOCAL ref but PlayerPrefab is NULL — player will not spawn.", this);
       return;
     }
 
     var spawned = runner.Spawn(PlayerPrefab, new Vector3(0f, 1f, 0f), Quaternion.identity, player);
     ForbesLog.Net($"Spawn local player -> {(spawned != null ? spawned.name : "NULL")}");
-    ForbesLog.Diag("Net", $"Local spawn result name={(spawned != null ? spawned.name : "NULL")} running={runner.IsRunning} SetPlayerObject next", spawned != null ? spawned.gameObject : this);
     if (spawned == null) {
       return;
     }
