@@ -1,53 +1,31 @@
 ---
-description: Each new feature must be developed on a dedicated git branch
+description: Git workflow — branch and commit policy for the agent
 alwaysApply: true
 ---
 
-# Feature Branching
+# Git workflow
 
-Before starting **any new feature**, the agent must:
+## Branch policy — do NOT switch branches automatically
 
-1. Check the current branch: `git branch --show-current`
-2. If on `main` (or `master`), create and switch to a feature branch:
-   ```
-   git checkout -b feature/<NNN>-<short-kebab-description>
-   ```
-   where `<NNN>` is the next sequential three-digit number (e.g. `001`, `002`); check existing branches with `git branch -a` first.
-3. All implementation commits go on that branch — **never commit feature work directly to `main`**.
-
-## Branch naming
-
-Branches include a zero-padded three-digit feature number followed by a short kebab description:
-
-- `feature/<NNN>-<name>` — new functionality
-- `fix/<NNN>-<name>` — bug fixes without new features
-- `chore/<NNN>-<name>` — tooling, refactors, non-functional changes
-
-The number is sequential starting at `001`. Before creating a branch, check existing branch names to determine the next number:
-
-```
-git branch -a
-```
-
-## Example
-
-```
-git checkout -b feature/001-mob-aggro-radius
-git checkout -b fix/002-projectile-floor-bounds
-git checkout -b chore/003-editmode-test-helpers
-```
+The agent **must never** create, checkout, or switch branches on its own.
+Work on whatever branch is currently active. If a branch change is needed, ask the user explicitly.
 
 ## Commit policy — stage only, never commit
 
 The agent **must never run `git commit`**. Instead:
 
 1. Stage all relevant files with `git add`.
-2. Display the intended commit message (following the branch naming convention prefix, e.g. `fix: …`, `feat: …`, `chore: …`) as plain text so the user can review it.
-3. Leave the working tree in a staged-but-uncommitted state; the user commits manually.
+2. Write the intended commit message to `.git/COMMIT_EDITMSG` so it appears pre-filled in the Source Control panel.
+3. Leave the working tree staged-but-uncommitted; the user commits from the UI.
 
-This applies everywhere — feature work, fixes, chores, cherry-picks, and any other git operations the agent performs.
+Commit message prefix conventions (for `COMMIT_EDITMSG`):
 
-## When the feature is done
+- `feat: …` — new functionality
+- `fix: …` — bug fix
+- `chore: …` — tooling, refactors, non-functional changes
+- `test: …` — test-only changes
 
-- Do **not** merge the feature branch into `main` or `master` from the agent session (no `git merge`, no push of a merge to the default branch).
-- Remind the user to open a PR and complete the merge through their usual review flow when they choose to.
+## When work is done
+
+- Do **not** merge, push, or rebase from the agent session.
+- Remind the user that staged files are ready and they can commit from the Source Control panel.
