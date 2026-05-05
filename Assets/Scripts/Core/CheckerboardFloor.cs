@@ -1,36 +1,40 @@
 using UnityEngine;
 
 /// <summary>
-/// Builds a 3 × 3 checkerboard floor at startup if one does not already exist.
+/// Builds a 5 × 5 checkerboard floor at startup if one does not already exist (or the saved layout is stale).
 /// The editor setup tool (Tools → Fusion → Scene → Apply Full Combat Setup) also
 /// calls <see cref="Create"/> so the floor is saved in the scene asset.
 /// </summary>
 public static class CheckerboardFloor {
   public const string ParentName = "Floor";
 
-  const int   GridSize   = 3;
+  public const int GridSize = 5;
   const float TileSize   = 10f;
   const float TileHeight = 0.2f;
 
-  static readonly Color ColorA = new Color(0.72f, 0.72f, 0.72f); // light grey
-  static readonly Color ColorB = new Color(0.28f, 0.28f, 0.28f); // dark grey
+  static readonly Color ColorA = Color.white;
+  static readonly Color ColorB = Color.black;
+
+  static int ExpectedTileCount => GridSize * GridSize;
+
+  /// <summary>True when <paramref name="floor"/> is the current checkerboard (tile count matches grid).</summary>
+  public static bool MatchesCurrentGrid(GameObject floor) {
+    return floor != null && floor.transform.childCount == ExpectedTileCount;
+  }
 
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
   static void AutoCreate() {
     var existing = GameObject.Find(ParentName);
 
-    // If there is a legacy single-object floor (no children = old Plane/Cube),
-    // destroy it so we can replace it with the checkerboard.
-    if (existing != null && existing.transform.childCount == 0) {
+    if (existing != null) {
+      if (MatchesCurrentGrid(existing)) return;
       Object.Destroy(existing);
-      existing = null;
     }
 
-    if (existing != null) return; // already the 3×3 checkerboard
     Create();
   }
 
-  /// <summary>Creates the 3 × 3 checkerboard floor centred at the world origin.</summary>
+  /// <summary>Creates the 5 × 5 checkerboard floor centred at the world origin.</summary>
   public static void Create() {
     var parent = new GameObject(ParentName);
     // Do NOT set isStatic = true on runtime-created objects: Unity does not rebuild

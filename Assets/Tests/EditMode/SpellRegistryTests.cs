@@ -22,7 +22,7 @@ namespace Forbes.Tests.EditMode {
       var spell = SpellRegistry.Get(1);
       Assert.IsTrue(spell.IsValid);
       Assert.AreEqual("Fireball", spell.Name);
-      Assert.AreEqual(1.5f, spell.CastTimeSec);
+      Assert.AreEqual(2.5f, spell.CastTimeSec);
       Assert.AreEqual(0f,   spell.CooldownSec);
       Assert.AreEqual(30f,  spell.RangeMeters);
       Assert.AreEqual(30f,  spell.Damage);
@@ -52,7 +52,7 @@ namespace Forbes.Tests.EditMode {
       Assert.IsTrue(spell.IsValid);
       Assert.AreEqual("Heavy Blast", spell.Name);
       Assert.AreEqual(2.5f, spell.CastTimeSec);
-      Assert.AreEqual(8f,   spell.CooldownSec);
+      Assert.AreEqual(4f,   spell.CooldownSec);
       Assert.AreEqual(30f,  spell.RangeMeters);
       Assert.AreEqual(60f,  spell.Damage);
       Assert.IsTrue(spell.TriggersGcd);

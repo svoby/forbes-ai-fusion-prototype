@@ -43,9 +43,9 @@ public readonly struct SpellData {
 /// </summary>
 public static class SpellRegistry {
   public static readonly SpellData[] All = {
-    new(1, "Fireball",    castTimeSec: 1.5f, cooldownSec: 0f, rangeMeters: 30f, damage: 30f, triggersGcd: true, projectileSpeedMetersPerSecond: 20f),
+    new(1, "Fireball",    castTimeSec: 2.5f, cooldownSec: 0f, rangeMeters: 30f, damage: 30f, triggersGcd: true, projectileSpeedMetersPerSecond: 20f),
     new(2, "Arcane Shot", castTimeSec: 0f,   cooldownSec: 3f, rangeMeters: 25f, damage: 15f, triggersGcd: true, projectileSpeedMetersPerSecond: 0f),
-    new(3, "Heavy Blast", castTimeSec: 2.5f, cooldownSec: 8f, rangeMeters: 30f, damage: 60f, triggersGcd: true, projectileSpeedMetersPerSecond: 0f),
+    new(3, "Heavy Blast", castTimeSec: 2.5f, cooldownSec: 4f, rangeMeters: 30f, damage: 60f, triggersGcd: true, projectileSpeedMetersPerSecond: 0f),
   };
 
   /// <summary>Returns the spell for the given 1-based ID, or an invalid default if not found.</summary>

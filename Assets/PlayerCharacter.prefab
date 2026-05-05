@@ -249,8 +249,8 @@ MonoBehaviour:
   _Cooldown1EndTick: 0
   _Cooldown2EndTick: 0
   _Cooldown3EndTick: 0
-  _LastFailReason: 0
-  _LastFailTick: 0
+  _LastCombatFeedbackReason: 0
+  _LastCombatFeedbackTick: 0
 --- !u!114 &9216940810419471991
 MonoBehaviour:
   m_ObjectHideFlags: 0
