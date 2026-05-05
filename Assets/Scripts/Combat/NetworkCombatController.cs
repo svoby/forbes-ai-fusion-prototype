@@ -38,11 +38,11 @@ public class NetworkCombatController : NetworkBehaviour {
   /// <summary>Tick when the current cast resolves; if Tick >= CastEndTick the spell fires.</summary>
   [Networked] public int       CastEndTick     { get; set; }
 
-  /// <summary>Last cast failure reason; shown in HUD for a few seconds.</summary>
-  [Networked] public byte LastFailReason { get; set; }
+  /// <summary>Latest player-facing combat warning; HUD shows for ~2 s.</summary>
+  [Networked] public byte LastCombatFeedbackReason { get; set; }
 
-  /// <summary>Tick at which <see cref="LastFailReason"/> was set; HUD hides after ~2 s.</summary>
-  [Networked] public int LastFailTick { get; set; }
+  /// <summary>Tick at which <see cref="LastCombatFeedbackReason"/> was set.</summary>
+  [Networked] public int LastCombatFeedbackTick { get; set; }
 
   // ── COOLDOWN / GCD ──────────────────────────────────────────────────────────
   // All tick-based; derived from Runner.TickRate at cast time. Observed by UI.
@@ -181,31 +181,41 @@ public class NetworkCombatController : NetworkBehaviour {
     }
 
     if (reason == CastCancelReason.Death) {
-      bool log = IsCasting;
+      bool hadCast = IsCasting;
       ClearCastState();
       // Death clears both cast state and any in-flight pending impact: the
       // projectile is abandoned and the target will not be damaged.
       ClearPendingImpact();
-      if (log) {
+      if (hadCast) {
+        SetCombatFeedback(CombatFeedbackReason.CastInterruptedByDeath);
         ForbesLog.Net($"Cast cancelled: {reason}", this);
       }
       return;
     }
 
-    // Non-Death cancellations (Movement, Jump, NewSpell, InvalidTarget) clear
-    // cast state only — not pending impact. Cancellation fires before
-    // ResolveCast, so no pending impact has been scheduled yet; movement
-    // cannot cancel a projectile already in flight.
+    // Non-Death cancellations clear cast state only — not pending impact.
+    // Movement and jump: silent (no HUD feedback, no log). Others set feedback + log.
     if (!IsCasting) {
       return;
     }
 
     ClearCastState();
+    if (reason == CastCancelReason.Movement || reason == CastCancelReason.Jump) {
+      return;
+    }
+
+    var feedback = CombatFeedbackReasonMapping.FromCastCancel(reason);
+    if (feedback != CombatFeedbackReason.None) {
+      SetCombatFeedback(feedback);
+    }
     ForbesLog.Net($"Cast cancelled: {reason}", this);
   }
 
   void TryCastOrInterrupt(byte spellId, NetworkId targetId) {
     if (IsCasting) {
+      if (CurrentSpellId == spellId) {
+        return;
+      }
       TryCancelCast(CastCancelReason.NewSpell);
     }
     TryStartCast(spellId, targetId);
@@ -226,19 +236,18 @@ public class NetworkCombatController : NetworkBehaviour {
           Runner.Tick, GcdEndTick, cooldownEnd,
           isAlreadyCasting: CurrentSpellId != 0,
           out var targetHealth, out var failReason)) {
-      SetFailReason(failReason);
+      SetCombatFeedback(CombatFeedbackReasonMapping.FromValidatorFailure(failReason));
       ForbesLog.Net($"Cast rejected: {failReason} spell={spell.Name}", this);
       return;
-    }
-
-    // GCD fires immediately on successful cast request.
-    if (spell.TriggersGcd) {
-      GcdEndTick = Runner.Tick + SecsToTicks(GcdSec);
     }
 
     int castTicks = SecsToTicks(spell.CastTimeSec);
 
     if (castTicks == 0) {
+      // Instant spell: GCD and cooldown start immediately (no cast bar to cancel).
+      if (spell.TriggersGcd) {
+        GcdEndTick = Runner.Tick + SecsToTicks(GcdSec);
+      }
       SetCooldownEndTick(spellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
       if (SpellTravelLogic.HasProjectile(spell)) {
@@ -249,13 +258,13 @@ public class NetworkCombatController : NetworkBehaviour {
         DispatchImpactVisual(spellId, targetId);
       }
     } else {
-      // Cast-time spell: set networked state; damage fires in ResolveCast.
+      // Cast-time spell: GCD and cooldown are deferred to ResolveCast.
+      // Cancelling the cast (movement, jump, new spell) incurs neither GCD nor cooldown,
+      // matching WoW behaviour where only a completed cast triggers these timers.
       CurrentSpellId = spellId;
       CastTarget     = targetId;
       CastStartTick  = Runner.Tick;
       CastEndTick    = Runner.Tick + castTicks;
-      // Cooldown begins at cast start (matches WoW: you can't bypass CD by cancelling).
-      SetCooldownEndTick(spellId, Runner.Tick + castTicks + SecsToTicks(spell.CooldownSec));
       ForbesLog.Net($"Cast started: {spell.Name} castTicks={castTicks}", this);
     }
   }
@@ -271,11 +280,17 @@ public class NetworkCombatController : NetworkBehaviour {
           Runner.Tick, gcdEndTick: 0, cooldownEndTick: 0,
           isAlreadyCasting: false,
           out var targetHealth, out var failReason)) {
-      SetFailReason(failReason);
+      SetCombatFeedback(CombatFeedbackReasonMapping.FromValidatorFailure(failReason));
       ForbesLog.Net($"Cast resolved but invalid at completion: {failReason}", this);
       ClearCastState();
       return;
     }
+
+    // Cast completed successfully: trigger GCD and cooldown now (WoW behaviour).
+    if (spell.TriggersGcd) {
+      GcdEndTick = Runner.Tick + SecsToTicks(GcdSec);
+    }
+    SetCooldownEndTick(CurrentSpellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
     if (SpellTravelLogic.HasProjectile(spell)) {
       SchedulePendingImpact(CurrentSpellId, CastTarget);
@@ -332,14 +347,14 @@ public class NetworkCombatController : NetworkBehaviour {
     if (!Runner.TryFindObject(PendingImpactTarget, out var targetObj)
         || targetObj == null
         || !targetObj.TryGetComponent(out Health impactHealth)) {
-      SetFailReason(CombatFailReason.NoTarget);
+      SetCombatFeedback(CombatFeedbackReason.NoTarget);
       ForbesLog.Net("Missile: target missing -> NoTarget", this);
       ClearPendingImpact();
       return;
     }
 
     if (impactHealth.IsDead) {
-      SetFailReason(CombatFailReason.TargetDead);
+      SetCombatFeedback(CombatFeedbackReason.TargetDead);
       ForbesLog.Net("Missile: target dead — impact cancelled", this);
       ClearPendingImpact();
       return;
@@ -362,9 +377,12 @@ public class NetworkCombatController : NetworkBehaviour {
     DispatchImpactVisual(arrivalSpellId, arrivalTarget);
   }
 
-  void SetFailReason(CombatFailReason reason) {
-    LastFailReason = (byte)reason;
-    LastFailTick   = Runner.Tick;
+  void SetCombatFeedback(CombatFeedbackReason reason) {
+    if (reason == CombatFeedbackReason.None) {
+      return;
+    }
+    LastCombatFeedbackReason = (byte)reason;
+    LastCombatFeedbackTick   = Runner.Tick;
   }
 
   int GetCooldownEndTick(byte spellId) {

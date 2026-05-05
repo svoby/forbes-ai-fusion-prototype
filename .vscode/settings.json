@@ -2,7 +2,6 @@
   "files.encoding": "utf8",
   "omnisharp.enableRoslynAnalyzers": true,
   "omnisharp.enableEditorConfigSupport": true,
-  "omnisharp.enableImportCompletion": true,
   "omnisharp.projectLoadTimeout": 120,
   "dotnet.formatting.organizeImportsOnFormat": true,
   "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "openFiles",

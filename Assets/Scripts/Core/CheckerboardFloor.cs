@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Builds a 5 × 5 black/white checkerboard floor at startup if one does not already exist.
+/// Builds a 5 × 5 checkerboard floor at startup if one does not already exist (or the saved layout is stale).
 /// The editor setup tool (Tools → Fusion → Scene → Apply Full Combat Setup) also
 /// calls <see cref="Create"/> so the floor is saved in the scene asset.
 /// </summary>
@@ -17,21 +17,21 @@ public static class CheckerboardFloor {
   static readonly Color ColorA = Color.white;
   static readonly Color ColorB = Color.black;
 
+  static int ExpectedTileCount => GridDimension * GridDimension;
+
+  /// <summary>True when <paramref name="floor"/> is the current checkerboard (tile count matches grid).</summary>
+  public static bool MatchesCurrentGrid(GameObject floor) {
+    return floor != null && floor.transform.childCount == ExpectedTileCount;
+  }
+
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
   static void AutoCreate() {
     var existing = GameObject.Find(ParentName);
 
-    // If there is a legacy single-object floor (no children = old Plane/Cube),
-    // destroy it so we can replace it with the checkerboard.
-    if (existing != null && existing.transform.childCount == 0) {
+    if (existing != null) {
+      if (MatchesCurrentGrid(existing)) return;
       Object.Destroy(existing);
-      existing = null;
     }
-
-    int expectedTiles = GridDimension * GridDimension;
-    if (existing != null && existing.transform.childCount == expectedTiles) return;
-
-    if (existing != null) Object.Destroy(existing);
 
     Create();
   }

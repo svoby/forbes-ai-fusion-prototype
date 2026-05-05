@@ -282,7 +282,7 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsFalse(SpellTravelLogic.HasProjectile(SpellRegistry.Get(3)),
           "Heavy Blast (spell 3) must be a non-projectile cast-time spell for this test.");
 
-        // Start Heavy Blast cast (2.5 s cast, no projectile, 8 s cooldown).
+        // Start Heavy Blast cast (2.5 s cast, no projectile, 4 s cooldown).
         _session.InputRelay.TargetNetworkId = _dummy.Id;
         _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell3;
 
@@ -298,6 +298,11 @@ namespace Forbes.Tests.PlayMode {
           () => combat.CurrentSpellId == 0,
           maxFrames: 120,
           messageOnFail: "Cast was not cancelled by movement input within timeout");
+
+        Assert.AreEqual(
+          0,
+          combat.LastCombatFeedbackReason,
+          "Movement-cancelled cast must not set networked combat feedback.");
 
         _session.InputRelay.StickyMove = Vector2.zero;
 
@@ -399,6 +404,132 @@ namespace Forbes.Tests.PlayMode {
           $"After far teleport, missile did not land. hp={dummyHealth.NetworkedHealth} expect~{startHp - dmg}");
 
         Assert.IsFalse(dummyHealth.IsDead, "Target must survive a single Fireball.");
+      }
+    }
+
+    /// <summary>
+    /// Pressing the same spell button during an active cast of that spell must be silently
+    /// ignored: cast continues, no feedback is set, and damage is applied when the cast resolves.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator CastTimedSpell_PressingSameSpellAgain_IsIgnored_CastContinues() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(CastTimedSpell_PressingSameSpellAgain_IsIgnored_CastContinues));
+
+        var combat      = _player.GetComponent<NetworkCombatController>();
+        var dummyHealth = _dummy.GetComponent<Health>();
+        float startHp   = dummyHealth.NetworkedHealth;
+        float dmg       = SpellRegistry.Get(3).Damage;
+
+        Assert.IsFalse(SpellTravelLogic.HasProjectile(SpellRegistry.Get(3)),
+          "Heavy Blast must be a non-projectile cast-time spell for this test.");
+
+        // Start Heavy Blast (2.5 s cast).
+        _session.InputRelay.TargetNetworkId = _dummy.Id;
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell3;
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => combat.CurrentSpellId == 3,
+          maxFrames: 120,
+          messageOnFail: "Heavy Blast cast did not start within timeout");
+
+        int castStartTick = combat.CastStartTick;
+
+        // Press the same spell mid-cast — must be a no-op.
+        _session.InputRelay.PendingPulse = FusionPlayModeSpellPulse.Spell3;
+        yield return FusionPlayModeTestHelpers.WaitFrames(10);
+
+        Assert.AreEqual(3, combat.CurrentSpellId,     "Cast must still be spell 3 after pressing it again.");
+        Assert.AreEqual(castStartTick, combat.CastStartTick, "CastStartTick must not reset when same spell is re-pressed.");
+        Assert.AreEqual(0, combat.LastCombatFeedbackReason,   "Re-pressing same spell must not set any feedback.");
+
+        // Cast must resolve and deal damage.
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => combat.CurrentSpellId == 0,
+          maxFrames: 480,
+          messageOnFail: "Cast did not resolve within timeout");
+
+        yield return FusionPlayModeTestHelpers.WaitFrames(20);
+
+        Assert.AreEqual(startHp - dmg, dummyHealth.NetworkedHealth, 0.35f,
+          "Damage must be applied after cast resolves despite re-press.");
+      }
+    }
+
+    /// <summary>
+    /// Rejected spell (no valid target id) must replicate
+    /// <see cref="NetworkCombatController.LastCombatFeedbackReason"/> for the HUD.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator RejectedCast_NoTarget_SetsCombatFeedback() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(RejectedCast_NoTarget_SetsCombatFeedback));
+
+        var combat = _player.GetComponent<NetworkCombatController>();
+
+        _session.InputRelay.TargetNetworkId = default;
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => combat.LastCombatFeedbackReason == (byte)CombatFeedbackReason.NoTarget,
+          maxFrames: 240,
+          messageOnFail:
+            $"Expected NoTarget feedback. got={(CombatFeedbackReason)combat.LastCombatFeedbackReason} tick={combat.LastCombatFeedbackTick}");
+
+        Assert.Greater(combat.LastCombatFeedbackTick, 0,
+          "LastCombatFeedbackTick must be set when feedback is shown.");
+      }
+    }
+
+    /// <summary>
+    /// A later rejection must bump <see cref="NetworkCombatController.LastCombatFeedbackTick"/> so the HUD clock restarts.
+    /// </summary>
+    [UnityTest]
+    [Timeout(120000)]
+    public IEnumerator CombatFeedbackTick_Advances_OnSecondRejection() {
+      yield return FusionPlayModeTestHelpers.RunWithFusionSession(_session, Body);
+
+      IEnumerator Body() {
+        yield return SpawnBoth(nameof(CombatFeedbackTick_Advances_OnSecondRejection));
+
+        var combat = _player.GetComponent<NetworkCombatController>();
+        var runner = _session.Runner;
+
+        _session.InputRelay.TargetNetworkId = default;
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => combat.LastCombatFeedbackReason == (byte)CombatFeedbackReason.NoTarget,
+          maxFrames: 240,
+          messageOnFail: "First cast should fail with NoTarget.");
+
+        int firstTick = combat.LastCombatFeedbackTick;
+        Assert.Greater(firstTick, 0);
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => runner.Tick > firstTick + 2,
+          maxFrames: 120,
+          messageOnFail: "Runner tick should advance after first rejection.");
+
+        _session.InputRelay.TargetNetworkId = _dummy.Id;
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell2;
+        yield return FusionPlayModeTestHelpers.WaitFrames(8);
+
+        _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell2;
+
+        yield return FusionPlayModeTestHelpers.WaitUntilLazy(
+          () => combat.LastCombatFeedbackReason == (byte)CombatFeedbackReason.GcdActive
+                && combat.LastCombatFeedbackTick > firstTick,
+          maxFrames: 360,
+          buildFailureDetails: () =>
+            $"Expected second rejection GcdActive with newer tick. feedback={(CombatFeedbackReason)combat.LastCombatFeedbackReason} " +
+            $"fbTick={combat.LastCombatFeedbackTick} first={firstTick} runnerTick={runner.Tick}");
       }
     }
   }

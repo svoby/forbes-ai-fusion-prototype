@@ -12,7 +12,7 @@ using UnityEngine;
 ///   <item>Cast timing is shown by <see cref="CastBarView"/> (canvas)</item>
 ///   <item>GCD remaining</item>
 ///   <item>Per-spell cooldowns [1] [2] [3]</item>
-///   <item>Last cast failure reason (shown for 2 s)</item>
+///   <item>Combat feedback banner (WoW-style, upper golden-ratio; ~2 s)</item>
 /// </list>
 /// </para>
 /// </summary>
@@ -24,7 +24,7 @@ public class CombatHud : MonoBehaviour {
   string _targetLine = "";
   string _gcdLine    = "";
   string _cdLine     = "";
-  string _failLine   = "";
+  string _feedbackLine = "";
 
   void Awake() {
     _runner    = GetComponent<NetworkRunner>();
@@ -33,7 +33,7 @@ public class CombatHud : MonoBehaviour {
 
   void Update() {
     if (_runner == null || !_runner.IsRunning) {
-      _selfLine = _targetLine = _gcdLine = _cdLine = _failLine = "";
+      _selfLine = _targetLine = _gcdLine = _cdLine = _feedbackLine = "";
       return;
     }
 
@@ -68,7 +68,7 @@ public class CombatHud : MonoBehaviour {
   }
 
   void UpdateCombatLines() {
-    _gcdLine = _cdLine = _failLine = "";
+    _gcdLine = _cdLine = _feedbackLine = "";
 
     if (!_runner.TryGetPlayerObject(_runner.LocalPlayer, out var playerObj)) {
       return;
@@ -90,13 +90,40 @@ public class CombatHud : MonoBehaviour {
     float cd3 = TicksToSecs(combat.Cooldown3EndTick - _runner.Tick);
     _cdLine = $"CD: [1] {FmtCd(cd1)}  [2] {FmtCd(cd2)}  [3] {FmtCd(cd3)}";
 
-    // Fail reason: show for ~2 seconds after it was set.
-    if (combat.LastFailTick > 0 && combat.LastFailReason != 0) {
-      float ageSecs = TicksToSecs(_runner.Tick - combat.LastFailTick);
-      if (ageSecs < 2f) {
-        _failLine = $"! {(CombatFailReason)combat.LastFailReason}";
-      }
+    var feedback = (CombatFeedbackReason)combat.LastCombatFeedbackReason;
+    if (IsFeedbackLineVisible(feedback, combat.LastCombatFeedbackTick, _runner.Tick, _runner.DeltaTime)
+        && ShouldShowCombatFeedbackInBanner(feedback)) {
+      _feedbackLine = $"! {feedback}";
     }
+  }
+
+  /// <summary>
+  /// Reasons still replicated on <see cref="NetworkCombatController"/> but not shown as the centered banner
+  /// (players already have GCD line; caster-death is not a cast “error” in the WoW sense).
+  /// </summary>
+  internal static bool ShouldShowCombatFeedbackInBanner(CombatFeedbackReason reason) {
+    return reason != CombatFeedbackReason.None
+           && reason != CombatFeedbackReason.GcdActive
+           && reason != CombatFeedbackReason.CasterDead
+           && reason != CombatFeedbackReason.CastInterruptedByNewSpell;
+  }
+
+  /// <summary>EditMode-testable mirror of the time-window rule used with <see cref="ShouldShowCombatFeedbackInBanner"/>.</summary>
+  internal static bool IsFeedbackLineVisible(
+      CombatFeedbackReason reason,
+      int feedbackTick,
+      int currentRunnerTick,
+      float runnerDeltaTime,
+      float visibleDurationSecs = 2f) {
+    if (feedbackTick <= 0 || reason == CombatFeedbackReason.None) {
+      return false;
+    }
+    int ageTicks = currentRunnerTick - feedbackTick;
+    if (ageTicks < 0) {
+      return false;
+    }
+    float ageSecs = ageTicks * runnerDeltaTime;
+    return ageSecs < visibleDurationSecs;
   }
 
   void OnGUI() {
@@ -108,16 +135,44 @@ public class CombatHud : MonoBehaviour {
       normal   = { textColor = Color.white },
     };
 
-    var failStyle = new GUIStyle(style) {
-      normal = { textColor = new Color(1f, 0.3f, 0.3f) },
+    float y = pad;
+    DrawLine(_selfLine,   style, pad, ref y, rowH);
+    DrawLine(_targetLine, style, pad, ref y, rowH);
+    DrawLine(_gcdLine,    style, pad, ref y, rowH);
+    DrawLine(_cdLine,     style, pad, ref y, rowH);
+
+    DrawCombatFeedbackBanner();
+  }
+
+  /// <summary>
+  /// WoW-like error line: horizontally centered, vertical position at φ⁻² · height from top (~38 %).
+  /// </summary>
+  void DrawCombatFeedbackBanner() {
+    if (string.IsNullOrEmpty(_feedbackLine)) {
+      return;
+    }
+
+    const float phi = 1.618033988749f;
+    // First golden-section cut measured from top of view (classic 1/φ² ≈ .382).
+    float yCenter = Screen.height / (phi * phi);
+
+    var textStyle = new GUIStyle(GUI.skin.label) {
+      alignment = TextAnchor.MiddleCenter,
+      fontSize  = 20,
+      fontStyle = FontStyle.Bold,
+      normal    = { textColor = new Color(1f, 0.25f, 0.2f) },
     };
 
-    float y = pad;
-    DrawLine(_selfLine,   style,    pad, ref y, rowH);
-    DrawLine(_targetLine, style,    pad, ref y, rowH);
-    DrawLine(_gcdLine,    style,    pad, ref y, rowH);
-    DrawLine(_cdLine,     style,    pad, ref y, rowH);
-    DrawLine(_failLine,   failStyle, pad, ref y, rowH);
+    const float bandH = 56f;
+    var rect = new Rect(0f, yCenter - bandH * 0.5f, Screen.width, bandH);
+
+    var shadowStyle = new GUIStyle(textStyle) {
+      normal = { textColor = new Color(0f, 0f, 0f, 0.82f) },
+    };
+
+    const float sh = 2f;
+    GUI.Label(new Rect(rect.x + sh, rect.y + sh, rect.width, rect.height), _feedbackLine, shadowStyle);
+    GUI.Label(rect, _feedbackLine, textStyle);
   }
 
   static void DrawLine(string text, GUIStyle style, float x, ref float y, float rowH) {

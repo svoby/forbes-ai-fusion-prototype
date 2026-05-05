@@ -1,4 +1,7 @@
-/// <summary>Why a spell cast was rejected by the state authority.</summary>
+/// <summary>
+/// Why a spell cast was rejected by the state authority. Byte values 0–7 match
+/// <see cref="CombatFeedbackReason"/> for HUD / replication.
+/// </summary>
 public enum CombatFailReason : byte {
   None          = 0,
   NoTarget      = 1,

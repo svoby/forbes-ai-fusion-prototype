@@ -2,8 +2,9 @@ using NUnit.Framework;
 
 namespace Forbes.Tests.EditMode {
   /// <summary>
-  /// Pins the byte values of <see cref="CombatFailReason"/>. These cross the wire
-  /// as <c>NetworkCombatController.LastFailReason</c> (a byte); renumbering would
+  /// Pins the byte values of <see cref="CombatFailReason"/>. These match
+  /// <see cref="CombatFeedbackReason"/> values 0–7 and replicate as
+  /// <c>NetworkCombatController.LastCombatFeedbackReason</c>; renumbering would
   /// silently corrupt every running session. New values must only be appended.
   /// </summary>
   [TestFixture]
