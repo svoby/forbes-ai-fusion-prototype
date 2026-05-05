@@ -7,9 +7,9 @@ Authoritative damage result
     Health.DealDamageRpc (runs on State Authority only)
         │
         ├─ Writes: NetworkedHealth (HP reduced)
-        ├─ Writes: LastHitEventSeq++ (monotonic byte counter)
-        ├─ Writes: LastHitDamage    (raw damage value)
-        └─ Writes: LastHitTick      (simulation tick)
+        ├─ Writes: LastHitDamage    (raw damage value — written before seq++)
+        ├─ Writes: LastHitTick      (simulation tick — written before seq++)
+        └─ Writes: LastHitEventSeq++ (monotonic byte counter — incremented last)
                 │
                 └─► Replicated to all clients via Fusion [Networked] props
                         │

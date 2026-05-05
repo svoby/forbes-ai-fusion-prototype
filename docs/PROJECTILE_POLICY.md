@@ -5,7 +5,7 @@
 | Term | Definition |
 |------|-----------|
 | **authoritative targeted missile** | Gameplay missile state owned exclusively by State Authority. Advances per simulation tick, resolves impact, applies damage. This is the only missile path that matters for gameplay outcomes. |
-| **cosmetic projectile visual** | A future local client visual object (e.g. a moving mesh/particle). Never applies damage; must never own or influence gameplay state. Not yet implemented. |
+| **cosmetic projectile visual** | A local client visual object that approximates missile position during in-flight spells. Never applies damage; must never own or influence gameplay state. Implemented as `CosmeticProjectileView` (plain `MonoBehaviour` on the player prefab). |
 
 These two concepts must remain permanently separated. Any visual object that moves toward a target is cosmetic only; the authoritative missile is the sole source of truth for damage.
 

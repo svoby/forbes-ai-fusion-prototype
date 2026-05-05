@@ -21,16 +21,17 @@ A playable host+client room with third-person movement, tab-targeting, spell com
 
 ```
 Assets/Scripts/
-  Combat/          CombatValidator, NetworkCombatController, CosmeticProjectileView,
-                   SpellRegistry, SpellImpactView, SpellTravelLogic, Targetable,
-                   TargetHighlight, TargetingController
-  Core/            GameplayInput, IInputSource, ForbesLog, CheckerboardFloor
+  Combat/          CastCancelReason, CombatFailReason, CombatFeedbackReason,
+                   CombatValidator, CosmeticProjectileView, NetworkCombatController,
+                   SpellImpactView, SpellRegistry, SpellTravelLogic, SpellVisualColors,
+                   Targetable, TargetHighlight, TargetingController
+  Core/            CheckerboardFloor, ForbesLog, GameplayInput, IInputSource
   Mobs/            NetworkMobBrain, NetworkMobBrainLogic
   Networking/      FusionInputProvider, PlayerSpawner, TrainingDummySpawner
-  Player/          Health, HitImpactView, HealthView, PlayerCombat, PlayerMovement,
-                   ThirdPersonOrbitCamera, KeyboardInputSource, PlayerColor
+  Player/          Health, HealthView, HitImpactView, KeyboardInputSource,
+                   PlayerColor, PlayerMovement, ThirdPersonOrbitCamera
   Training/        TrainingDummy
-  UI/              CastBarView, CombatHud, FloatingCombatTextCanvas,
+  UI/              CastBarView, CombatHud, CombatWarningText, FloatingCombatTextCanvas,
                    FloatingCombatTextItem, FloatingCombatTextLogic, FusionHudToggle,
                    SelectedTargetHealthBar, TargetHealthBarLogic
 ```
@@ -39,15 +40,20 @@ Assets/Scripts/
 
 **EditMode** (`Forbes.Tests.EditMode`) — pure logic, no runner:
 - `CombatValidatorPureTests`, `CombatFailReasonEnumTests`
+- `CombatFeedbackReasonEnumTests`, `CombatFeedbackMappingTests`, `CombatHudFeedbackVisibilityTests`, `MidCastCancelPolicyTests`
+- `CombatHitEventTests`
+- `CombatWarningTextTests`
 - `NetworkCombatSecsToTicksTests`
 - `SpellRegistryTests`, `SpellTravelLogicTests`
 - `NetworkMobBrainLogicTests`
 - `CastBarLayoutDefaultsTests`, `CastBarHudRegressionTests`
 - `HealthDefaultsTests`, `TargetHealthBarLogicTests`
 - `CosmeticProjectileViewColliderTests`
+- `FloatingCombatTextLogicTests`
 
 **PlayMode** (`Forbes.Tests.PlayMode`) — Fusion `GameMode.Single` smokes:
 - `FusionHealthSmokeTests`
+- `CombatFeedbackSmokeTests`
 - `FusionSinglePlayerTestSession` (session fixture)
 - `NetworkMobBrainMovementSmokeTests`, `NetworkMobBrainMeleeSmokeTests`, `NetworkMobBrainChaseLeashSmokeTests`
 - `NetworkCombatProjectileTravelSmokeTests`

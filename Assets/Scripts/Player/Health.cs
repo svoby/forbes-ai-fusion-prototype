@@ -212,10 +212,11 @@ public class Health : NetworkBehaviour {
     NetworkedHealth = Mathf.Max(0f, NetworkedHealth - damage);
 
     // Record authoritative hit event so all clients can play cosmetic feedback.
-    // Written after HP is applied so LastHitDamage reflects a real impact.
-    unchecked { LastHitEventSeq++; }
+    // Data fields are written before LastHitEventSeq is incremented so the
+    // payload is always consistent when OnCombatHitEventRender fires.
     LastHitDamage = damage;
     LastHitTick   = Runner.Tick;
+    unchecked { LastHitEventSeq++; }
 
     if (NetworkedHealth <= 0f) {
       ApplyDeathAuthority();

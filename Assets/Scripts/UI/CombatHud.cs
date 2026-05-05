@@ -93,7 +93,7 @@ public class CombatHud : MonoBehaviour {
     var feedback = (CombatFeedbackReason)combat.LastCombatFeedbackReason;
     if (IsFeedbackLineVisible(feedback, combat.LastCombatFeedbackTick, _runner.Tick, _runner.DeltaTime)
         && ShouldShowCombatFeedbackInBanner(feedback)) {
-      _feedbackLine = $"! {feedback}";
+      _feedbackLine = CombatWarningText.ForReason(feedback);
     }
   }
 
