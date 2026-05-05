@@ -27,10 +27,11 @@ Nemusíš hned přesouvat vše; při nových featurách drž tento tvar a staré
 Assets/Scripts/
   Core/              # sdílené typy: GameplayInput, enumy tlačítek, konstanty
   Networking/        # Fusion glue: spawner, callbacks na runneru (tenké)
-  Player/            # hráč: movement, health, camera (NetworkBehaviour + případné služby)
-  Combat/            # targeting, validation, spell registry, missile logic
+  Player/            # hráč: movement, health, camera, HitImpactView (CombatHitReceived → UI)
+  Combat/            # targeting, validation, spell registry, missile logic,
+                     # CosmeticProjectileView / SpellImpactView (kosmetika bez autority)
   Mobs/              # mob AI (NetworkMobBrain + čistá logika NetworkMobBrainLogic)
-  UI/                # HUD, OnGUI / UI Toolkit – jen čtení stavu / events
+  UI/                # HUD + FloatingCombatTextCanvas / Item / Logic (screen-space dmg text)
   Training/          # editor / dummy cíle (volitelné)
 ```
 

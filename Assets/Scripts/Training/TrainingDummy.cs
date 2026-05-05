@@ -27,7 +27,6 @@ public class TrainingDummy : MonoBehaviour {
       col.height = 2f;
       col.radius = 0.4f;
       col.center = new Vector3(0f, 1f, 0f);
-      Debug.Log("[TrainingDummy] Added CapsuleCollider for raycast targeting.", this);
     }
 
     if (GetComponent<Targetable>() == null) {

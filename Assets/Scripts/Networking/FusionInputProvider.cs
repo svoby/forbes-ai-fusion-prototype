@@ -25,7 +25,7 @@ public class FusionInputProvider : MonoBehaviour, INetworkRunnerCallbacks {
     }
 
     if (_input == null) {
-      Debug.LogWarning("FusionInputProvider: no IInputSource sibling found; OnInput will emit empty input.");
+      ForbesLog.Warn("FusionInputProvider: no IInputSource sibling found; OnInput will emit empty input.");
     }
   }
 

@@ -42,7 +42,7 @@ public static class SpellVisualColors {
       );
     }
 
-    Debug.LogWarning(
+    ForbesLog.Warn(
       "[SpellVisualColors] Resources material \"" + UnlitOrbBaseResourcePath +
       "\" missing — using Shader.Find fallback (prefer fixing the asset path)."
     );

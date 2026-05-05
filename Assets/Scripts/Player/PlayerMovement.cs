@@ -20,7 +20,6 @@ public class PlayerMovement : NetworkBehaviour {
   NetworkButtons           _prevButtons;
   Health                   _health;
   NetworkCombatController  _combat;   // may be null until added to prefab
-  bool                     _loggedFirstInput;
   bool                     _wasDead;
 
   // Cached for render-rate rotation (client-side prediction).
@@ -38,7 +37,7 @@ public class PlayerMovement : NetworkBehaviour {
     _combat     = GetComponent<NetworkCombatController>();
 
     if (_controller == null) {
-      Debug.LogError($"[PlayerMovement] CharacterController missing on '{name}' — movement will not work.", this);
+      ForbesLog.Error($"[PlayerMovement] CharacterController missing on '{name}' — movement will not work.", this);
     }
 
     if (GetComponent<Targetable>() == null) {
@@ -87,12 +86,6 @@ public class PlayerMovement : NetworkBehaviour {
 
     if (!GetInput(out GameplayInput input)) {
       return;
-    }
-
-    // Log the first successful input tick so we can confirm input is flowing.
-    if (!_loggedFirstInput) {
-      _loggedFirstInput = true;
-      Debug.Log($"[PlayerMovement] First input received: Move={input.Move} LookYaw={input.LookYaw:F1} obj={name}", this);
     }
 
     if (_controller.isGrounded) {

@@ -56,7 +56,6 @@ public class TargetingController : MonoBehaviour {
     go.AddComponent<TargetHighlight>();
     go.AddComponent<TargetingController>();
     go.AddComponent<SelectedTargetHealthBar>();
-    Debug.Log("[TargetingController] Auto-created TargetingSystem. Run 'Apply Full Combat Setup' to persist.");
   }
 
   /// <summary>
@@ -77,15 +76,7 @@ public class TargetingController : MonoBehaviour {
 
   // ---- Per-frame logic ----
 
-  bool _loggedStart;
-
   void Update() {
-    if (!_loggedStart) {
-      _loggedStart = true;
-      Debug.Log($"[TargetingController] Running on '{gameObject.name}'. TargetHighlight.Instance={(TargetHighlight.Instance != null ? "OK" : "NULL")}");
-    }
-
-    EnsureCamera();
 
     ClearCurrentTargetIfDead();
 
@@ -110,7 +101,6 @@ public class TargetingController : MonoBehaviour {
     // LMB release without drag: raycast select.
     if (mouse != null && mouse.leftButton.wasReleasedThisFrame) {
       bool dragged = _camera != null && _camera.IsLmbDragging;
-      ForbesLog.Targeting($"LMB released. dragged={dragged}  IsLmbDragging={(_camera != null ? _camera.IsLmbDragging.ToString() : "camera=null")}");
       if (!dragged) {
         TrySelectFromScreenRay();
       }
@@ -142,7 +132,7 @@ public class TargetingController : MonoBehaviour {
     }
 
     if (_tabScratch.Count == 0) {
-      Debug.LogWarning("[TargetingController] CycleTarget: no valid candidates. Is Targetable on prefabs?");
+      ForbesLog.Warn("[TargetingController] CycleTarget: no valid candidates. Is Targetable on prefabs?");
       SetTarget(null);
       return;
     }
@@ -172,20 +162,19 @@ public class TargetingController : MonoBehaviour {
   void TrySelectFromScreenRay() {
     var cam = Camera.main;
     if (cam == null) {
-      Debug.LogWarning("[TargetingController] TrySelectFromScreenRay: Camera.main is null.");
+      ForbesLog.Warn("[TargetingController] TrySelectFromScreenRay: Camera.main is null.");
       return;
     }
 
     var mouse = Mouse.current;
     if (mouse == null) {
-      Debug.LogWarning("[TargetingController] TrySelectFromScreenRay: Mouse.current is null.");
+      ForbesLog.Warn("[TargetingController] TrySelectFromScreenRay: Mouse.current is null.");
       return;
     }
 
     EnsureRunner();
 
-    Vector2 screenPos = mouse.position.ReadValue();
-    var ray = cam.ScreenPointToRay(screenPos);
+    var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
 
     // Fusion spawns objects into its own PhysicsScene (separate from the Unity default scene).
     // Use runner.GetPhysicsScene() so Fusion-spawned objects (player, dummy) are included.
@@ -205,19 +194,14 @@ public class TargetingController : MonoBehaviour {
       hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
     }
 
-    ForbesLog.Targeting($"Raycast screen={screenPos} cam={cam.transform.position:F1} hit={hitSomething} runner={((_runner != null && _runner.IsRunning) ? "OK" : "none")}");
-
     if (hitSomething) {
       Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
-      ForbesLog.Targeting($"  Hit '{hitInfo.collider.name}' on '{hitInfo.collider.transform.root.name}'");
       var hit = hitInfo.collider.GetComponentInParent<Targetable>();
-      ForbesLog.Targeting($"  Targetable: {(hit != null ? hit.DisplayName : "NULL")}");
       if (hit != null) {
         SetTarget(hit);
       }
     } else {
       Debug.DrawRay(ray.origin, ray.direction * _maxRaycastDistance, Color.red, 1f);
-      ForbesLog.Targeting("  Raycast missed all colliders.");
     }
   }
 
@@ -246,7 +230,7 @@ public class TargetingController : MonoBehaviour {
     if (TargetHighlight.Instance != null) {
       TargetHighlight.Instance.SetTarget(t);
     } else {
-      Debug.LogWarning("[TargetingController] TargetHighlight.Instance is null — ring won't show.");
+      ForbesLog.Warn("[TargetingController] TargetHighlight.Instance is null — ring won't show.");
     }
   }
 

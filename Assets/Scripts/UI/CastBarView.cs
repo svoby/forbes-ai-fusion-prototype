@@ -87,7 +87,7 @@ public class CastBarView : MonoBehaviour {
         // Try next candidate.
       }
     }
-    Debug.LogWarning(
+    ForbesLog.Warn(
       "[CastBarView] No UI font resolved — Resources load path '" + BundledHudFontResourcesPath
       + "' missing or failed import; built-in Arial/Legacy absent; OS fallbacks failed. Text may not render.");
     return null;

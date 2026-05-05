@@ -1,19 +1,21 @@
 using UnityEngine;
 
 /// <summary>
-/// Builds a 3 × 3 checkerboard floor at startup if one does not already exist.
+/// Builds a 5 × 5 black/white checkerboard floor at startup if one does not already exist.
 /// The editor setup tool (Tools → Fusion → Scene → Apply Full Combat Setup) also
 /// calls <see cref="Create"/> so the floor is saved in the scene asset.
 /// </summary>
 public static class CheckerboardFloor {
   public const string ParentName = "Floor";
 
-  const int   GridSize   = 3;
+  /// <summary>Edge length of the square tile grid (total tiles = this squared).</summary>
+  public const int GridDimension = 5;
+
   const float TileSize   = 10f;
   const float TileHeight = 0.2f;
 
-  static readonly Color ColorA = new Color(0.72f, 0.72f, 0.72f); // light grey
-  static readonly Color ColorB = new Color(0.28f, 0.28f, 0.28f); // dark grey
+  static readonly Color ColorA = Color.white;
+  static readonly Color ColorB = Color.black;
 
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
   static void AutoCreate() {
@@ -26,11 +28,15 @@ public static class CheckerboardFloor {
       existing = null;
     }
 
-    if (existing != null) return; // already the 3×3 checkerboard
+    int expectedTiles = GridDimension * GridDimension;
+    if (existing != null && existing.transform.childCount == expectedTiles) return;
+
+    if (existing != null) Object.Destroy(existing);
+
     Create();
   }
 
-  /// <summary>Creates the 3 × 3 checkerboard floor centred at the world origin.</summary>
+  /// <summary>Creates the 5 × 5 checkerboard floor centred at the world origin.</summary>
   public static void Create() {
     var parent = new GameObject(ParentName);
     // Do NOT set isStatic = true on runtime-created objects: Unity does not rebuild
@@ -40,10 +46,10 @@ public static class CheckerboardFloor {
     var matA = BuildMat(ColorA);
     var matB = BuildMat(ColorB);
 
-    float halfSpan = (GridSize - 1) * TileSize * 0.5f;
+    float halfSpan = (GridDimension - 1) * TileSize * 0.5f;
 
-    for (int row = 0; row < GridSize; row++) {
-      for (int col = 0; col < GridSize; col++) {
+    for (int row = 0; row < GridDimension; row++) {
+      for (int col = 0; col < GridDimension; col++) {
         var tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
         tile.name = $"Tile_{row}_{col}";
         tile.transform.SetParent(parent.transform, false);

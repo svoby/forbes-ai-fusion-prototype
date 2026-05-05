@@ -21,15 +21,17 @@ A playable host+client room with third-person movement, tab-targeting, spell com
 
 ```
 Assets/Scripts/
-  Combat/          CombatValidator, NetworkCombatController, SpellRegistry,
-                   SpellTravelLogic, Targetable, TargetHighlight, TargetingController
+  Combat/          CombatValidator, NetworkCombatController, CosmeticProjectileView,
+                   SpellRegistry, SpellImpactView, SpellTravelLogic, Targetable,
+                   TargetHighlight, TargetingController
   Core/            GameplayInput, IInputSource, ForbesLog, CheckerboardFloor
   Mobs/            NetworkMobBrain, NetworkMobBrainLogic
   Networking/      FusionInputProvider, PlayerSpawner, TrainingDummySpawner
-  Player/          Health, HealthView, PlayerCombat, PlayerMovement,
+  Player/          Health, HitImpactView, HealthView, PlayerCombat, PlayerMovement,
                    ThirdPersonOrbitCamera, KeyboardInputSource, PlayerColor
   Training/        TrainingDummy
-  UI/              CastBarView, CombatHud, FusionHudToggle,
+  UI/              CastBarView, CombatHud, FloatingCombatTextCanvas,
+                   FloatingCombatTextItem, FloatingCombatTextLogic, FusionHudToggle,
                    SelectedTargetHealthBar, TargetHealthBarLogic
 ```
 
@@ -42,6 +44,7 @@ Assets/Scripts/
 - `NetworkMobBrainLogicTests`
 - `CastBarLayoutDefaultsTests`, `CastBarHudRegressionTests`
 - `HealthDefaultsTests`, `TargetHealthBarLogicTests`
+- `CosmeticProjectileViewColliderTests`
 
 **PlayMode** (`Forbes.Tests.PlayMode`) — Fusion `GameMode.Single` smokes:
 - `FusionHealthSmokeTests`
