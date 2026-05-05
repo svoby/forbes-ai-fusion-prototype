@@ -15,12 +15,11 @@ namespace Forbes.Tests.EditMode {
   [TestFixture]
   public class CombatHitEventTests {
     GameObject _go;
-    Health     _health;
 
     [SetUp]
     public void SetUp() {
-      _go     = new GameObject(nameof(CombatHitEventTests));
-      _health = _go.AddComponent<Health>();
+      _go = new GameObject(nameof(CombatHitEventTests));
+      _go.AddComponent<Health>();  // required by HitImpactView [RequireComponent]
     }
 
     [TearDown]
@@ -79,26 +78,25 @@ namespace Forbes.Tests.EditMode {
     /// Firing CombatHitReceived must not throw and must NOT create any world-space
     /// TextMesh. Floating damage numbers are now rendered via
     /// <see cref="FloatingCombatTextCanvas"/> (screen-space UI).
-    /// Camera.main is null in EditMode tests, so ShowDamage returns immediately
-    /// and no canvas is created — verifying the null-camera guard.
+    /// <see cref="FloatingCombatTextCanvas.ShowDamage"/> is a no-op outside play mode
+    /// (<c>!Application.isPlaying</c>), so no canvas or TextMesh is created.
     /// </summary>
     [Test]
     public void HitImpactView_OnCombatHitReceived_DoesNotCreateWorldSpaceTextMesh() {
-      _go.AddComponent<HitImpactView>();
+      var view = _go.AddComponent<HitImpactView>();
 
-      var backingField = typeof(Health).GetField(
-        "CombatHitReceived",
-        BindingFlags.NonPublic | BindingFlags.Instance);
-      Assert.IsNotNull(backingField, "Cannot find CombatHitReceived backing field.");
-
-      var del = backingField.GetValue(_health) as Action<float>;
-      Assert.IsNotNull(del, "No subscribers registered; HitImpactView.OnEnable may have failed.");
+      // EditMode tests do not call Awake/OnEnable for behaviours without [ExecuteAlways],
+      // so we cannot drive the full subscription lifecycle here. Invoke OnHit directly
+      // to verify the two behavioural contracts: no throw, no world-space TextMesh.
+      var onHit = typeof(HitImpactView)
+        .GetMethod("OnHit", BindingFlags.NonPublic | BindingFlags.Instance);
+      Assert.IsNotNull(onHit, "HitImpactView.OnHit was renamed or removed.");
 
       int meshCountBefore = UnityEngine.Object.FindObjectsByType<TextMesh>(
         FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
 
-      Assert.DoesNotThrow(() => del.Invoke(42f),
-        "HitImpactView.OnHit should not throw when Camera.main is null.");
+      Assert.DoesNotThrow(() => onHit.Invoke(view, new object[] { 42f }),
+        "HitImpactView.OnHit must not throw when Camera.main is null.");
 
       int meshCountAfter = UnityEngine.Object.FindObjectsByType<TextMesh>(
         FindObjectsInactive.Include, FindObjectsSortMode.None).Length;

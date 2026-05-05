@@ -32,7 +32,7 @@ public class FloatingCombatTextCanvas : MonoBehaviour {
   /// </para>
   /// </summary>
   public static void ShowDamage(Transform worldAnchor, float damage) {
-    if (Camera.main == null) {
+    if (!Application.isPlaying || Camera.main == null) {
       return;
     }
 

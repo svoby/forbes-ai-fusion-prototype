@@ -74,6 +74,9 @@ public static class SpellTravelLogic {
   public static bool HasMissileArrived(
     Vector3 missilePos, Vector3 targetPos, float speedMPS, float deltaTime) {
     float step = speedMPS * deltaTime;
-    return step > 0f && Vector3.Distance(missilePos, targetPos) <= step;
+    // Use a tiny relative tolerance: MoveTowards uses sqrt internally, which can
+    // leave the post-advance distance fractionally above the exact step value at
+    // the boundary. 1e-5 (0.001 %) is sub-millimetre at any realistic tick rate.
+    return step > 0f && Vector3.Distance(missilePos, targetPos) < step * (1f + 1e-5f);
   }
 }
