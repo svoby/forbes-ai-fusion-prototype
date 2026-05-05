@@ -50,7 +50,7 @@ namespace Forbes.Tests.EditMode {
     [Test]
     public void ForReason_BannerVisibleReasons_ReturnNonEmptyString() {
       foreach (CombatFeedbackReason reason in Enum.GetValues(typeof(CombatFeedbackReason))) {
-        if (!CombatHud.ShouldShowCombatFeedbackInBanner(reason)) {
+        if (!CombatFeedbackBannerView.ShouldShowCombatFeedbackInBanner(reason)) {
           continue;
         }
         string text = CombatWarningText.ForReason(reason);

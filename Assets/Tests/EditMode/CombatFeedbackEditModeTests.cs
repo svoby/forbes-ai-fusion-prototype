@@ -49,7 +49,7 @@ namespace Forbes.Tests.EditMode {
     [Test]
     public void IsFeedbackLineVisible_True_WhenWithinTwoSeconds() {
       float dt = 1f / 60f;
-      Assert.IsTrue(CombatHud.IsFeedbackLineVisible(
+      Assert.IsTrue(CombatFeedbackBannerView.IsFeedbackLineVisible(
         CombatFeedbackReason.NoTarget,
         feedbackTick: 1000,
         currentRunnerTick: 1000 + 60, // 1s
@@ -68,13 +68,13 @@ namespace Forbes.Tests.EditMode {
     [TestCase(CombatFeedbackReason.CastInterruptedByDeath,     true)]
     [TestCase(CombatFeedbackReason.CastInterruptedInvalidTarget, true)]
     public void ShouldShowCombatFeedbackInBanner_Matches(CombatFeedbackReason reason, bool expected) {
-      Assert.AreEqual(expected, CombatHud.ShouldShowCombatFeedbackInBanner(reason));
+      Assert.AreEqual(expected, CombatFeedbackBannerView.ShouldShowCombatFeedbackInBanner(reason));
     }
 
     [Test]
     public void IsFeedbackLineVisible_False_WhenOlderThanTwoSeconds() {
       float dt = 1f / 60f;
-      Assert.IsFalse(CombatHud.IsFeedbackLineVisible(
+      Assert.IsFalse(CombatFeedbackBannerView.IsFeedbackLineVisible(
         CombatFeedbackReason.NoTarget,
         feedbackTick: 1000,
         currentRunnerTick: 1000 + 200, // 200/60 > 2s
@@ -84,12 +84,12 @@ namespace Forbes.Tests.EditMode {
 
     [Test]
     public void IsFeedbackLineVisible_False_ForNoneOrNonPositiveTick() {
-      Assert.IsFalse(CombatHud.IsFeedbackLineVisible(
+      Assert.IsFalse(CombatFeedbackBannerView.IsFeedbackLineVisible(
         CombatFeedbackReason.None,
         feedbackTick: 10,
         currentRunnerTick: 20,
         1f / 60f));
-      Assert.IsFalse(CombatHud.IsFeedbackLineVisible(
+      Assert.IsFalse(CombatFeedbackBannerView.IsFeedbackLineVisible(
         CombatFeedbackReason.OutOfRange,
         feedbackTick: 0,
         currentRunnerTick: 20,

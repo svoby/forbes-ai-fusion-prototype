@@ -145,7 +145,6 @@ public static class ForbesFusionSharedSceneSetup {
     EnsureComponent<TargetingController>(go);
     EnsureComponent<SelectedTargetHealthBar>(go);
     var dummySpawner = EnsureComponent<TrainingDummySpawner>(go);
-    EnsureComponent<CombatHud>(go);
     EnsureComponent<FusionHudToggle>(go);
     EnsureHudCanvas(runner);
 
@@ -285,12 +284,20 @@ public static class ForbesFusionSharedSceneSetup {
   }
 
   /// <summary>
-  /// One overlay canvas under the runner with <see cref="CastBarView"/> wired.
-  /// Skips creation if <see cref="CastBarView.HudCanvasChildName"/> already exists. Cast bar overlay does not create an EventSystem (avoids Input System UI module clashes and is not needed for passive rendering).
+  /// One overlay canvas under the runner with <see cref="CastBarView"/> and
+  /// <see cref="CombatFeedbackBannerView"/> wired. Destroys a stale canvas (layout
+  /// version below <see cref="CastBarView.CurrentHudLayoutVersion"/>) and rebuilds.
+  /// Does not create an EventSystem (not needed for passive rendering).
   /// </summary>
   static void EnsureHudCanvas(NetworkRunner runner) {
-    if (FindHudCanvasDirectChild(runner) != null) {
-      return;
+    var existing = FindHudCanvasDirectChild(runner);
+    if (existing != null) {
+      var existingView = existing.GetComponent<CastBarView>();
+      if (existingView != null && existingView.UsesCurrentHudLayout) {
+        return;
+      }
+      // Stale layout — destroy so we can rebuild with the banner panel.
+      Undo.DestroyObjectImmediate(existing.gameObject);
     }
 
     Font uiFont = CastBarView.ResolveDefaultHudFont(26);
@@ -382,10 +389,16 @@ public static class ForbesFusionSharedSceneSetup {
     view.BindUi(panelGroup, fillImg, nameTxt);
     view.StampLayoutVersion(CastBarView.CurrentHudLayoutVersion);
 
+    var bannerView = CastBarView.BuildBannerPanel(canvasGo, uiFont);
+    Undo.RegisterCreatedObjectUndo(
+      bannerView.GetComponentInChildren<Text>()?.gameObject ?? canvasGo,
+      "BannerPanel Label");
+
     EditorUtility.SetDirty(view);
+    EditorUtility.SetDirty(bannerView);
     EditorUtility.SetDirty(canvasGo);
 
-    Debug.Log("ForbesFusionSharedSceneSetup: Created ForbesHudCanvas with CastBarView.");
+    Debug.Log("ForbesFusionSharedSceneSetup: Created ForbesHudCanvas with CastBarView and CombatFeedbackBannerView.");
   }
 
   static void StretchFull(RectTransform rt) {

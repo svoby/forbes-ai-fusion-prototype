@@ -15,7 +15,7 @@ public class CastBarView : MonoBehaviour {
   public const string HudCanvasChildName = "ForbesHudCanvas";
 
   /// <summary>Bump when default HUD geometry changes so <see cref="EnsureForRunner"/> can rebuild stale UI.</summary>
-  public const int CurrentHudLayoutVersion = 5;
+  public const int CurrentHudLayoutVersion = 6;
 
   public const float CastBarPanelWidth   = 640f;
   public const float CastBarPanelHeight = 112f;
@@ -230,7 +230,52 @@ public class CastBarView : MonoBehaviour {
     var view = canvasGo.AddComponent<CastBarView>();
     view.BindUi(panelGroup, fillImg, nameTxt);
     view.StampLayoutVersion(CurrentHudLayoutVersion);
+
+    BuildBannerPanel(canvasGo, uiFont);
     return view;
+  }
+
+  /// <summary>
+  /// Builds the WoW-style centered combat feedback banner panel under <paramref name="canvasGo"/>
+  /// and adds a wired <see cref="CombatFeedbackBannerView"/> to the canvas root.
+  /// Position: horizontally full-width, vertically centered at 1/φ² ≈ 38 % from top.
+  /// </summary>
+  public static CombatFeedbackBannerView BuildBannerPanel(GameObject canvasGo, Font uiFont) {
+    const float phi        = 1.618033988749f;
+    // 1/φ² ≈ 0.382 of reference height (1080) below the top edge.
+    const float yFromTop   = 1080f / (phi * phi); // ≈ 413 px
+
+    var bannerGo = new GameObject("BannerPanel");
+    bannerGo.transform.SetParent(canvasGo.transform, false);
+
+    var bannerRect   = bannerGo.AddComponent<RectTransform>();
+    bannerRect.anchorMin        = new Vector2(0f, 1f);
+    bannerRect.anchorMax        = new Vector2(1f, 1f);
+    bannerRect.pivot            = new Vector2(0.5f, 0.5f);
+    bannerRect.anchoredPosition = new Vector2(0f, -yFromTop);
+    bannerRect.sizeDelta        = new Vector2(0f, 60f);
+
+    var bannerGroup = bannerGo.AddComponent<CanvasGroup>();
+    bannerGroup.alpha          = 0f;
+    bannerGroup.blocksRaycasts = false;
+    bannerGroup.interactable   = false;
+
+    var labelGo = new GameObject("Label");
+    labelGo.transform.SetParent(bannerGo.transform, false);
+    StretchFull(labelGo.AddComponent<RectTransform>());
+
+    var labelText = labelGo.AddComponent<Text>();
+    StyleHudText(labelText, uiFont, 20, FontStyle.Bold, new Color(1f, 0.25f, 0.2f));
+    labelText.alignment = TextAnchor.MiddleCenter;
+    labelText.text      = "";
+
+    var shadow = labelGo.AddComponent<UnityEngine.UI.Shadow>();
+    shadow.effectColor    = new Color(0f, 0f, 0f, 0.82f);
+    shadow.effectDistance = new Vector2(2f, -2f);
+
+    var bannerView = canvasGo.AddComponent<CombatFeedbackBannerView>();
+    bannerView.BindUi(bannerGroup, labelText);
+    return bannerView;
   }
 
   static void StretchFull(RectTransform rt) {

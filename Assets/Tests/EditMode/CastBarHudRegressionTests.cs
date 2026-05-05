@@ -39,9 +39,9 @@ namespace Forbes.Tests.EditMode {
     }
 
     [Test]
-    public void CombatHud_DoesNotCallEnsureForRunner_DuplicateProvisioningRegresses() {
-      string src = ReadUtf8(Path.Combine("Assets", "Scripts", "UI", "CombatHud.cs"));
-      StringAssert.DoesNotContain("EnsureForRunner", src, "Cast bar must be created only from FusionHudToggle (one coroutine), not CombatHud.");
+    public void CombatFeedbackBannerView_DoesNotCallEnsureForRunner_DuplicateProvisioningRegresses() {
+      string src = ReadUtf8(Path.Combine("Assets", "Scripts", "UI", "CombatFeedbackBannerView.cs"));
+      StringAssert.DoesNotContain("EnsureForRunner", src, "Cast bar must be created only from FusionHudToggle (one coroutine), not CombatFeedbackBannerView.");
     }
 
     [Test]
