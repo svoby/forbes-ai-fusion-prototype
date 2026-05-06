@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// <see cref="NetworkCombatController"/>. No gameplay logic.
 /// </para>
 /// <para>
-/// Built and wired by <see cref="CastBarView.EnsureForRunner"/> at runtime, and by
+/// Built and wired by <see cref="RuntimeHudBootstrap.EnsureForRunner"/> at runtime, and by
 /// <c>ForbesFusionSharedSceneSetup.EnsureHudCanvas</c> in the Editor.
 /// </para>
 /// </summary>

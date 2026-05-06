@@ -41,6 +41,7 @@ Příklad rozdělení současné logiky:
 |-----------------|-------|----------|
 | `PlayerSpawner` | `Networking/` + tenké `Player/` spawn helper | Input latch může zůstat na spawneru nebo jít do `Core/InputLatch.cs` |
 | `PlayerMovement`, `Health` | `Player/` | Čisté C# `TargetSelector` / `SpellCast` jako služby volané z `FixedUpdateNetwork` |
+| `RuntimeHudBootstrap` | `UI/` | Vlastní runtime HUD canvas a skládá view komponenty |
 | `CombatFeedbackBannerView` | `UI/` | |
 
 ## Kdy založit nový soubor

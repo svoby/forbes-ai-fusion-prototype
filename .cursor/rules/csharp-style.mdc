@@ -11,3 +11,5 @@ alwaysApply: false
 - Use guard clauses for invalid states.
 - Avoid God classes; split by feature responsibility.
 - Prefer explicit fields/properties for gameplay-critical values.
+- Do not hide reusable helpers inside feature, scene setup, editor setup, or test fixture classes. If a helper is useful outside that one class, move it to a shared utility in the appropriate scope, for example `Assets/Editor/*Utility.cs` for editor-only helpers or a feature/shared runtime utility under `Assets/Scripts`.
+- Before adding a private `Ensure*`, `Find*`, `Build*`, or wiring helper, search for an existing shared helper and reuse or extend it when the behavior is general.

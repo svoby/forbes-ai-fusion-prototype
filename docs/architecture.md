@@ -67,7 +67,8 @@ Assets/Scripts/
 │   └── TrainingDummy.cs          — colours the dummy, ensures collider + Targetable exist
 │
 └── UI/
-    ├── CastBarView.cs            — Canvas cast-bar: progress, spell name, interrupt feedback
+    ├── RuntimeHudBootstrap.cs    — owns the runner-child runtime HUD canvas and wires HUD panels
+    ├── CastBarView.cs            — cast-bar presentation: progress, spell name, visibility
     ├── CombatFeedbackBannerView.cs — centered combat rejection / interrupt banner (reads local feedback fields)
     ├── FusionHudToggle.cs        — toggles Fusion stats overlay
     ├── SelectedTargetHealthBar.cs— world-space HP bar above the current target

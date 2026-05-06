@@ -33,16 +33,16 @@ public class FusionHudToggle : MonoBehaviour {
     if (_runner == null) {
       _runner = GetComponent<NetworkRunner>();
     }
-    StartCoroutine(EnsureCastBarAfterDestroyFlush());
+    StartCoroutine(EnsureRuntimeHudAfterDestroyFlush());
   }
 
   /// <summary>
   /// Wait one frame so queued <see cref="Object.Destroy"/> from HUD teardown completes before rebuilding;
-  /// same-frame Destroy+Create duplicates children and the wrong <see cref="CastBarView"/> can "win".
+  /// same-frame Destroy+Create duplicates children and the wrong HUD root can "win".
   /// </summary>
-  IEnumerator EnsureCastBarAfterDestroyFlush() {
+  IEnumerator EnsureRuntimeHudAfterDestroyFlush() {
     yield return null;
-    CastBarView.EnsureForRunner(_runner);
+    RuntimeHudBootstrap.EnsureForRunner(_runner);
   }
 
   void Update() {

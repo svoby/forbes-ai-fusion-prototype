@@ -31,8 +31,8 @@ Assets/Scripts/
   Player/          Health, HealthView, HitImpactView, KeyboardInputSource,
                    PlayerColor, PlayerMovement, ThirdPersonOrbitCamera
   Training/        TrainingDummy
-  UI/              CastBarView, CombatFeedbackBannerView, CombatWarningText, FloatingCombatTextCanvas,
-                   FloatingCombatTextItem, FloatingCombatTextLogic, FusionHudToggle,
+  UI/              RuntimeHudBootstrap, CastBarView, CombatFeedbackBannerView, CombatWarningText,
+                   FloatingCombatTextCanvas, FloatingCombatTextItem, FloatingCombatTextLogic, FusionHudToggle,
                    SelectedTargetHealthBar, TargetHealthBarLogic
 ```
 

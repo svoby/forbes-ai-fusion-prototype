@@ -139,17 +139,17 @@ public static class ForbesFusionSharedSceneSetup {
     }
 
     var go      = runner.gameObject;
-    var spawner = EnsureComponent<PlayerSpawner>(go);
-    EnsureComponent<KeyboardInputSource>(go);
-    EnsureComponent<FusionInputProvider>(go);
-    EnsureComponent<TargetingController>(go);
-    EnsureComponent<SelectedTargetHealthBar>(go);
-    var dummySpawner = EnsureComponent<TrainingDummySpawner>(go);
-    EnsureComponent<FusionHudToggle>(go);
+    var spawner = ForbesEditorObjectUtility.EnsureComponent<PlayerSpawner>(go);
+    ForbesEditorObjectUtility.EnsureComponent<KeyboardInputSource>(go);
+    ForbesEditorObjectUtility.EnsureComponent<FusionInputProvider>(go);
+    ForbesEditorObjectUtility.EnsureComponent<TargetingController>(go);
+    ForbesEditorObjectUtility.EnsureComponent<SelectedTargetHealthBar>(go);
+    var dummySpawner = ForbesEditorObjectUtility.EnsureComponent<TrainingDummySpawner>(go);
+    ForbesEditorObjectUtility.EnsureComponent<FusionHudToggle>(go);
     EnsureHudCanvas(runner);
 
-    WireAssetRef(spawner, "PlayerPrefab", PlayerPrefabPath);
-    WireAssetRef(dummySpawner, "TrainingDummyPrefab", TrainingDummyPrefabPath);
+    ForbesEditorObjectUtility.WireAssetRef(spawner, "PlayerPrefab", PlayerPrefabPath);
+    ForbesEditorObjectUtility.WireAssetRef(dummySpawner, "TrainingDummyPrefab", TrainingDummyPrefabPath);
   }
 
   /// <summary>
@@ -172,7 +172,7 @@ public static class ForbesFusionSharedSceneSetup {
       EditorUtility.SetDirty(go);
     }
 
-    EnsureComponent<ThirdPersonOrbitCamera>(go);
+    ForbesEditorObjectUtility.EnsureComponent<ThirdPersonOrbitCamera>(go);
     Debug.Log("ForbesFusionSharedSceneSetup: ThirdPersonOrbitCamera added to Main Camera.");
   }
 
@@ -275,7 +275,7 @@ public static class ForbesFusionSharedSceneSetup {
     Transform t = runner.transform;
     for (var i = 0; i < t.childCount; i++) {
       Transform c = t.GetChild(i);
-      if (c != null && c.name == CastBarView.HudCanvasChildName) {
+      if (c != null && c.name == RuntimeHudBootstrap.HudCanvasChildName) {
         return c;
       }
     }
@@ -284,16 +284,15 @@ public static class ForbesFusionSharedSceneSetup {
   }
 
   /// <summary>
-  /// One overlay canvas under the runner with <see cref="CastBarView"/> and
-  /// <see cref="CombatFeedbackBannerView"/> wired. Destroys a stale canvas (layout
-  /// version below <see cref="CastBarView.CurrentHudLayoutVersion"/>) and rebuilds.
+  /// One overlay canvas under the runner with the runtime HUD root and player-facing
+  /// HUD views wired. Destroys a stale canvas and rebuilds.
   /// Does not create an EventSystem (not needed for passive rendering).
   /// </summary>
   static void EnsureHudCanvas(NetworkRunner runner) {
     var existing = FindHudCanvasDirectChild(runner);
     if (existing != null) {
-      var existingView = existing.GetComponent<CastBarView>();
-      if (existingView != null && existingView.UsesCurrentHudLayout) {
+      var existingHud = existing.GetComponent<RuntimeHudBootstrap>();
+      if (existingHud != null && existingHud.UsesCurrentHudLayout) {
         return;
       }
       // Stale layout — destroy so we can rebuild with the banner panel.
@@ -308,7 +307,7 @@ public static class ForbesFusionSharedSceneSetup {
       new Vector2(0.5f, 0.5f),
       100f);
 
-    GameObject canvasGo = new GameObject(CastBarView.HudCanvasChildName);
+    GameObject canvasGo = new GameObject(RuntimeHudBootstrap.HudCanvasChildName);
     Undo.RegisterCreatedObjectUndo(canvasGo, "Forbes HUD Canvas");
     canvasGo.transform.SetParent(runner.transform, false);
 
@@ -323,123 +322,19 @@ public static class ForbesFusionSharedSceneSetup {
     scaler.referencePixelsPerUnit = 100f;
     canvasGo.AddComponent<GraphicRaycaster>();
 
-    GameObject panel = new GameObject("CastBarPanel");
-    Undo.RegisterCreatedObjectUndo(panel, "CastBarPanel");
-    panel.transform.SetParent(canvasGo.transform, false);
-    var panelRect = panel.AddComponent<RectTransform>();
-    panelRect.anchorMin = new Vector2(0.5f, 0f);
-    panelRect.anchorMax = new Vector2(0.5f, 0f);
-    panelRect.pivot = new Vector2(0.5f, 0f);
-    panelRect.anchoredPosition = new Vector2(0f, CastBarView.CastBarLiftFromBottomPx);
-    panelRect.sizeDelta = new Vector2(CastBarView.CastBarPanelWidth, CastBarView.CastBarPanelHeight);
-    var panelGroup = panel.AddComponent<CanvasGroup>();
-    panelGroup.alpha = 0f;
-    panelGroup.blocksRaycasts = false;
+    var hud = canvasGo.AddComponent<RuntimeHudBootstrap>();
+    hud.StampLayoutVersion(RuntimeHudBootstrap.CurrentHudLayoutVersion);
 
-    var bg = new GameObject("Background");
-    Undo.RegisterCreatedObjectUndo(bg, "CastBar Background");
-    bg.transform.SetParent(panel.transform, false);
-    var bgRt = bg.AddComponent<RectTransform>();
-    StretchFull(bgRt);
-    var bgImg = bg.AddComponent<Image>();
-    bgImg.sprite = white;
-    bgImg.color = new Color(0.12f, 0.12f, 0.14f, 0.95f);
+    var view = RuntimeHudBootstrap.BuildCastBarPanel(canvasGo, uiFont, white);
+    var bannerView = RuntimeHudBootstrap.BuildBannerPanel(canvasGo, uiFont);
 
-    var nameGo = new GameObject("SpellName");
-    Undo.RegisterCreatedObjectUndo(nameGo, "CastBar SpellName");
-    nameGo.transform.SetParent(panel.transform, false);
-    var nameRt = nameGo.AddComponent<RectTransform>();
-    nameRt.anchorMin = new Vector2(0f, 1f);
-    nameRt.anchorMax = new Vector2(1f, 1f);
-    nameRt.pivot = new Vector2(0.5f, 1f);
-    nameRt.anchoredPosition = new Vector2(0f, -6f);
-    nameRt.sizeDelta = new Vector2(-24f, 40f);
-    var nameTxt = nameGo.AddComponent<Text>();
-    CastBarView.StyleHudText(nameTxt, uiFont, 26, FontStyle.Bold, Color.white);
-    nameTxt.alignment = TextAnchor.MiddleCenter;
-    nameTxt.text = "";
-
-    var trackGo = new GameObject("FillTrack");
-    Undo.RegisterCreatedObjectUndo(trackGo, "CastBar FillTrack");
-    trackGo.transform.SetParent(panel.transform, false);
-    var trackRt = trackGo.AddComponent<RectTransform>();
-    trackRt.anchorMin = new Vector2(0f, 0f);
-    trackRt.anchorMax = new Vector2(1f, 0f);
-    trackRt.pivot = new Vector2(0.5f, 0f);
-    trackRt.anchoredPosition = new Vector2(0f, 20f);
-    trackRt.sizeDelta = new Vector2(-24f, 30f);
-    var trackImg = trackGo.AddComponent<Image>();
-    trackImg.sprite = white;
-    trackImg.color = new Color(0.06f, 0.06f, 0.08f, 1f);
-
-    var fillGo = new GameObject("Fill");
-    Undo.RegisterCreatedObjectUndo(fillGo, "CastBar Fill");
-    fillGo.transform.SetParent(trackGo.transform, false);
-    var fillRt = fillGo.AddComponent<RectTransform>();
-    StretchFull(fillRt);
-    var fillImg = fillGo.AddComponent<Image>();
-    fillImg.sprite = white;
-    fillImg.type = Image.Type.Filled;
-    fillImg.fillMethod = Image.FillMethod.Horizontal;
-    fillImg.fillOrigin = 0;
-    fillImg.color = new Color(0.85f, 0.45f, 0.12f, 1f);
-    fillImg.fillAmount = 0f;
-
-    var view = canvasGo.AddComponent<CastBarView>();
-    view.BindUi(panelGroup, fillImg, nameTxt);
-    view.StampLayoutVersion(CastBarView.CurrentHudLayoutVersion);
-
-    var bannerView = CastBarView.BuildBannerPanel(canvasGo, uiFont);
-    Undo.RegisterCreatedObjectUndo(
-      bannerView.GetComponentInChildren<Text>()?.gameObject ?? canvasGo,
-      "BannerPanel Label");
-
+    EditorUtility.SetDirty(hud);
     EditorUtility.SetDirty(view);
     EditorUtility.SetDirty(bannerView);
     EditorUtility.SetDirty(canvasGo);
 
-    Debug.Log("ForbesFusionSharedSceneSetup: Created ForbesHudCanvas with CastBarView and CombatFeedbackBannerView.");
+    Debug.Log("ForbesFusionSharedSceneSetup: Created ForbesHudCanvas with RuntimeHudBootstrap, CastBarView, and CombatFeedbackBannerView.");
   }
 
-  static void StretchFull(RectTransform rt) {
-    rt.anchorMin = Vector2.zero;
-    rt.anchorMax = Vector2.one;
-    rt.pivot = new Vector2(0.5f, 0.5f);
-    rt.offsetMin = Vector2.zero;
-    rt.offsetMax = Vector2.zero;
-    rt.localScale = Vector3.one;
-  }
-
-  // -----------------------------------------------------------------------
-  //  Utilities
-  // -----------------------------------------------------------------------
-
-  static T EnsureComponent<T>(GameObject go) where T : Component {
-    var c = go.GetComponent<T>();
-    if (c == null) {
-      c = Undo.AddComponent<T>(go);
-    }
-
-    return c;
-  }
-
-  static void WireAssetRef<T>(T component, string propertyName, string assetPath) where T : Object {
-    var asset = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
-    if (asset == null) {
-      Debug.LogWarning($"ForbesFusionSharedSceneSetup: Asset not found at {assetPath} — wire {propertyName} manually.");
-      return;
-    }
-
-    var so   = new SerializedObject(component);
-    var prop = so.FindProperty(propertyName);
-    if (prop == null) {
-      Debug.LogWarning($"ForbesFusionSharedSceneSetup: Property '{propertyName}' not found on {typeof(T).Name}.");
-      return;
-    }
-
-    prop.objectReferenceValue = asset;
-    so.ApplyModifiedPropertiesWithoutUndo();
-    EditorUtility.SetDirty(component);
-  }
 }
 #endif

@@ -17,8 +17,8 @@ namespace Forbes.Tests.EditMode {
     [Test]
     public void HudLayoutVersion_Monotonic() {
       Assert.IsTrue(
-        CastBarView.CurrentHudLayoutVersion >= 5,
-        "When geometry changes bump version so EnsureForRunner can recreate HUD.");
+        RuntimeHudBootstrap.CurrentHudLayoutVersion >= 5,
+        "When geometry changes bump version so RuntimeHudBootstrap can recreate HUD.");
     }
   }
 }

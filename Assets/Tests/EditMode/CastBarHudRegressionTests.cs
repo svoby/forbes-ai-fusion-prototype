@@ -35,29 +35,36 @@ namespace Forbes.Tests.EditMode {
 
     [Test]
     public void EnsureForRunner_ReturnsNullWhenRunnerNull() {
-      Assert.IsNull(CastBarView.EnsureForRunner(null));
+      Assert.IsNull(RuntimeHudBootstrap.EnsureForRunner(null));
     }
 
     [Test]
     public void CombatFeedbackBannerView_DoesNotCallEnsureForRunner_DuplicateProvisioningRegresses() {
       string src = ReadUtf8(Path.Combine("Assets", "Scripts", "UI", "CombatFeedbackBannerView.cs"));
-      StringAssert.DoesNotContain("EnsureForRunner", src, "Cast bar must be created only from FusionHudToggle (one coroutine), not CombatFeedbackBannerView.");
+      StringAssert.DoesNotContain("EnsureForRunner", src, "Runtime HUD must be created only from FusionHudToggle (one coroutine), not CombatFeedbackBannerView.");
+    }
+
+    [Test]
+    public void CastBarView_DoesNotOwnRuntimeHudCanvas() {
+      string src = ReadUtf8(Path.Combine("Assets", "Scripts", "UI", "CastBarView.cs"));
+      StringAssert.DoesNotContain("ForbesHudCanvas", src, "CastBarView should only present casting state, not own the HUD canvas.");
+      StringAssert.DoesNotContain("EnsureForRunner", src, "CastBarView should not provision the runtime HUD.");
     }
 
     [Test]
     public void FusionHudToggle_InvokesEnsureForRunnerOnce() {
       string src = ReadUtf8(Path.Combine("Assets", "Scripts", "UI", "FusionHudToggle.cs"));
-      int n = Regex.Matches(src, @"\bCastBarView\.EnsureForRunner\s*\(").Count;
+      int n = Regex.Matches(src, @"\bRuntimeHudBootstrap\.EnsureForRunner\s*\(").Count;
       Assert.AreEqual(1, n, "Single post-yield call keeps one Destroy/Create ordering; duplicate sites race.");
     }
 
     [Test]
-    public void CastBarView_EnsureForRunner_InvokedOnlyFromFusionHudToggleInScriptsTree() {
+    public void RuntimeHudBootstrap_EnsureForRunner_InvokedOnlyFromFusionHudToggleInScriptsTree() {
       string scripts = Path.Combine(ProjectRoot(), "Assets", "Scripts");
-      var rx = new Regex(@"\bCastBarView\.EnsureForRunner\s*\(", RegexOptions.Compiled);
+      var rx = new Regex(@"\bRuntimeHudBootstrap\.EnsureForRunner\s*\(", RegexOptions.Compiled);
       foreach (var file in Directory.EnumerateFiles(scripts, "*.cs", SearchOption.AllDirectories)) {
         string rel = file.Substring(ProjectRoot().Length).Replace('\\', '/');
-        if (rel.EndsWith("/CastBarView.cs")) {
+        if (rel.EndsWith("/RuntimeHudBootstrap.cs")) {
           continue;
         }
 
@@ -68,7 +75,7 @@ namespace Forbes.Tests.EditMode {
 
         Assert.IsTrue(
           rel.Replace('\\', '/').EndsWith("/UI/FusionHudToggle.cs"),
-          $"CastBarView.EnsureForRunner must stay on FusionHudToggle only (found in {rel}).");
+          $"RuntimeHudBootstrap.EnsureForRunner must stay on FusionHudToggle only (found in {rel}).");
       }
     }
 

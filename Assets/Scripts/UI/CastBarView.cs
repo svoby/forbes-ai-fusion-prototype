@@ -5,25 +5,13 @@ using UnityEngine.UI;
 /// <summary>
 /// WoW-like cast bar for the local player's <see cref="NetworkCombatController"/>.
 /// Presentation-only: reads networked cast ticks and hides for instant casts.
-/// <para>
-/// At runtime, <see cref="EnsureForRunner"/> builds the canvas under the
-/// <see cref="NetworkRunner"/> if none exists (so play mode works without re-running
-/// the editor scene setup menu).
-/// </para>
 /// </summary>
 public class CastBarView : MonoBehaviour {
-  public const string HudCanvasChildName = "ForbesHudCanvas";
-
-  /// <summary>Bump when default HUD geometry changes so <see cref="EnsureForRunner"/> can rebuild stale UI.</summary>
-  public const int CurrentHudLayoutVersion = 6;
-
   public const float CastBarPanelWidth   = 640f;
   public const float CastBarPanelHeight = 112f;
 
   /// <summary>Pixels above screen bottom for bottom-anchored cast bar pivot (WoW-like: above thumb / action-bar zone).</summary>
   public const float CastBarLiftFromBottomPx = 172f;
-
-  [SerializeField] int _builtLayoutVersion;
 
   [SerializeField] CanvasGroup _rootGroup;
 
@@ -41,18 +29,11 @@ public class CastBarView : MonoBehaviour {
   /// <summary>True when editor or <see cref="BindUi"/> wired the bar.</summary>
   public bool IsUiBound => _rootGroup != null && _fillImage != null;
 
-  /// <summary>Ready to use built-in HUD geometry (used to skip nuking/recreating unnecessarily).</summary>
-  public bool UsesCurrentHudLayout => IsUiBound && _builtLayoutVersion >= CurrentHudLayoutVersion;
-
   /// <summary>Wires UI built in code or from the editor setup tool.</summary>
   public void BindUi(CanvasGroup rootGroup, Image fillImage, Text spellNameText) {
     _rootGroup      = rootGroup;
     _fillImage      = fillImage;
     _spellNameText  = spellNameText;
-  }
-
-  public void StampLayoutVersion(int version) {
-    _builtLayoutVersion = version;
   }
 
   public const string BundledHudFontResourcesPath = "ForbesHud/NotoSans-Regular";
@@ -112,179 +93,6 @@ public class CastBarView : MonoBehaviour {
     t.alignByGeometry     = false;
     t.color               = color;
     t.raycastTarget       = false;
-  }
-
-  /// <summary>
-  /// Ensures a cast bar exists under <paramref name="runner"/>; creates UI if missing.
-  /// Call from the next frame (e.g. after <c>yield return null</c>) if replacing an existing HUD,
-  /// so Unity can finish queued <see cref="Object.Destroy"/> calls first.
-  /// </summary>
-  public static CastBarView EnsureForRunner(NetworkRunner runner) {
-    if (runner == null) {
-      return null;
-    }
-
-    foreach (var v in runner.GetComponentsInChildren<CastBarView>(true)) {
-      if (v != null && v.UsesCurrentHudLayout) {
-        return v;
-      }
-    }
-
-    DestroyAllHudCanvasesUnderRunner(runner);
-    return CreateHudUnderRunner(runner);
-  }
-
-  /// <summary>Removes all direct child canvases matching <see cref="HudCanvasChildName"/>.</summary>
-  public static void DestroyAllHudCanvasesUnderRunner(NetworkRunner runner) {
-    if (runner == null) {
-      return;
-    }
-
-    Transform t = runner.transform;
-    for (int i = t.childCount - 1; i >= 0; --i) {
-      Transform c = t.GetChild(i);
-      if (c != null && c.name == HudCanvasChildName) {
-        Object.Destroy(c.gameObject);
-      }
-    }
-  }
-
-  static CastBarView CreateHudUnderRunner(NetworkRunner runner) {
-    Font uiFont = ResolveDefaultHudFont(26);
-
-    Sprite white = Sprite.Create(
-      Texture2D.whiteTexture,
-      new Rect(0f, 0f, Texture2D.whiteTexture.width, Texture2D.whiteTexture.height),
-      new Vector2(0.5f, 0.5f),
-      100f);
-
-    GameObject canvasGo = new GameObject(HudCanvasChildName);
-    canvasGo.transform.SetParent(runner.transform, false);
-
-    var canvas = canvasGo.AddComponent<Canvas>();
-    canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-    canvas.sortingOrder = 1000;
-
-    var scaler = canvasGo.AddComponent<CanvasScaler>();
-    scaler.uiScaleMode           = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-    scaler.referenceResolution   = new Vector2(1920f, 1080f);
-    scaler.matchWidthOrHeight    = 0.5f;
-    scaler.referencePixelsPerUnit = 100f;
-    canvasGo.AddComponent<GraphicRaycaster>();
-
-    GameObject panel = new GameObject("CastBarPanel");
-    panel.transform.SetParent(canvasGo.transform, false);
-    var panelRect = panel.AddComponent<RectTransform>();
-    panelRect.anchorMin = new Vector2(0.5f, 0f);
-    panelRect.anchorMax = new Vector2(0.5f, 0f);
-    panelRect.pivot = new Vector2(0.5f, 0f);
-    panelRect.anchoredPosition = new Vector2(0f, CastBarLiftFromBottomPx);
-    panelRect.sizeDelta = new Vector2(CastBarPanelWidth, CastBarPanelHeight);
-    var panelGroup = panel.AddComponent<CanvasGroup>();
-    panelGroup.alpha = 0f;
-    panelGroup.blocksRaycasts = false;
-
-    var bg = new GameObject("Background");
-    bg.transform.SetParent(panel.transform, false);
-    StretchFull(bg.AddComponent<RectTransform>());
-    var bgImg = bg.AddComponent<Image>();
-    bgImg.sprite = white;
-    bgImg.color = new Color(0.12f, 0.12f, 0.14f, 0.95f);
-
-    var nameGo = new GameObject("SpellName");
-    nameGo.transform.SetParent(panel.transform, false);
-    var nameRt = nameGo.AddComponent<RectTransform>();
-    nameRt.anchorMin = new Vector2(0f, 1f);
-    nameRt.anchorMax = new Vector2(1f, 1f);
-    nameRt.pivot = new Vector2(0.5f, 1f);
-    nameRt.anchoredPosition = new Vector2(0f, -6f);
-    nameRt.sizeDelta = new Vector2(-24f, 40f);
-    var nameTxt = nameGo.AddComponent<Text>();
-    StyleHudText(nameTxt, uiFont, 26, FontStyle.Bold, Color.white);
-    nameTxt.alignment = TextAnchor.MiddleCenter;
-    nameTxt.text      = "";
-
-    var trackGo = new GameObject("FillTrack");
-    trackGo.transform.SetParent(panel.transform, false);
-    var trackRt = trackGo.AddComponent<RectTransform>();
-    trackRt.anchorMin = new Vector2(0f, 0f);
-    trackRt.anchorMax = new Vector2(1f, 0f);
-    trackRt.pivot = new Vector2(0.5f, 0f);
-    trackRt.anchoredPosition = new Vector2(0f, 20f);
-    trackRt.sizeDelta = new Vector2(-24f, 30f);
-    var trackImg = trackGo.AddComponent<Image>();
-    trackImg.sprite = white;
-    trackImg.color = new Color(0.06f, 0.06f, 0.08f, 1f);
-
-    var fillGo = new GameObject("Fill");
-    fillGo.transform.SetParent(trackGo.transform, false);
-    StretchFull(fillGo.AddComponent<RectTransform>());
-    var fillImg = fillGo.AddComponent<Image>();
-    fillImg.sprite = white;
-    fillImg.type = Image.Type.Filled;
-    fillImg.fillMethod = Image.FillMethod.Horizontal;
-    fillImg.fillOrigin = 0;
-    fillImg.color = new Color(0.85f, 0.45f, 0.12f, 1f);
-    fillImg.fillAmount = 0f;
-
-    var view = canvasGo.AddComponent<CastBarView>();
-    view.BindUi(panelGroup, fillImg, nameTxt);
-    view.StampLayoutVersion(CurrentHudLayoutVersion);
-
-    BuildBannerPanel(canvasGo, uiFont);
-    return view;
-  }
-
-  /// <summary>
-  /// Builds the WoW-style centered combat feedback banner panel under <paramref name="canvasGo"/>
-  /// and adds a wired <see cref="CombatFeedbackBannerView"/> to the canvas root.
-  /// Position: horizontally full-width, vertically centered at 1/φ² ≈ 38 % from top.
-  /// </summary>
-  public static CombatFeedbackBannerView BuildBannerPanel(GameObject canvasGo, Font uiFont) {
-    const float phi        = 1.618033988749f;
-    // 1/φ² ≈ 0.382 of reference height (1080) below the top edge.
-    const float yFromTop   = 1080f / (phi * phi); // ≈ 413 px
-
-    var bannerGo = new GameObject("BannerPanel");
-    bannerGo.transform.SetParent(canvasGo.transform, false);
-
-    var bannerRect   = bannerGo.AddComponent<RectTransform>();
-    bannerRect.anchorMin        = new Vector2(0f, 1f);
-    bannerRect.anchorMax        = new Vector2(1f, 1f);
-    bannerRect.pivot            = new Vector2(0.5f, 0.5f);
-    bannerRect.anchoredPosition = new Vector2(0f, -yFromTop);
-    bannerRect.sizeDelta        = new Vector2(0f, 60f);
-
-    var bannerGroup = bannerGo.AddComponent<CanvasGroup>();
-    bannerGroup.alpha          = 0f;
-    bannerGroup.blocksRaycasts = false;
-    bannerGroup.interactable   = false;
-
-    var labelGo = new GameObject("Label");
-    labelGo.transform.SetParent(bannerGo.transform, false);
-    StretchFull(labelGo.AddComponent<RectTransform>());
-
-    var labelText = labelGo.AddComponent<Text>();
-    StyleHudText(labelText, uiFont, 20, FontStyle.Bold, new Color(1f, 0.25f, 0.2f));
-    labelText.alignment = TextAnchor.MiddleCenter;
-    labelText.text      = "";
-
-    var shadow = labelGo.AddComponent<UnityEngine.UI.Shadow>();
-    shadow.effectColor    = new Color(0f, 0f, 0f, 0.82f);
-    shadow.effectDistance = new Vector2(2f, -2f);
-
-    var bannerView = canvasGo.AddComponent<CombatFeedbackBannerView>();
-    bannerView.BindUi(bannerGroup, labelText);
-    return bannerView;
-  }
-
-  static void StretchFull(RectTransform rt) {
-    rt.anchorMin = Vector2.zero;
-    rt.anchorMax = Vector2.one;
-    rt.pivot = new Vector2(0.5f, 0.5f);
-    rt.offsetMin = Vector2.zero;
-    rt.offsetMax = Vector2.zero;
-    rt.localScale = Vector3.one;
   }
 
   void Awake() {
