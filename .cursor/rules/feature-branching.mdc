@@ -10,13 +10,21 @@ alwaysApply: true
 The agent **must never** create, checkout, or switch branches on its own.
 Work on whatever branch is currently active. If a branch change is needed, ask the user explicitly.
 
+But at the very beginning of the session, the agent should create a new branch for the current task.
+
+Branch name convention:
+- `feat/<task-name>` - for new features
+- `fix/<task-name>` - for bug fixes
+- `chore/<task-name>` - for chores and refactors
+- `test/<task-name>` - for test-only changes
+
 ## Commit policy — stage only, never commit
 
 The agent **must never run `git commit`**. Instead:
 
 1. Stage all relevant files with `git add`.
-2. Write the intended commit message to `.git/COMMIT_EDITMSG` so it appears pre-filled in the Source Control panel.
-3. Leave the working tree staged-but-uncommitted; the user commits from the UI.
+2. Write the intended commit message to `.git/COMMIT_EDITMSG`.
+3. Leave the working tree staged-but-uncommitted;
 
 Commit message prefix conventions (for `COMMIT_EDITMSG`):
 
