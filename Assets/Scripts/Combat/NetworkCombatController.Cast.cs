@@ -45,20 +45,30 @@ public partial class NetworkCombatController {
     ForbesLog.Net($"Cast cancelled: {reason}", this);
   }
 
-  void TryCastOrInterrupt(byte spellId, NetworkId targetId) {
+  /// <summary>
+  /// Request-level authoritative cast API shared by player input today and
+  /// future AI/mob casters. This refactor keeps NetworkCombatController as the
+  /// combat owner; it does not introduce a new combat system.
+  /// </summary>
+  public bool TryRequestCast(byte spellId, NetworkId targetId) {
+    if (!HasStateAuthority || Runner == null) {
+      return false;
+    }
+
     if (IsCasting) {
       if (CurrentSpellId == spellId) {
-        return;
+        return false;
       }
       TryCancelCast(CastCancelReason.NewSpell);
     }
-    TryStartCast(spellId, targetId);
+
+    return TryStartCast(spellId, targetId);
   }
 
-  void TryStartCast(byte spellId, NetworkId targetId) {
+  bool TryStartCast(byte spellId, NetworkId targetId) {
     var spell = SpellRegistry.Get(spellId);
     if (!spell.IsValid) {
-      return;
+      return false;
     }
 
     int cooldownEnd = GetCooldownEndTick(spellId);
@@ -70,7 +80,7 @@ public partial class NetworkCombatController {
           out var targetHealth, out var failReason)) {
       SetCombatFeedback(CombatFeedbackReasonMapping.FromValidatorFailure(failReason));
       ForbesLog.Net($"Cast rejected: {failReason} spell={spell.Name}", this);
-      return;
+      return false;
     }
 
     int castTicks = SecsToTicks(spell.CastTimeSec);
@@ -97,6 +107,8 @@ public partial class NetworkCombatController {
       CastEndTick    = Runner.Tick + castTicks;
       ForbesLog.Net($"Cast started: {spell.Name} castTicks={castTicks}", this);
     }
+
+    return true;
   }
 
   void ResolveCast() {

@@ -118,16 +118,7 @@ public partial class NetworkCombatController : NetworkBehaviour {
       return;
     }
 
-    if (_health != null && _health.IsDead) {
-      TryCancelCast(CastCancelReason.Death);
-      return;
-    }
-
-    TryResolvePendingImpact();
-
-    // Resolve a cast-time spell when the timer expires.
-    if (CurrentSpellId != 0 && Runner.Tick >= CastEndTick) {
-      ResolveCast();
+    if (!TickCombatRuntime()) {
       return;
     }
 
@@ -135,6 +126,29 @@ public partial class NetworkCombatController : NetworkBehaviour {
       return;
     }
 
+    ProcessPlayerInput(input);
+  }
+
+  // Runtime spell work is intentionally separate from player input dispatch so
+  // future AI/mob casters can request casts without becoming a second combat system.
+  bool TickCombatRuntime() {
+    if (_health != null && _health.IsDead) {
+      TryCancelCast(CastCancelReason.Death);
+      return false;
+    }
+
+    TryResolvePendingImpact();
+
+    // Resolve a cast-time spell when the timer expires.
+    if (CurrentSpellId != 0 && Runner.Tick >= CastEndTick) {
+      ResolveCast();
+      return false;
+    }
+
+    return true;
+  }
+
+  void ProcessPlayerInput(GameplayInput input) {
     if (IsCasting) {
       if (input.Move.sqrMagnitude > MovementCancelSqr) {
         TryCancelCast(CastCancelReason.Movement);
@@ -155,15 +169,33 @@ public partial class NetworkCombatController : NetworkBehaviour {
     }
 
     // ── INPUT DISPATCH ───────────────────────────────────────────────────────
-    if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell1)) {
-      TryCastOrInterrupt(1, input.TargetId);
-    } else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell2)) {
-      TryCastOrInterrupt(2, input.TargetId);
-    } else if (input.Buttons.WasPressed(_prevButtons, (int)GameplayButtons.Spell3)) {
-      TryCastOrInterrupt(3, input.TargetId);
+    if (TryGetPressedPlayerSpell(input.Buttons, _prevButtons, out byte requestedSpellId)) {
+      TryRequestCast(requestedSpellId, input.TargetId);
     }
 
     _prevButtons = input.Buttons;
+  }
+
+  // Player-specific button mapping. Combat runtime consumes spell IDs so AI/mob
+  // casters can later call TryRequestCast directly without depending on input enums.
+  static bool TryGetPressedPlayerSpell(NetworkButtons buttons, NetworkButtons previousButtons, out byte spellId) {
+    if (buttons.WasPressed(previousButtons, (int)GameplayButtons.Spell1)) {
+      spellId = 1;
+      return true;
+    }
+
+    if (buttons.WasPressed(previousButtons, (int)GameplayButtons.Spell2)) {
+      spellId = 2;
+      return true;
+    }
+
+    if (buttons.WasPressed(previousButtons, (int)GameplayButtons.Spell3)) {
+      spellId = 3;
+      return true;
+    }
+
+    spellId = 0;
+    return false;
   }
 
   /// <summary>
