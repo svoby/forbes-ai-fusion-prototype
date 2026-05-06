@@ -31,7 +31,7 @@ Assets/Scripts/
   Player/          Health, HealthView, HitImpactView, KeyboardInputSource,
                    PlayerColor, PlayerMovement, ThirdPersonOrbitCamera
   Training/        TrainingDummy
-  UI/              CastBarView, CombatHud, CombatWarningText, FloatingCombatTextCanvas,
+  UI/              CastBarView, CombatFeedbackBannerView, CombatWarningText, FloatingCombatTextCanvas,
                    FloatingCombatTextItem, FloatingCombatTextLogic, FusionHudToggle,
                    SelectedTargetHealthBar, TargetHealthBarLogic
 ```
@@ -40,7 +40,7 @@ Assets/Scripts/
 
 **EditMode** (`Forbes.Tests.EditMode`) — pure logic, no runner:
 - `CombatValidatorPureTests`, `CombatFailReasonEnumTests`
-- `CombatFeedbackReasonEnumTests`, `CombatFeedbackMappingTests`, `CombatHudFeedbackVisibilityTests`, `MidCastCancelPolicyTests`
+- `CombatFeedbackReasonEnumTests`, `CombatFeedbackMappingTests`, `CombatFeedbackBannerVisibilityTests`, `MidCastCancelPolicyTests`
 - `CombatHitEventTests`
 - `CombatWarningTextTests`
 - `NetworkCombatSecsToTicksTests`

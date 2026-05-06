@@ -13,6 +13,7 @@ namespace Forbes.Tests.EditMode {
     [TestCase(CombatFeedbackReason.OutOfRange,                   "Out of range")]
     [TestCase(CombatFeedbackReason.TargetDead,                   "Target is dead")]
     [TestCase(CombatFeedbackReason.OnCooldown,                   "Spell is on cooldown")]
+    [TestCase(CombatFeedbackReason.GcdActive,                    "Spell not ready")]
     [TestCase(CombatFeedbackReason.AlreadyCasting,               "Already casting")]
     [TestCase(CombatFeedbackReason.CastInterruptedByDeath,       "Interrupted: you died")]
     [TestCase(CombatFeedbackReason.CastInterruptedInvalidTarget, "Interrupted: target lost")]

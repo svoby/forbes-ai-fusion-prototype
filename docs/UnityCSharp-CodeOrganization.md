@@ -16,7 +16,7 @@ Photon Fusion: **[Fusion dokumentace / tutoriály](https://doc.photonengine.com/
 
 - **Jedna hlavní odpovědnost** na třídu (už v `.cursor/rules/unity-architecture.mdc`).
 - **NetworkBehaviour zůstává tenký**: čte vstup, volá služby, synchronizuje stav; složitá pravidla dej do plain C# tříd (bez `MonoBehaviour`), které lze unit-testovat mimo Play Mode, kde to dává smysl.
-- **UI odděleně** od spawnu / sítě (`CombatHud` nesmí řídit gameplay).
+- **UI odděleně** od spawnu / sítě (HUD view třídy jako `CombatFeedbackBannerView` nesmí řídit gameplay).
 - **Editor-only kód** jen za `#if UNITY_EDITOR` nebo v `Assets/.../Editor/` s vlastním `.asmdef`, ať se nedostane do buildu.
 
 ## Návrh stromu pro `Assets/Scripts` (postupná migrace)
@@ -41,7 +41,7 @@ Příklad rozdělení současné logiky:
 |-----------------|-------|----------|
 | `PlayerSpawner` | `Networking/` + tenké `Player/` spawn helper | Input latch může zůstat na spawneru nebo jít do `Core/InputLatch.cs` |
 | `PlayerMovement`, `Health` | `Player/` | Čisté C# `TargetSelector` / `SpellCast` jako služby volané z `FixedUpdateNetwork` |
-| `CombatHud` | `UI/` | |
+| `CombatFeedbackBannerView` | `UI/` | |
 
 ## Kdy založit nový soubor
 

@@ -67,12 +67,11 @@ public class CombatFeedbackBannerView : MonoBehaviour {
 
   /// <summary>
   /// Reasons not shown as the centered banner:
-  /// GCD is indicated by the GCD bar; caster-death is not a cast "error" in the WoW sense;
+  /// caster-death is not a cast "error" in the WoW sense;
   /// NewSpell interruption is silent from the player's perspective.
   /// </summary>
   internal static bool ShouldShowCombatFeedbackInBanner(CombatFeedbackReason reason) {
     return reason != CombatFeedbackReason.None
-           && reason != CombatFeedbackReason.GcdActive
            && reason != CombatFeedbackReason.CasterDead
            && reason != CombatFeedbackReason.CastInterruptedByNewSpell;
   }

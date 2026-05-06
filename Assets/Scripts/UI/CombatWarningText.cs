@@ -2,9 +2,8 @@
 /// Pure static mapping from <see cref="CombatFeedbackReason"/> to a short player-facing
 /// warning string displayed in the central combat banner.
 /// <para>
-/// No runtime state, no <see cref="UnityEngine.MonoBehaviour"/>, no Fusion dependency.
-/// Kept separate from <see cref="CombatHud"/> so the mapping is testable in EditMode
-/// without a scene or runner.
+/// No runtime state, no <see cref="UnityEngine.MonoBehaviour"/>, no Fusion dependency —
+/// the mapping is unit-testable in EditMode without a scene or runner.
 /// </para>
 /// </summary>
 public static class CombatWarningText {

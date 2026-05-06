@@ -45,7 +45,7 @@ namespace Forbes.Tests.EditMode {
   }
 
   [TestFixture]
-  public class CombatHudFeedbackVisibilityTests {
+  public class CombatFeedbackBannerVisibilityTests {
     [Test]
     public void IsFeedbackLineVisible_True_WhenWithinTwoSeconds() {
       float dt = 1f / 60f;
@@ -58,7 +58,7 @@ namespace Forbes.Tests.EditMode {
     }
 
     [TestCase(CombatFeedbackReason.None,                      false)]
-    [TestCase(CombatFeedbackReason.GcdActive,                  false)]
+    [TestCase(CombatFeedbackReason.GcdActive,                  true)]
     [TestCase(CombatFeedbackReason.CasterDead,                 false)]
     [TestCase(CombatFeedbackReason.CastInterruptedByNewSpell,  false)]
     [TestCase(CombatFeedbackReason.NoTarget,                   true)]

@@ -68,7 +68,7 @@ Assets/Scripts/
 │
 └── UI/
     ├── CastBarView.cs            — Canvas cast-bar: progress, spell name, interrupt feedback
-    ├── CombatHud.cs              — IMGUI debug overlay (legacy; coexists with Canvas UI)
+    ├── CombatFeedbackBannerView.cs — centered combat rejection / interrupt banner (reads local feedback fields)
     ├── FusionHudToggle.cs        — toggles Fusion stats overlay
     ├── SelectedTargetHealthBar.cs— world-space HP bar above the current target
     ├── TargetHealthBarLogic.cs   — pure math for target HP bar (width, color); testable in EditMode
