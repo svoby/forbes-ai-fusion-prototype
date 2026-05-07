@@ -14,8 +14,7 @@ namespace Forbes.Tests.EditMode {
     [SetUp]
     public void SetUp() {
       _go = new GameObject(nameof(CosmeticProjectileViewColliderTests));
-      _go.AddComponent<Health>();
-      _go.AddComponent<NetworkCombatController>();
+      _go.AddComponent<PlayerMissileSlot>();
       _go.AddComponent<CosmeticProjectileView>();
     }
 

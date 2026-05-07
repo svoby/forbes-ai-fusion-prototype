@@ -3,33 +3,33 @@ using UnityEngine;
 
 /// <summary>
 /// Cosmetic-only sphere visual for the Fireball in-flight missile.
-/// Reads already-replicated <see cref="NetworkCombatController"/> properties
-/// (<see cref="NetworkCombatController.PendingImpactSpellId"/>,
-/// <see cref="NetworkCombatController.PendingImpactTarget"/>,
-/// <see cref="NetworkCombatController.PendingMissileReleaseTick"/>) to
+/// Reads already-replicated <see cref="PlayerMissileSlot"/> properties
+/// (<see cref="PlayerMissileSlot.PendingImpactSpellId"/>,
+/// <see cref="PlayerMissileSlot.PendingImpactTarget"/>,
+/// <see cref="PlayerMissileSlot.MissileOrigin"/>,
+/// <see cref="PlayerMissileSlot.PendingMissileReleaseTick"/>) to
 /// approximate the missile position each render frame.
 /// <para>
 /// Authority contract: this component never applies damage, never writes a
 /// networked field, has no <see cref="HasStateAuthority"/> guard, and is not a
 /// <see cref="NetworkBehaviour"/>. The authoritative missile lives entirely inside
-/// <see cref="NetworkCombatController.TryResolvePendingImpact"/>.
+/// <see cref="PlayerMissileSlot.FixedUpdateNetwork"/>.
 /// </para>
 /// <para>
-/// Known approximation: the lerp origin is the caster's <em>current</em> position,
-/// not the position at release tick. If the caster moves after releasing the missile
-/// the visual arc drifts slightly from the authoritative homing path; this is
-/// acceptable for a cosmetic-only indicator.
+/// Visual fidelity: the lerp origin is <see cref="PlayerMissileSlot.MissileOrigin"/>
+/// — the replicated caster position at release time. This eliminates the drift that
+/// occurred when the caster moved after releasing the missile.
 /// </para>
 /// </summary>
-[RequireComponent(typeof(NetworkCombatController))]
+[RequireComponent(typeof(PlayerMissileSlot))]
 public class CosmeticProjectileView : MonoBehaviour {
   const float VisualDiameter = 0.3f;
 
-  NetworkCombatController _ncc;
-  GameObject              _sphere;
+  PlayerMissileSlot _missileSlot;
+  GameObject        _sphere;
 
   void Awake() {
-    _ncc = GetComponent<NetworkCombatController>();
+    _missileSlot = GetComponent<PlayerMissileSlot>();
 
     _sphere      = GameObject.CreatePrimitive(PrimitiveType.Sphere);
     _sphere.name = "FireballVisual";
@@ -55,8 +55,8 @@ public class CosmeticProjectileView : MonoBehaviour {
   }
 
   void LateUpdate() {
-    var  runner  = _ncc.Runner;
-    byte spellId = _ncc.PendingImpactSpellId;
+    var  runner  = _missileSlot.Runner;
+    byte spellId = _missileSlot.PendingImpactSpellId;
 
     if (runner == null || spellId == 0) {
       _sphere.SetActive(false);
@@ -69,21 +69,23 @@ public class CosmeticProjectileView : MonoBehaviour {
       return;
     }
 
-    if (!runner.TryFindObject(_ncc.PendingImpactTarget, out var targetObj) || targetObj == null) {
+    if (!runner.TryFindObject(_missileSlot.PendingImpactTarget, out var targetObj) || targetObj == null) {
       _sphere.SetActive(false);
       return;
     }
 
-    Vector3 casterPos = transform.position;
+    // Use the replicated release position as the lerp origin so the visual arc
+    // stays correct even when the caster moves after firing.
+    Vector3 originPos = _missileSlot.MissileOrigin;
     Vector3 targetPos = targetObj.transform.position;
 
-    float dist    = Vector3.Distance(casterPos, targetPos);
-    float elapsed = (runner.Tick - _ncc.PendingMissileReleaseTick) * runner.DeltaTime;
+    float dist    = Vector3.Distance(originPos, targetPos);
+    float elapsed = (runner.Tick - _missileSlot.PendingMissileReleaseTick) * runner.DeltaTime;
     float t       = dist > 0.001f
       ? Mathf.Clamp01(elapsed * spell.ProjectileSpeedMetersPerSecond / dist)
       : 1f;
 
-    _sphere.transform.position = Vector3.Lerp(casterPos, targetPos, t);
+    _sphere.transform.position = Vector3.Lerp(originPos, targetPos, t);
     _sphere.SetActive(true);
   }
 }
