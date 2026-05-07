@@ -10,6 +10,11 @@ public enum NetworkMobBrainState {
   Return,
 }
 
+public enum NetworkMobBrainCombatMode {
+  Melee,
+  Caster,
+}
+
 public static class NetworkMobBrainLogic {
   const float HorizontalEpsSqr = 1e-8f;
 
@@ -98,6 +103,14 @@ public static class NetworkMobBrainLogic {
 
   public static bool CanAttackAtTick(int currentTick, int nextAttackTick) {
     return currentTick >= nextAttackTick;
+  }
+
+  public static bool UsesCasterCombat(NetworkMobBrainCombatMode mode) {
+    return mode == NetworkMobBrainCombatMode.Caster;
+  }
+
+  public static bool ShouldHoldForCasterCast(Vector3 casterPosition, Vector3 targetPosition, float spellRange) {
+    return IsWithinHorizontalRange(casterPosition, targetPosition, spellRange);
   }
 
   /// <summary>

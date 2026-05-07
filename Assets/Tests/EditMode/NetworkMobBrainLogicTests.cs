@@ -123,6 +123,22 @@ namespace Forbes.Tests.EditMode {
     }
 
     [Test]
+    public void UsesCasterCombat_OnlyCasterMode_ReturnsTrue() {
+      Assert.IsFalse(NetworkMobBrainLogic.UsesCasterCombat(NetworkMobBrainCombatMode.Melee));
+      Assert.IsTrue(NetworkMobBrainLogic.UsesCasterCombat(NetworkMobBrainCombatMode.Caster));
+    }
+
+    [Test]
+    public void ShouldHoldForCasterCast_UsesHorizontalSpellRange() {
+      var caster = new Vector3(0f, 0f, 0f);
+      var inside = new Vector3(3f, 20f, 4f);
+      var outside = new Vector3(6f, 0f, 8f);
+
+      Assert.IsTrue(NetworkMobBrainLogic.ShouldHoldForCasterCast(caster, inside, 5f));
+      Assert.IsFalse(NetworkMobBrainLogic.ShouldHoldForCasterCast(caster, outside, 9.99f));
+    }
+
+    [Test]
     public void SecondsToTicks_AlwaysAtLeastOne() {
       Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(0f, 60));
       Assert.AreEqual(1, NetworkMobBrainLogic.SecondsToTicks(0.001f, 60));

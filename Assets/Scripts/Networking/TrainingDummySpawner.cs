@@ -7,8 +7,8 @@ using UnityEditor;
 
 /// <summary>
 /// Editor-only test scaffolding. After the local player is spawned by
-/// <see cref="PlayerSpawner"/>, places one networked training dummy in front of
-/// the player. Compiles in builds (so scene references stay valid) but is a no-op
+/// <see cref="PlayerSpawner"/>, places networked training mobs near the player.
+/// Compiles in builds (so scene references stay valid) but is a no-op
 /// outside the Editor.
 /// </summary>
 [DisallowMultipleComponent]
@@ -25,6 +25,12 @@ public class TrainingDummySpawner : MonoBehaviour {
 
   [Tooltip("Offset in the local player's space (X=right, Y=up, Z=forward). Default is straight ahead so FP camera sees the dummy.")]
   [SerializeField] Vector3 spawnOffsetLocal = new Vector3(0f, 0f, 4f);
+
+  [Tooltip("Editor / solo test: spawn a second training dummy configured as a Fireball caster mob.")]
+  [SerializeField] bool spawnCasterMobInEditor = true;
+
+  [Tooltip("Offset in the local player's space for the caster mob. Placed beside the regular dummy so it has a nearby target.")]
+  [SerializeField] Vector3 casterSpawnOffsetLocal = new Vector3(8f, 0f, 4f);
 
   NetworkRunner _runner;
   PlayerSpawner _spawner;
@@ -70,10 +76,10 @@ public class TrainingDummySpawner : MonoBehaviour {
     }
 
     _spawnStarted = true;
-    StartCoroutine(CoSpawnTrainingDummy());
+    StartCoroutine(CoSpawnTrainingDummies());
   }
 
-  IEnumerator CoSpawnTrainingDummy() {
+  IEnumerator CoSpawnTrainingDummies() {
     if (TrainingDummyPrefab.GetComponent<NetworkObject>() == null) {
       ForbesLog.Error("TrainingDummySpawner: TrainingDummyPrefab must be a root object with a NetworkObject.");
       _spawnStarted = false;
@@ -106,6 +112,10 @@ public class TrainingDummySpawner : MonoBehaviour {
         NetworkSpawnFlags.SharedModeStateAuthLocalPlayer);
 
       if (spawnedDummy != null) {
+        if (spawnCasterMobInEditor) {
+          SpawnCasterMob(playerObj);
+        }
+
         _spawned = true;
         ForbesLog.Net($"TrainingDummy spawned name={spawnedDummy.name} id={spawnedDummy.Id}");
         yield break;
@@ -118,5 +128,40 @@ public class TrainingDummySpawner : MonoBehaviour {
 
     ForbesLog.Warn("TrainingDummySpawner: training dummy not spawned (local player object not ready in time).");
     _spawnStarted = false;
+  }
+
+  void SpawnCasterMob(NetworkObject playerObj) {
+    if (TrainingDummyPrefab.GetComponent<NetworkCombatController>() == null) {
+      ForbesLog.Error("TrainingDummySpawner: caster mob requires NetworkCombatController on TrainingDummyPrefab.");
+      return;
+    }
+
+    var worldPos = playerObj.transform.TransformPoint(casterSpawnOffsetLocal);
+    worldPos.y = Mathf.Max(worldPos.y, 0.5f);
+    var rot = playerObj.transform.rotation;
+
+    var spawnedCaster = _runner.Spawn(
+      TrainingDummyPrefab,
+      worldPos,
+      rot,
+      PlayerRef.None,
+      null,
+      NetworkSpawnFlags.SharedModeStateAuthLocalPlayer);
+
+    if (spawnedCaster == null) {
+      ForbesLog.Error("TrainingDummySpawner: caster mob spawn returned null.");
+      return;
+    }
+
+    spawnedCaster.name = "Caster Mob";
+
+    if (spawnedCaster.TryGetComponent(out NetworkMobBrain brain)) {
+      brain.CombatMode = NetworkMobBrainCombatMode.Caster;
+      brain.CasterSpellId = 1;
+      brain.AggroRadius = 30f;
+      brain.LeashRadius = 40f;
+    }
+
+    ForbesLog.Net($"Caster mob spawned name={spawnedCaster.name} id={spawnedCaster.Id}");
   }
 }

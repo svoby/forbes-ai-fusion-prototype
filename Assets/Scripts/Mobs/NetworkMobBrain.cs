@@ -26,8 +26,12 @@ public class NetworkMobBrain : NetworkBehaviour {
   public float AttackIntervalSeconds = 1.5f;
   public float AggroRadius = 6f;
 
+  public NetworkMobBrainCombatMode CombatMode = NetworkMobBrainCombatMode.Melee;
+  public byte CasterSpellId = 1;
+
   CharacterController _controller;
   Health _health;
+  NetworkCombatController _combat;
   Vector3 _spawnPosition;
   Vector3 _initialSpawnPos;
   bool _wasMobDead;
@@ -44,6 +48,7 @@ public class NetworkMobBrain : NetworkBehaviour {
   public override void Spawned() {
     _controller = GetComponent<CharacterController>();
     _health = GetComponent<Health>();
+    _combat = GetComponent<NetworkCombatController>();
 
     if (!HasStateAuthority) {
       return;
@@ -168,7 +173,8 @@ public class NetworkMobBrain : NetworkBehaviour {
         break;
     }
 
-    if (_state != NetworkMobBrainState.Return) {
+    if (_state != NetworkMobBrainState.Return
+        && !NetworkMobBrainLogic.UsesCasterCombat(CombatMode)) {
       TryMeleeAuthority();
     }
   }
@@ -197,6 +203,24 @@ public class NetworkMobBrain : NetworkBehaviour {
       return;
     }
 
+    if (NetworkMobBrainLogic.UsesCasterCombat(CombatMode)) {
+      FaceTargetIfPossible(mobPos, tpos);
+
+      if (_combat != null && _combat.IsCasting) {
+        _controller.Move(_velocity * dt);
+        return;
+      }
+
+      var spell = SpellRegistry.Get(CasterSpellId);
+      if (_combat != null
+          && spell.IsValid
+          && NetworkMobBrainLogic.ShouldHoldForCasterCast(mobPos, tpos, spell.RangeMeters)) {
+        _combat.TryRequestCast(CasterSpellId, target.Object.Id);
+        _controller.Move(_velocity * dt);
+        return;
+      }
+    }
+
     float attackR = Mathf.Max(0f, AttackRange);
     bool holdPosition = attackR <= Mathf.Epsilon
       ? NetworkMobBrainLogic.HorizontalSqrDistance(mobPos, tpos) <= 1e-6f
@@ -214,6 +238,12 @@ public class NetworkMobBrain : NetworkBehaviour {
       _controller.Move(planarC + _velocity * dt);
     } else {
       _controller.Move(_velocity * dt);
+    }
+  }
+
+  void FaceTargetIfPossible(Vector3 mobPos, Vector3 targetPos) {
+    if (NetworkMobBrainLogic.TryGetHorizontalDirection(mobPos, targetPos, out var dir)) {
+      transform.rotation = NetworkMobBrainLogic.RotationFacingHorizontal(dir, transform.rotation);
     }
   }
 

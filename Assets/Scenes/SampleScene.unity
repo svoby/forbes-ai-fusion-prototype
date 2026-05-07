@@ -3386,6 +3386,8 @@ MonoBehaviour:
   TrainingDummyPrefab: {fileID: 991001001001, guid: c8e7f6a5b4c3d2e1f0a9b8c7d6e5f403, type: 3}
   spawnInEditor: 1
   spawnOffsetLocal: {x: 0, y: 0, z: 4}
+  spawnCasterMobInEditor: 1
+  casterSpawnOffsetLocal: {x: 8, y: 0, z: 4}
 --- !u!114 &1260076964
 MonoBehaviour:
   m_ObjectHideFlags: 0
