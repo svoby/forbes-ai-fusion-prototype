@@ -125,7 +125,8 @@ namespace Forbes.Tests.PlayMode {
           1200,
           () =>
             $"Fireball damage did not arrive. victimHP={victimHealth.NetworkedHealth} " +
-            $"expected~={expectedHp} pendingSpell={_caster.GetComponent<PlayerMissileSlot>().PendingImpactSpellId}");
+            $"expected~={expectedHp} registryHasInstance=" +
+            $"{_caster.GetComponent<ActiveSpellInstanceRegistry>()?.HasActiveInstanceForCaster(_caster.Id)}");
 
         Assert.AreEqual(casterHpBeforeCast, casterHealth.NetworkedHealth, 1e-2f,
           "Caster mob should not damage itself.");
@@ -149,6 +150,7 @@ namespace Forbes.Tests.PlayMode {
 
       if (includeCombat) {
         go.AddComponent<NetworkCombatController>();
+        go.AddComponent<ActiveSpellInstanceRegistry>();
       }
 
       go.AddComponent<NetworkMobBrain>();

@@ -43,15 +43,16 @@ Assets/Scripts/
 │   ├── Targetable.cs             — marker: this object can be targeted
 │   ├── TargetingController.cs    — local client target selection (Tab, LMB click)
 │   ├── TargetHighlight.cs        — golden ring under current target (LineRenderer)
-│   ├── NetworkCombatController.cs— authoritative cast, GCD, per-spell cooldowns; delegates missile scheduling to PlayerMissileSlot
-│   ├── PlayerMissileSlot.cs      — NetworkBehaviour (-200): single missile slot; Networked travel state (SpellId, Target, ReleaseTick, MissileOrigin); per-tick advance/impact; fires OnImpact/OnCancelled events
+│   ├── NetworkCombatController.cs— authoritative cast, GCD, per-spell cooldowns; adds ActiveSpellInstance to registry on resolve; subscribes to OnInstanceArrived/OnInstanceCancelled
+│   ├── ActiveSpellInstance.cs    — INetworkStruct: SpellId, Kind (SpellInstanceKind), CasterId, TargetId, Origin, ReleaseTick, IsActive
+│   ├── ActiveSpellInstanceRegistry.cs — NetworkBehaviour (-200): fixed-capacity (16) registry; per-tick homing simulation on state authority; fires OnInstanceArrived/OnInstanceCancelled C# events
+│   ├── ActiveSpellInstancePresenter.cs — cosmetic-only MonoBehaviour: reads same-object registry; manages local fireball sphere per active TargetedProjectile slot
 │   ├── SpellRegistry.cs          — hardcoded spell definitions (SpellData structs)
 │   ├── SpellTravelLogic.cs       — pure missile math (AdvanceMissilePosition, HasMissileArrived)
 │   ├── CombatValidator.cs        — stateless range/cooldown/target checks
 │   ├── CombatFailReason.cs       — enum: why a cast was rejected
 │   ├── CastCancelReason.cs       — enum: why an in-progress cast was interrupted (state authority only)
 │   ├── CombatFeedbackReason.cs   — enum + mapping: player-facing feedback reason (reject or interrupt)
-│   ├── CosmeticProjectileView.cs — cosmetic-only: local sphere lerps MissileOrigin→target during missile flight
 │   ├── SpellImpactView.cs        — cosmetic-only: brief sphere flash at target on spell impact
 │   └── SpellVisualColors.cs      — shared cosmetic colours and URP/Unlit materials for spell primitives
 │
@@ -130,8 +131,8 @@ NetworkCombatController.FixedUpdateNetwork  (spells, GCD)
 
 `SpellRegistry` holds static `SpellData` (id, name, damage, range, cast time, GCD, cooldown).
 `CombatValidator` is stateless — checks: target alive, in range, GCD clear, spell cooldown clear.
-`NetworkCombatController` owns networked cooldown ticks; for projectile spells it calls `PlayerMissileSlot.Schedule` and subscribes to `OnImpact` to dispatch `Health.DealDamageRpc`.
-`PlayerMissileSlot` owns all missile state and runs per-tick homing logic at `[DefaultExecutionOrder(-200)]`, before `NetworkCombatController` processes new inputs.
+`NetworkCombatController` owns networked cooldown ticks; for projectile spells it calls `ActiveSpellInstanceRegistry.TryAdd` on resolve and subscribes to `OnInstanceArrived` to dispatch `Health.DealDamageRpc`.
+`ActiveSpellInstanceRegistry` owns all spell instance state (up to 16 concurrent instances per caster) and runs per-tick homing logic at `[DefaultExecutionOrder(-200)]`, before `NetworkCombatController` processes new inputs. Replicated `ActiveSpellInstance` entries allow late-joining clients to reconstruct in-flight projectile visuals.
 
 ---
 

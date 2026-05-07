@@ -76,10 +76,11 @@ namespace Forbes.Tests.PlayMode {
     IEnumerator FireFireball() {
       _session.InputRelay.TargetNetworkId = _dummy.Id;
       _session.InputRelay.PendingPulse    = FusionPlayModeSpellPulse.Spell1;
+      var registry = _player.GetComponent<ActiveSpellInstanceRegistry>();
       yield return FusionPlayModeTestHelpers.WaitUntil(
-        () => _player.GetComponent<PlayerMissileSlot>().PendingImpactSpellId != 0,
+        () => registry != null && registry.HasActiveInstanceForCaster(_player.Id),
         maxFrames: 1200,
-        messageOnFail: "Fireball missile not scheduled within timeout");
+        messageOnFail: "Fireball instance not added to registry within timeout");
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ namespace Forbes.Tests.PlayMode {
         yield return SpawnBoth(nameof(ProjectileSpell_DamageNotAppliedDuringFlight));
 
         var combat      = _player.GetComponent<NetworkCombatController>();
-        var missileSlot = _player.GetComponent<PlayerMissileSlot>();
+        var registry    = _player.GetComponent<ActiveSpellInstanceRegistry>();
         var dummyHealth = _dummy.GetComponent<Health>();
         float startHp   = dummyHealth.NetworkedHealth;
 
@@ -122,7 +123,7 @@ namespace Forbes.Tests.PlayMode {
 
         Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
           "Dummy HP must not change while missile is still in flight.");
-        Assert.AreNotEqual(0, missileSlot.PendingImpactSpellId,
+        Assert.IsTrue(registry.HasActiveInstanceForCaster(_player.Id),
           "Missile slot must still be occupied during flight.");
 
         Assert.Greater(_player.GetComponent<Health>().NetworkedHealth, 0.5f,
@@ -132,7 +133,7 @@ namespace Forbes.Tests.PlayMode {
 
     /// <summary>
     /// Missile eventually resolves and applies the correct damage.
-    /// Also verifies that <see cref="PlayerMissileSlot.MissileOrigin"/> is cleared after impact.
+    /// Also verifies that the active instance is removed from the registry after impact.
     /// </summary>
     [UnityTest]
     [Timeout(120000)]
@@ -142,15 +143,15 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         yield return SpawnBoth(nameof(ProjectileSpell_DamageAppliedAfterMissileArrives));
 
-        var missileSlot = _player.GetComponent<PlayerMissileSlot>();
-        var dummyHealth = _dummy.GetComponent<Health>();
-        float startHp   = dummyHealth.NetworkedHealth;
+        var registry      = _player.GetComponent<ActiveSpellInstanceRegistry>();
+        var dummyHealth   = _dummy.GetComponent<Health>();
+        float startHp     = dummyHealth.NetworkedHealth;
         float fireballDmg = SpellRegistry.Get(1).Damage;
 
         yield return FireFireball();
 
-        // MissileOrigin must be set while the missile is in flight.
-        Assert.AreNotEqual(default(Vector3), missileSlot.MissileOrigin,
+        // Origin must be set while the missile is in flight.
+        Assert.AreNotEqual(default(Vector3), registry.GetFirstActiveInstanceForCaster(_player.Id).Origin,
           "MissileOrigin must be set to the caster's release position during flight.");
 
         // Poll until HP drops by the expected damage amount.
@@ -159,10 +160,8 @@ namespace Forbes.Tests.PlayMode {
           maxFrames: 960,
           messageOnFail: $"post-impact hp={dummyHealth.NetworkedHealth} expected ~{startHp - fireballDmg}");
 
-        Assert.AreEqual(0, missileSlot.PendingImpactSpellId,
-          "Missile slot must be cleared after impact.");
-        Assert.AreEqual(default(Vector3), missileSlot.MissileOrigin,
-          "MissileOrigin must be cleared (default) after missile impact.");
+        Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
+          "Active instance must be cleared from registry after impact.");
       }
     }
 
@@ -177,7 +176,7 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         yield return SpawnBoth(nameof(ProjectileSpell_DeadTarget_NoDelayedDamage_ClearPendingSafely));
 
-        var missileSlot = _player.GetComponent<PlayerMissileSlot>();
+        var registry    = _player.GetComponent<ActiveSpellInstanceRegistry>();
         var dummyHealth = _dummy.GetComponent<Health>();
 
         yield return FireFireball();
@@ -195,7 +194,7 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsTrue(dummyHealth.IsDead,     "Target must stay dead — no missile resurrection.");
         Assert.AreEqual(0f, dummyHealth.NetworkedHealth, 0.01f,
           "Dead target must not receive delayed projectile damage.");
-        Assert.AreEqual(0, missileSlot.PendingImpactSpellId,
+        Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
           "Missile slot must be cleared when target is dead.");
       }
     }
@@ -212,8 +211,7 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         yield return SpawnBoth(nameof(ProjectileSpell_CasterDiesBeforeImpact_PendingImpactCleared_TargetUnharmed));
 
-        var combat      = _player.GetComponent<NetworkCombatController>();
-        var missileSlot = _player.GetComponent<PlayerMissileSlot>();
+        var registry     = _player.GetComponent<ActiveSpellInstanceRegistry>();
         var playerHealth = _player.GetComponent<Health>();
         var dummyHealth  = _dummy.GetComponent<Health>();
         float startDummyHp = dummyHealth.NetworkedHealth;
@@ -228,7 +226,7 @@ namespace Forbes.Tests.PlayMode {
         // Wait well past normal travel time; cleared missile must not land.
         yield return FusionPlayModeTestHelpers.WaitFrames(120);
 
-        Assert.AreEqual(0, missileSlot.PendingImpactSpellId,
+        Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
           "Pending missile must be cleared when the caster dies.");
         Assert.AreEqual(startDummyHp, dummyHealth.NetworkedHealth, 0.35f,
           "Target must be undamaged: in-flight missile abandoned on caster death.");
@@ -286,7 +284,7 @@ namespace Forbes.Tests.PlayMode {
         yield return SpawnBoth(nameof(CastTimedSpell_MovementDuringCast_CancelsCast_NoDamageApplied));
 
         var combat      = _player.GetComponent<NetworkCombatController>();
-        var missileSlot = _player.GetComponent<PlayerMissileSlot>();
+        var registry    = _player.GetComponent<ActiveSpellInstanceRegistry>();
         var dummyHealth = _dummy.GetComponent<Health>();
         float startHp   = dummyHealth.NetworkedHealth;
 
@@ -322,7 +320,7 @@ namespace Forbes.Tests.PlayMode {
 
         Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
           "No damage must be applied after a movement-cancelled cast-time spell.");
-        Assert.AreEqual(0, missileSlot.PendingImpactSpellId,
+        Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
           "No missile must be in flight after a non-projectile cancelled cast.");
       }
     }
@@ -340,7 +338,7 @@ namespace Forbes.Tests.PlayMode {
       IEnumerator Body() {
         yield return SpawnBoth(nameof(ProjectileSpell_MovementAfterRelease_DoesNotCancelMissile));
 
-        var missileSlot = _player.GetComponent<PlayerMissileSlot>();
+        var registry    = _player.GetComponent<ActiveSpellInstanceRegistry>();
         var dummyHealth = _dummy.GetComponent<Health>();
         float startHp   = dummyHealth.NetworkedHealth;
         float dmg       = SpellRegistry.Get(1).Damage;
@@ -348,7 +346,7 @@ namespace Forbes.Tests.PlayMode {
         // Fire Fireball and wait for the missile to be in flight.
         yield return FireFireball();
 
-        Assert.AreNotEqual(0, missileSlot.PendingImpactSpellId,
+        Assert.IsTrue(registry.HasActiveInstanceForCaster(_player.Id),
           "Missile must be in flight before movement is injected.");
 
         // Inject continuous movement AFTER missile is in flight.
@@ -363,7 +361,7 @@ namespace Forbes.Tests.PlayMode {
 
         _session.InputRelay.StickyMove = Vector2.zero;
 
-        Assert.AreEqual(0, missileSlot.PendingImpactSpellId,
+        Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
           "Missile slot must be cleared after impact.");
         Assert.IsFalse(dummyHealth.IsDead, "Target must survive a single Fireball.");
       }
