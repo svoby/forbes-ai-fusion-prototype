@@ -125,7 +125,7 @@ namespace Forbes.Tests.PlayMode {
           1200,
           () =>
             $"Fireball damage did not arrive. victimHP={victimHealth.NetworkedHealth} " +
-            $"expected~={expectedHp} pendingSpell={casterCombat.PendingImpactSpellId}");
+            $"expected~={expectedHp} pendingSpell={_caster.GetComponent<PlayerMissileSlot>().PendingImpactSpellId}");
 
         Assert.AreEqual(casterHpBeforeCast, casterHealth.NetworkedHealth, 1e-2f,
           "Caster mob should not damage itself.");

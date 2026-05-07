@@ -17,9 +17,9 @@ public partial class NetworkCombatController {
     if (reason == CastCancelReason.Death) {
       bool hadCast = IsCasting;
       ClearCastState();
-      // Death clears both cast state and any in-flight pending impact: the
+      // Death clears both cast state and any in-flight pending missile: the
       // projectile is abandoned and the target will not be damaged.
-      ClearPendingImpact();
+      _missileSlot.Clear();
       if (hadCast) {
         SetCombatFeedback(CombatFeedbackReason.CastInterruptedByDeath);
         ForbesLog.Net($"Cast cancelled: {reason}", this);
@@ -93,7 +93,7 @@ public partial class NetworkCombatController {
       SetCooldownEndTick(spellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
       if (SpellTravelLogic.HasProjectile(spell)) {
-        SchedulePendingImpact(spellId, targetId);
+        _missileSlot.Schedule(spellId, targetId, transform.position);
         ForbesLog.Net($"Instant cast (missile): {spell.Name} releaseTick={Runner.Tick}", this);
       } else {
         targetHealth.DealDamageRpc(spell.Damage);
@@ -133,7 +133,7 @@ public partial class NetworkCombatController {
     SetCooldownEndTick(CurrentSpellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
     if (SpellTravelLogic.HasProjectile(spell)) {
-      SchedulePendingImpact(CurrentSpellId, CastTarget);
+      _missileSlot.Schedule(CurrentSpellId, CastTarget, transform.position);
       ForbesLog.Net($"Cast resolved (missile): {spell.Name} releaseTick={Runner.Tick}", this);
     } else {
       targetHealth.DealDamageRpc(spell.Damage);

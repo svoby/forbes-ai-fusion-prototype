@@ -55,25 +55,6 @@ public partial class NetworkCombatController : NetworkBehaviour {
   [Networked] public int Cooldown2EndTick { get; set; }
   [Networked] public int Cooldown3EndTick { get; set; }
 
-  // ── PENDING MISSILE SLOT ─────────────────────────────────────────────────────
-  // ONE-SLOT MODEL: only one in-flight missile at a time.
-  // With a stationary target at max range (30 m / 20 m·s⁻¹ = 1.5 s) a second
-  // Fireball cast (also 1.5 s) resolves exactly as the first arrives. However
-  // if the target flees during flight the travel time EXCEEDS the cast time and
-  // SchedulePendingImpact will silently overwrite the first missile (logged as a
-  // warning). This is an acknowledged prototype limitation; see PROJECTILE_POLICY.md.
-  // Upgrade path: extract to a sibling TargetedMissileSlot : NetworkBehaviour
-  // with a small NetworkLinkedList when multi-missile support is needed.
-
-  /// <summary>0 = no missile in flight.</summary>
-  [Networked] public byte PendingImpactSpellId { get; set; }
-
-  /// <summary>Target locked at missile release (<see cref="NetworkId"/>); resolved each tick.</summary>
-  [Networked] public NetworkId PendingImpactTarget { get; set; }
-
-  /// <summary>Simulation tick when the missile was released; retained for diagnostics.</summary>
-  [Networked] public int PendingMissileReleaseTick { get; set; }
-
   /// <summary>True while a cast-time spell is in flight; <see cref="PlayerMovement"/> uses this to freeze movement.</summary>
   public bool IsCasting => CurrentSpellId != 0 && Runner != null && Runner.Tick < CastEndTick;
 
@@ -90,27 +71,35 @@ public partial class NetworkCombatController : NetworkBehaviour {
 
   Health          _health;
   SpellImpactView _impactView;
+  PlayerMissileSlot _missileSlot;
   NetworkButtons  _prevButtons;
 
-  // Non-networked; state authority only. Tracks the missile's logical position
-  // each tick so it can home toward the target's current position. Reset to
-  // default by ClearPendingImpact. Lost on authority transfer — acceptable for
-  // prototype (a future fix can re-derive from PendingMissileReleaseTick on Spawned).
-  Vector3 _missileVirtualPos;
-
   void Awake() {
-    _health     = GetComponent<Health>();
-    _impactView = GetComponent<SpellImpactView>();
+    _health      = GetComponent<Health>();
+    _impactView  = GetComponent<SpellImpactView>();
+    _missileSlot = GetComponent<PlayerMissileSlot>();
   }
 
   public override void Spawned() {
-    if (HasStateAuthority && PendingImpactSpellId != 0) {
-      // Authority transferred while a missile was in flight. _missileVirtualPos is
-      // non-networked, so the new authority starts with Vector3.zero. Re-init to the
-      // caster's current position so the missile homes correctly from here onward.
-      _missileVirtualPos = transform.position;
-      ForbesLog.Net($"Spawned with missile in flight — re-init missileVirtualPos={_missileVirtualPos}", this);
+    _missileSlot.OnImpact    += HandleMissileImpact;
+    _missileSlot.OnCancelled += HandleMissileCancelled;
+  }
+
+  public override void Despawned(NetworkRunner runner, bool hasState) {
+    if (_missileSlot != null) {
+      _missileSlot.OnImpact    -= HandleMissileImpact;
+      _missileSlot.OnCancelled -= HandleMissileCancelled;
     }
+  }
+
+  void HandleMissileImpact(byte spellId, NetworkId targetId, Health targetHealth) {
+    var spell = SpellRegistry.Get(spellId);
+    targetHealth.DealDamageRpc(spell.Damage);
+    DispatchImpactVisual(spellId, targetId);
+  }
+
+  void HandleMissileCancelled(CombatFeedbackReason reason) {
+    SetCombatFeedback(reason);
   }
 
   public override void FixedUpdateNetwork() {
@@ -136,8 +125,6 @@ public partial class NetworkCombatController : NetworkBehaviour {
       TryCancelCast(CastCancelReason.Death);
       return false;
     }
-
-    TryResolvePendingImpact();
 
     // Resolve a cast-time spell when the timer expires.
     if (CurrentSpellId != 0 && Runner.Tick >= CastEndTick) {

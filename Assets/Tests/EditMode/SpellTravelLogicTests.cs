@@ -122,7 +122,7 @@ namespace Forbes.Tests.EditMode {
     }
 
     // ── Advance-then-check production pattern ───────────────────────────────
-    // NetworkCombatController.TryResolvePendingImpact calls AdvanceMissilePosition
+    // PlayerMissileSlot.TryResolvePendingImpact calls AdvanceMissilePosition
     // and then HasMissileArrived with the POST-ADVANCE position.  These tests
     // document the actual arrival semantics used in production: a missile between
     // 1× and 2× one tick's step from the target is detected as arrived on the

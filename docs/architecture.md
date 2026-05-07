@@ -43,14 +43,15 @@ Assets/Scripts/
 │   ├── Targetable.cs             — marker: this object can be targeted
 │   ├── TargetingController.cs    — local client target selection (Tab, LMB click)
 │   ├── TargetHighlight.cs        — golden ring under current target (LineRenderer)
-│   ├── NetworkCombatController.cs— authoritative cast, GCD, per-spell cooldowns, missile state
+│   ├── NetworkCombatController.cs— authoritative cast, GCD, per-spell cooldowns; delegates missile scheduling to PlayerMissileSlot
+│   ├── PlayerMissileSlot.cs      — NetworkBehaviour (-200): single missile slot; Networked travel state (SpellId, Target, ReleaseTick, MissileOrigin); per-tick advance/impact; fires OnImpact/OnCancelled events
 │   ├── SpellRegistry.cs          — hardcoded spell definitions (SpellData structs)
 │   ├── SpellTravelLogic.cs       — pure missile math (AdvanceMissilePosition, HasMissileArrived)
 │   ├── CombatValidator.cs        — stateless range/cooldown/target checks
 │   ├── CombatFailReason.cs       — enum: why a cast was rejected
 │   ├── CastCancelReason.cs       — enum: why an in-progress cast was interrupted (state authority only)
 │   ├── CombatFeedbackReason.cs   — enum + mapping: player-facing feedback reason (reject or interrupt)
-│   ├── CosmeticProjectileView.cs — cosmetic-only: local sphere lerps caster→target during missile flight
+│   ├── CosmeticProjectileView.cs — cosmetic-only: local sphere lerps MissileOrigin→target during missile flight
 │   ├── SpellImpactView.cs        — cosmetic-only: brief sphere flash at target on spell impact
 │   └── SpellVisualColors.cs      — shared cosmetic colours and URP/Unlit materials for spell primitives
 │
@@ -129,7 +130,8 @@ NetworkCombatController.FixedUpdateNetwork  (spells, GCD)
 
 `SpellRegistry` holds static `SpellData` (id, name, damage, range, cast time, GCD, cooldown).
 `CombatValidator` is stateless — checks: target alive, in range, GCD clear, spell cooldown clear.
-`NetworkCombatController` owns networked cooldown ticks and resolves damage via `Health.DealDamageRpc`.
+`NetworkCombatController` owns networked cooldown ticks; for projectile spells it calls `PlayerMissileSlot.Schedule` and subscribes to `OnImpact` to dispatch `Health.DealDamageRpc`.
+`PlayerMissileSlot` owns all missile state and runs per-tick homing logic at `[DefaultExecutionOrder(-200)]`, before `NetworkCombatController` processes new inputs.
 
 ---
 
