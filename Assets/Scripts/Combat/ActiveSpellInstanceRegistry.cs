@@ -24,6 +24,11 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
 
   readonly Vector3[] _virtualPositions = new Vector3[Capacity];
 
+  // Authority-only monotonic counter. Non-networked is acceptable for a prototype:
+  // InstanceIds only need session-local uniqueness and the replicated value on each
+  // ActiveSpellInstance struct carries identity to all clients.
+  int _nextInstanceId = 1;
+
   /// <summary>Fired on state authority when a projectile instance arrives at its target.</summary>
   public event Action<int, ActiveSpellInstance> OnInstanceArrived;
 
@@ -36,7 +41,7 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
         if (Instances[i].IsActive) {
           _virtualPositions[i] = Instances[i].Origin;
           ForbesLog.Net(
-            $"Spawned with instance in flight at slot {i} — re-init virtualPos={_virtualPositions[i]}", this);
+            $"Spawned with instance in flight at index {i} — re-init virtualPos={_virtualPositions[i]}", this);
         }
       }
     }
@@ -54,7 +59,7 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
     }
   }
 
-  /// <summary>Authority: add a new active instance. Returns slot index, or -1 if registry is full.</summary>
+  /// <summary>Authority: add a new active instance. Returns entry index, or -1 if registry is full.</summary>
   public int TryAdd(ActiveSpellInstance instance) {
     if (!HasStateAuthority) {
       return -1;
@@ -62,27 +67,28 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
 
     for (int i = 0; i < Capacity; i++) {
       if (!Instances[i].IsActive) {
+        instance.InstanceId = _nextInstanceId++;
         Instances.Set(i, instance);
         _virtualPositions[i] = instance.Origin;
         return i;
       }
     }
 
-    ForbesLog.Warn("ActiveSpellInstanceRegistry: all slots full — instance dropped.", this);
+    ForbesLog.Warn("ActiveSpellInstanceRegistry: registry full — instance dropped.", this);
     return -1;
   }
 
-  /// <summary>Authority: mark a slot as inactive (SpellId = 0).</summary>
-  public void Complete(int slotIndex) {
+  /// <summary>Authority: mark an entry as inactive (SpellId = 0).</summary>
+  public void Complete(int index) {
     if (!HasStateAuthority) {
       return;
     }
 
-    if ((uint)slotIndex >= Capacity) {
+    if ((uint)index >= Capacity) {
       return;
     }
 
-    Instances.Set(slotIndex, default);
+    Instances.Set(index, default);
   }
 
   /// <summary>Authority: cancel all active instances for a caster (e.g. on caster death).</summary>
@@ -134,7 +140,7 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
     if (!Runner.TryFindObject(inst.TargetId, out var targetObj)
         || targetObj == null
         || !targetObj.TryGetComponent(out Health impactHealth)) {
-      ForbesLog.Net($"Spell instance slot={i} spellId={inst.SpellId}: target missing -> NoTarget", this);
+      ForbesLog.Net($"Spell instance index={i} spellId={inst.SpellId}: target missing -> NoTarget", this);
       var cancelled = inst;
       Complete(i);
       OnInstanceCancelled?.Invoke(i, cancelled, CombatFeedbackReason.NoTarget);
@@ -142,7 +148,7 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
     }
 
     if (impactHealth.IsDead) {
-      ForbesLog.Net($"Spell instance slot={i} spellId={inst.SpellId}: target dead -> TargetDead", this);
+      ForbesLog.Net($"Spell instance index={i} spellId={inst.SpellId}: target dead -> TargetDead", this);
       var cancelled = inst;
       Complete(i);
       OnInstanceCancelled?.Invoke(i, cancelled, CombatFeedbackReason.TargetDead);

@@ -124,7 +124,7 @@ namespace Forbes.Tests.PlayMode {
         Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
           "Dummy HP must not change while missile is still in flight.");
         Assert.IsTrue(registry.HasActiveInstanceForCaster(_player.Id),
-          "Missile slot must still be occupied during flight.");
+          "Active instance must still be in registry during flight.");
 
         Assert.Greater(_player.GetComponent<Health>().NetworkedHealth, 0.5f,
           "Caster should stay alive for this smoke.");
@@ -195,7 +195,7 @@ namespace Forbes.Tests.PlayMode {
         Assert.AreEqual(0f, dummyHealth.NetworkedHealth, 0.01f,
           "Dead target must not receive delayed projectile damage.");
         Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
-          "Missile slot must be cleared when target is dead.");
+          "Active instance must be cleared from registry when target is dead.");
       }
     }
 
@@ -227,7 +227,7 @@ namespace Forbes.Tests.PlayMode {
         yield return FusionPlayModeTestHelpers.WaitFrames(120);
 
         Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
-          "Pending missile must be cleared when the caster dies.");
+          "Active instance must be cleared from registry when the caster dies.");
         Assert.AreEqual(startDummyHp, dummyHealth.NetworkedHealth, 0.35f,
           "Target must be undamaged: in-flight missile abandoned on caster death.");
         Assert.IsFalse(dummyHealth.IsDead,
@@ -362,7 +362,7 @@ namespace Forbes.Tests.PlayMode {
         _session.InputRelay.StickyMove = Vector2.zero;
 
         Assert.IsFalse(registry.HasActiveInstanceForCaster(_player.Id),
-          "Missile slot must be cleared after impact.");
+          "Active instance must be cleared from registry after impact.");
         Assert.IsFalse(dummyHealth.IsDead, "Target must survive a single Fireball.");
       }
     }

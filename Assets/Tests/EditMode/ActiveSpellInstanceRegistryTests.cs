@@ -14,7 +14,7 @@ namespace Forbes.Tests.EditMode {
     [Test]
     public void ActiveSpellInstance_Default_SpellId_IsZero() {
       var inst = new ActiveSpellInstance();
-      Assert.AreEqual(0, inst.SpellId, "SpellId 0 = inactive slot.");
+      Assert.AreEqual(0, inst.SpellId, "SpellId 0 = inactive (no active instance).");
     }
 
     [Test]
@@ -48,6 +48,20 @@ namespace Forbes.Tests.EditMode {
     public void ActiveSpellInstance_IsActive_TrueWhenSpellIdNonZero() {
       var inst = new ActiveSpellInstance { SpellId = 1 };
       Assert.IsTrue(inst.IsActive);
+    }
+
+    [Test]
+    public void ActiveSpellInstance_DefaultInstanceId_IsZero() {
+      var inst = new ActiveSpellInstance();
+      Assert.AreEqual(0, inst.InstanceId,
+        "Default InstanceId must be 0 (unassigned).");
+    }
+
+    [Test]
+    public void ActiveSpellInstance_InstanceIdDoesNotDriveIsActive() {
+      var inst = new ActiveSpellInstance { SpellId = 0, InstanceId = 1 };
+      Assert.IsFalse(inst.IsActive,
+        "IsActive is governed by SpellId, not InstanceId.");
     }
 
     [Test]
@@ -90,11 +104,11 @@ namespace Forbes.Tests.EditMode {
           "Adding ActiveSpellInstancePresenter must not throw.");
 
         var spheres = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include)
-          .Where(g => g != null && g.name == ActiveSpellInstancePresenter.FireballVisualName)
+          .Where(g => g != null && g.name == ActiveSpellInstancePresenter.ProjectileVisualName)
           .ToList();
 
         Assert.AreEqual(0, spheres.Count,
-          $"Adding ActiveSpellInstancePresenter to a GameObject must not create '{ActiveSpellInstancePresenter.FireballVisualName}' spheres in Awake.");
+          $"Adding ActiveSpellInstancePresenter to a GameObject must not create '{ActiveSpellInstancePresenter.ProjectileVisualName}' visuals in Awake.");
       } finally {
         Object.DestroyImmediate(go);
       }

@@ -15,29 +15,17 @@ namespace Forbes.Tests.PlayMode {
     FusionSinglePlayerTestSession _session;
     NetworkObject                 _caster;
     NetworkObject                 _victim;
-    GameObject                    _casterPrefab;
-    GameObject                    _victimPrefab;
 
     [SetUp]
     public void SetUp() {
       PlayModeTargetingCleanup.DestroyAutoCreatedTargetingSystem();
-      _session      = new FusionSinglePlayerTestSession();
-      _caster       = null;
-      _victim       = null;
-      _casterPrefab = null;
-      _victimPrefab = null;
+      _session = new FusionSinglePlayerTestSession();
+      _caster  = null;
+      _victim  = null;
     }
 
     [TearDown]
     public void TearDown() {
-      if (_casterPrefab != null) {
-        UnityEngine.Object.Destroy(_casterPrefab);
-      }
-
-      if (_victimPrefab != null) {
-        UnityEngine.Object.Destroy(_victimPrefab);
-      }
-
       PlayModeTargetingCleanup.DestroyAutoCreatedTargetingSystem();
     }
 
@@ -51,8 +39,10 @@ namespace Forbes.Tests.PlayMode {
         Assert.IsNotNull(runner);
         yield return FusionPlayModeTestHelpers.WaitFrames(5);
 
-        _casterPrefab = CreateRuntimeMobPrefab("RuntimeCasterMobPrefab", includeCombat: true);
-        _victimPrefab = CreateRuntimeMobPrefab("RuntimeCasterVictimPrefab", includeCombat: false);
+        // Fusion TrySpawn requires prefabs listed in NetworkProjectConfig PrefabTable.
+        // Runtime-built GameObjects are not valid spawn prefabs (PrefabTable miss).
+        GameObject dummyPrefab = FusionPlayModeTestAssets.LoadPrefab(FusionPlayModeTestAssets.TrainingDummyPrefabPath);
+        Assert.IsNotNull(dummyPrefab, "TrainingDummy.prefab missing.");
 
         var spawnFlags = NetworkSpawnFlags.SharedModeStateAuthLocalPlayer;
         var casterSpawn = Vector3.zero;
@@ -61,7 +51,7 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner,
-          _casterPrefab,
+          dummyPrefab,
           casterSpawn,
           Quaternion.identity,
           PlayerRef.None,
@@ -73,7 +63,7 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FusionPlayModeTestHelpers.SpawnPrefabBlocking(
           runner,
-          _victimPrefab,
+          dummyPrefab,
           victimFar,
           Quaternion.identity,
           PlayerRef.None,
@@ -90,6 +80,8 @@ namespace Forbes.Tests.PlayMode {
 
         Assert.IsNotNull(casterBrain);
         Assert.IsNotNull(casterCombat, "Caster mob must use the existing NetworkCombatController runtime.");
+        Assert.IsNotNull(_caster.GetComponent<ActiveSpellInstanceRegistry>(),
+          "Caster needs ActiveSpellInstanceRegistry for projectile simulation.");
         Assert.IsTrue(casterBrain.HasStateAuthority, "Caster mob intent must run on State Authority.");
         Assert.IsTrue(casterCombat.HasStateAuthority, "Combat requests must be made by State Authority.");
 
@@ -133,28 +125,6 @@ namespace Forbes.Tests.PlayMode {
         Assert.AreEqual(expectedHp, victimHealth.NetworkedHealth, 0.5f,
           "Caster mob should apply Fireball damage through NetworkCombatController, not melee damage.");
       }
-    }
-
-    static GameObject CreateRuntimeMobPrefab(string name, bool includeCombat) {
-      var go = new GameObject(name);
-      go.AddComponent<NetworkObject>();
-      go.AddComponent<NetworkTransform>();
-      var controller = go.AddComponent<CharacterController>();
-      controller.center = new Vector3(0f, 1f, 0f);
-      controller.height = 2f;
-      controller.radius = 0.5f;
-
-      var health = go.AddComponent<Health>();
-      health.StartingHealth = 100f;
-      health.FallKillEnabled = false;
-
-      if (includeCombat) {
-        go.AddComponent<NetworkCombatController>();
-        go.AddComponent<ActiveSpellInstanceRegistry>();
-      }
-
-      go.AddComponent<NetworkMobBrain>();
-      return go;
     }
 
     static void ConfigureCaster(NetworkMobBrain brain) {

@@ -4,19 +4,45 @@ using UnityEngine;
 
 /// <summary>
 /// Cosmetic-only observer: reads <see cref="ActiveSpellInstanceRegistry"/> on the
-/// same GameObject and manages one local fireball sphere per active TargetedProjectile slot.
+/// same GameObject and manages one local projectile visual per active TargetedProjectile instance.
 /// Never applies damage, never writes networked state, not a NetworkBehaviour.
+/// <para>
+/// Visuals are keyed by <see cref="ActiveSpellInstance.InstanceId"/>, not by registry index.
+/// When the same entry index is reused by a new spell, the old visual is destroyed and a
+/// fresh one is created for the new InstanceId.
+/// </para>
+/// <para>
+/// Visual position is reconstructed on first appearance (fast-forward from Origin through
+/// elapsed ticks) then advanced each render frame using the same step model as the server.
+/// Visual position is never networked.
+/// </para>
 /// </summary>
 [RequireComponent(typeof(ActiveSpellInstanceRegistry))]
 public class ActiveSpellInstancePresenter : MonoBehaviour {
-  const float  VisualDiameter    = 0.3f;
-  internal const string FireballVisualName = "FireballVisual";
+  /// <summary>Maps a SpellId to the cosmetic prefab used for that spell's projectile visual.</summary>
+  [System.Serializable]
+  public struct ProjectileVisualEntry {
+    public byte       SpellId;
+    public GameObject Prefab;
+  }
+
+  const float VisualDiameter = 0.3f;
+  internal const string ProjectileVisualName = "ProjectileVisual";
+
+  /// <summary>
+  /// Per-spell projectile prefabs. Each entry maps a SpellId to the prefab instantiated as
+  /// its cosmetic projectile. Any colliders on the prefab are removed at runtime.
+  /// If no entry matches the active spell, a primitive sphere fallback is used.
+  /// </summary>
+  [SerializeField] ProjectileVisualEntry[] _projectileVisuals = {};
 
   ActiveSpellInstanceRegistry _registry;
   NetworkRunner               _runner;
 
-  readonly Dictionary<int, GameObject> _activeVisuals = new();
-  readonly List<int>                   _toRemove      = new();
+  // Both dictionaries keyed by InstanceId (not registry index).
+  readonly Dictionary<int, GameObject> _activeVisuals   = new();
+  readonly Dictionary<int, Vector3>    _visualPositions = new();
+  readonly List<int>                   _toRemove        = new();
 
   void Awake() {
     _registry = GetComponent<ActiveSpellInstanceRegistry>();
@@ -31,58 +57,144 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
       return;
     }
 
-    // Remove visuals for completed (inactive) slots.
+    // Collect active InstanceIds currently in the registry.
+    // Remove visuals for any InstanceId that is no longer present.
     _toRemove.Clear();
-    foreach (var kv in _activeVisuals) {
-      if (!_registry.Instances[kv.Key].IsActive) {
-        _toRemove.Add(kv.Key);
+    foreach (var id in _activeVisuals.Keys) {
+      if (!IsInstanceIdActive(id)) {
+        _toRemove.Add(id);
       }
     }
-    foreach (int idx in _toRemove) {
-      Destroy(_activeVisuals[idx]);
-      _activeVisuals.Remove(idx);
+    foreach (int id in _toRemove) {
+      Destroy(_activeVisuals[id]);
+      _activeVisuals.Remove(id);
+      _visualPositions.Remove(id);
     }
 
-    // Spawn visuals for newly active slots with a projectile spell.
+    // Spawn visuals for newly active instances and advance all live visual positions.
     for (int i = 0; i < ActiveSpellInstanceRegistry.Capacity; i++) {
       var inst = _registry.Instances[i];
-      if (!inst.IsActive || _activeVisuals.ContainsKey(i)) {
+      if (!inst.IsActive || inst.InstanceId == 0) {
         continue;
       }
+
       var spell = SpellRegistry.Get(inst.SpellId);
       if (!SpellTravelLogic.HasProjectile(spell)) {
         continue;
       }
-      _activeVisuals[i] = CreateFireballVisual();
+
+      if (!_activeVisuals.ContainsKey(inst.InstanceId)) {
+        // New active instance: reconstruct starting position then create visual.
+        if (!_runner.TryFindObject(inst.TargetId, out var initialTarget) || initialTarget == null) {
+          continue;
+        }
+
+        var reconstructed = ReconstructVisualPosition(
+          inst.Origin,
+          initialTarget.transform.position,
+          spell.ProjectileSpeedMetersPerSecond,
+          _runner.DeltaTime,
+          _runner.Tick - inst.ReleaseTick);
+
+        _visualPositions[inst.InstanceId] = reconstructed;
+        _activeVisuals[inst.InstanceId]   = CreateProjectileVisual(inst.SpellId);
+      }
     }
 
-    // Update position of all live visuals.
+    // Advance all live visual positions and apply to transforms.
     foreach (var kv in _activeVisuals) {
-      UpdateVisualPosition(kv.Key, kv.Value);
+      AdvanceAndUpdateVisual(kv.Key, kv.Value);
     }
   }
 
-  void UpdateVisualPosition(int slotIndex, GameObject visual) {
-    var inst = _registry.Instances[slotIndex];
+  // Fast-forwards from origin through elapsedTicks simulation steps toward currentTargetPos.
+  // Assumes the target was at its current position throughout (acceptable for a cosmetic visual).
+  static Vector3 ReconstructVisualPosition(
+    Vector3 origin, Vector3 currentTargetPos, float speed, float tickDt, int elapsedTicks) {
+    var pos = origin;
+    for (int t = 0; t < elapsedTicks; t++) {
+      pos = SpellTravelLogic.AdvanceMissilePosition(pos, currentTargetPos, speed, tickDt);
+    }
+
+    return pos;
+  }
+
+  void AdvanceAndUpdateVisual(int instanceId, GameObject visual) {
+    // Find the registry entry for this InstanceId.
+    ActiveSpellInstance inst = default;
+    bool found = false;
+    for (int i = 0; i < ActiveSpellInstanceRegistry.Capacity; i++) {
+      var candidate = _registry.Instances[i];
+      if (candidate.IsActive && candidate.InstanceId == instanceId) {
+        inst  = candidate;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      visual.SetActive(false);
+      return;
+    }
+
     if (!_runner.TryFindObject(inst.TargetId, out var targetObj) || targetObj == null) {
       visual.SetActive(false);
       return;
     }
 
-    var   spell   = SpellRegistry.Get(inst.SpellId);
-    float dist    = Vector3.Distance(inst.Origin, targetObj.transform.position);
-    float elapsed = (_runner.Tick - inst.ReleaseTick) * _runner.DeltaTime;
-    float t       = dist > 0.001f
-      ? Mathf.Clamp01(elapsed * spell.ProjectileSpeedMetersPerSecond / dist)
-      : 1f;
+    var   spell    = SpellRegistry.Get(inst.SpellId);
+    float speed    = spell.ProjectileSpeedMetersPerSecond;
+    var   targetPos = targetObj.transform.position;
 
-    visual.transform.position = Vector3.Lerp(inst.Origin, targetObj.transform.position, t);
+    var current = _visualPositions[instanceId];
+    current = SpellTravelLogic.AdvanceMissilePosition(current, targetPos, speed, Time.deltaTime);
+    _visualPositions[instanceId] = current;
+
+    visual.transform.position = current;
     visual.SetActive(true);
   }
 
-  static GameObject CreateFireballVisual() {
+  bool IsInstanceIdActive(int instanceId) {
+    for (int i = 0; i < ActiveSpellInstanceRegistry.Capacity; i++) {
+      var inst = _registry.Instances[i];
+      if (inst.IsActive && inst.InstanceId == instanceId) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  GameObject CreateProjectileVisual(byte spellId) {
+    var prefab = FindVisualPrefab(spellId);
+    GameObject go;
+    if (prefab != null) {
+      go      = Instantiate(prefab);
+      go.name = ProjectileVisualName;
+      foreach (var col in go.GetComponentsInChildren<Collider>()) {
+        Destroy(col);
+      }
+    } else {
+      go = CreatePrimitiveSphereVisual();
+    }
+
+    go.SetActive(false);
+    return go;
+  }
+
+  GameObject FindVisualPrefab(byte spellId) {
+    foreach (var entry in _projectileVisuals) {
+      if (entry.SpellId == spellId) {
+        return entry.Prefab;
+      }
+    }
+
+    return null;
+  }
+
+  static GameObject CreatePrimitiveSphereVisual() {
     var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-    sphere.name = FireballVisualName;
+    sphere.name = ProjectileVisualName;
     sphere.transform.localScale = Vector3.one * VisualDiameter;
 
     if (sphere.TryGetComponent<Collider>(out var col)) {
@@ -90,7 +202,6 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
     }
 
     sphere.GetComponent<Renderer>().material = SpellVisualColors.NewFireballOrbMaterial();
-    sphere.SetActive(false);
     return sphere;
   }
 
@@ -101,5 +212,6 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
       }
     }
     _activeVisuals.Clear();
+    _visualPositions.Clear();
   }
 }

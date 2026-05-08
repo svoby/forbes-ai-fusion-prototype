@@ -17,8 +17,10 @@ public partial class NetworkCombatController {
     if (reason == CastCancelReason.Death) {
       bool hadCast = IsCasting;
       ClearCastState();
-      // Death clears both cast state and any in-flight pending instances: the
+      // Death clears both cast state and any in-flight active instances: the
       // projectile is abandoned and the target will not be damaged.
+      // TODO: Gameplay policy — caster death may later differ by spell type
+      // (e.g. a persistent AoE might survive the caster's death). Keep as-is for now.
       _registry?.RemoveAllForCaster(Object.Id);
       if (hadCast) {
         SetCombatFeedback(CombatFeedbackReason.CastInterruptedByDeath);
@@ -87,8 +89,10 @@ public partial class NetworkCombatController {
 
     if (castTicks == 0) {
       // Instant spell: GCD and cooldown start immediately.
-      if (spell.TriggersGcd) {
+      if (spell.TriggersGcd)
+      {
         GcdEndTick = Runner.Tick + SecsToTicks(GcdSec);
+        
       }
       SetCooldownEndTick(spellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
@@ -158,9 +162,13 @@ public partial class NetworkCombatController {
       Origin      = transform.position,
       ReleaseTick = Runner.Tick,
     };
-    int slot = _registry?.TryAdd(inst) ?? -1;
-    if (slot < 0) {
-      ForbesLog.Warn($"Projectile instance dropped: registry full. spellId={spellId}", this);
+    int entryIndex = _registry?.TryAdd(inst) ?? -1;
+    if (entryIndex < 0) {
+      ForbesLog.Warn(
+        _registry == null
+          ? $"Projectile instance dropped: no ActiveSpellInstanceRegistry on '{gameObject.name}'. spellId={spellId}"
+          : $"Projectile instance dropped: registry full. spellId={spellId}",
+        this);
     }
     ForbesLog.Net($"{logPrefix} (projectile): {spellName} releaseTick={Runner.Tick}", this);
   }

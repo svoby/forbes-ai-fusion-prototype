@@ -8,10 +8,10 @@ public enum SpellInstanceKind : byte {
 
 /// <summary>
 /// Describes one active spell presentation/gameplay instance replicated to all clients.
-/// SpellId == 0 means the slot is empty. Used in <see cref="ActiveSpellInstanceRegistry"/>.
+/// SpellId == 0 means the entry is inactive. Used in <see cref="ActiveSpellInstanceRegistry"/>.
 /// </summary>
 public partial struct ActiveSpellInstance : INetworkStruct {
-  /// <summary>0 = slot empty/completed; non-zero = active spell.</summary>
+  /// <summary>0 = inactive (no active spell); non-zero = active spell.</summary>
   public byte SpellId;
 
   /// <summary>Governs simulation and presentation routing.</summary>
@@ -25,6 +25,13 @@ public partial struct ActiveSpellInstance : INetworkStruct {
 
   /// <summary>Simulation tick when this instance was created/released.</summary>
   public int ReleaseTick;
+
+  /// <summary>
+  /// Non-zero unique id assigned at creation by the state authority.
+  /// Guards against visual reuse when a new spell occupies the same entry index.
+  /// 0 = unassigned (struct default / inactive).
+  /// </summary>
+  public int InstanceId;
 
   public bool IsActive => SpellId != 0;
 }

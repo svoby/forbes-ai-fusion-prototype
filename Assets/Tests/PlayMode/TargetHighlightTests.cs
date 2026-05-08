@@ -50,8 +50,13 @@ namespace Forbes.Tests.PlayMode {
 
         yield return null;
         yield return null;
+        // IEnumerator resumes after Update but before LateUpdate for a plain yield; TargetHighlight
+        // moves the ring in LateUpdate. Wait until the frame finishes so we compare against that pose.
+        yield return new WaitForEndOfFrame();
 
-        var expected = targetGo.transform.position + Vector3.up * 0.04f;
+        // Plain target: no CharacterController / CapsuleCollider, so feet == pivot (see EditMode
+        // TargetHighlightGetFeetPositionTests for collider cases).
+        var expected = targetGo.transform.position + Vector3.up * 0.02f;
         Assert.AreEqual(expected.x, highlight.transform.position.x, 1e-5f);
         Assert.AreEqual(expected.y, highlight.transform.position.y, 1e-5f);
         Assert.AreEqual(expected.z, highlight.transform.position.z, 1e-5f);

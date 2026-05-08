@@ -100,7 +100,7 @@ public partial class NetworkCombatController : NetworkBehaviour {
     }
   }
 
-  void HandleInstanceArrived(int slotIndex, ActiveSpellInstance instance) {
+  void HandleInstanceArrived(int index, ActiveSpellInstance instance) {
     if (instance.CasterId != Object.Id) {
       return;
     }
@@ -119,7 +119,7 @@ public partial class NetworkCombatController : NetworkBehaviour {
     DispatchImpactVisual(instance.SpellId, instance.TargetId);
   }
 
-  void HandleInstanceCancelled(int slotIndex, ActiveSpellInstance instance, CombatFeedbackReason reason) {
+  void HandleInstanceCancelled(int index, ActiveSpellInstance instance, CombatFeedbackReason reason) {
     if (instance.CasterId != Object.Id) {
       return;
     }
