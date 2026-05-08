@@ -20,9 +20,10 @@ GameObject:
   - component: {fileID: 451230020}
   - component: {fileID: 5369084840526379457}
   - component: {fileID: 9216940810419471991}
-  - component: {fileID: 451230030}
   - component: {fileID: 451230031}
   - component: {fileID: 451230040}
+  - component: {fileID: 451230050}
+  - component: {fileID: 451230060}
   m_Layer: 0
   m_Name: PlayerCharacter
   m_TagString: Untagged
@@ -125,6 +126,7 @@ MonoBehaviour:
   - {fileID: 451230011}
   - {fileID: 451230012}
   - {fileID: 5369084840526379457}
+  - {fileID: 451230050}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &3461557113846365698
 CharacterController:
@@ -477,18 +479,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &451230030
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7272019710335391474}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &451230031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -513,3 +503,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82ed76a3e954fc143bb91fef3fbb1448, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &451230050
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d7632a385ac4a2a8142a96298f7b477, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ActiveSpellInstanceRegistry
+--- !u!114 &451230060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7272019710335391474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6dbabf6141f4976bbc6187c723609d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ActiveSpellInstancePresenter
+  _projectileVisuals:
+  - SpellId: 1
+    Prefab: {fileID: 1000000, guid: 3df642fc75974560876e4f726f28920b, type: 3}

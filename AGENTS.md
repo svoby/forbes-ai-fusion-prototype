@@ -42,7 +42,7 @@ Do not treat old plans, checkpoints, or removed historical docs as current guida
 - Work on the current branch by default.
 - Do not create, checkout, switch, merge, rebase, push, or commit unless the user explicitly asks.
 - If a branch change seems needed, ask first and explain why.
-- Stage or commit only files that belong to the requested task.
+- Do not run `git add` or otherwise stage changes unless the user explicitly asks. When the user asks you to commit, include only files that belong to the requested task.
 - Never merge feature branches into `main`/`master` unless the user explicitly requests that operation.
 
 These rules allow Codex and Cursor to operate in the same repository without surprise branch

@@ -61,7 +61,7 @@ public class TargetHighlight : MonoBehaviour {
   /// Returns the bottom-of-collider world position for <paramref name="t"/>.
   /// Falls back to <c>t.position</c> when no recognised collider is present.
   /// </summary>
-  static Vector3 GetFeetPosition(Transform t) {
+  internal static Vector3 GetFeetPosition(Transform t) {
     // CharacterController pivot is at the capsule centre; bottom = pos - up*(height/2 - skinWidth).
     var cc = t.GetComponentInChildren<CharacterController>();
     if (cc != null) {

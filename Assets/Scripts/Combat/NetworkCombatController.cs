@@ -69,36 +69,61 @@ public partial class NetworkCombatController : NetworkBehaviour {
     }
   }
 
-  Health          _health;
-  SpellImpactView _impactView;
-  PlayerMissileSlot _missileSlot;
-  NetworkButtons  _prevButtons;
+  Health                      _health;
+  SpellImpactView             _impactView;
+  ActiveSpellInstanceRegistry _registry;
+  NetworkButtons              _prevButtons;
 
   void Awake() {
-    _health      = GetComponent<Health>();
-    _impactView  = GetComponent<SpellImpactView>();
-    _missileSlot = GetComponent<PlayerMissileSlot>();
-  }
-
-  public override void Spawned() {
-    _missileSlot.OnImpact    += HandleMissileImpact;
-    _missileSlot.OnCancelled += HandleMissileCancelled;
-  }
-
-  public override void Despawned(NetworkRunner runner, bool hasState) {
-    if (_missileSlot != null) {
-      _missileSlot.OnImpact    -= HandleMissileImpact;
-      _missileSlot.OnCancelled -= HandleMissileCancelled;
+    _health    = GetComponent<Health>();
+    _impactView = GetComponent<SpellImpactView>();
+    _registry  = GetComponent<ActiveSpellInstanceRegistry>();
+    if (_registry == null) {
+      ForbesLog.Warn(
+        "NetworkCombatController: no ActiveSpellInstanceRegistry on this GameObject — " +
+        "projectile spells will not deal damage.", this);
     }
   }
 
-  void HandleMissileImpact(byte spellId, NetworkId targetId, Health targetHealth) {
-    var spell = SpellRegistry.Get(spellId);
-    targetHealth.DealDamageRpc(spell.Damage);
-    DispatchImpactVisual(spellId, targetId);
+  public override void Spawned() {
+    if (HasStateAuthority && _registry != null) {
+      _registry.OnInstanceArrived   += HandleInstanceArrived;
+      _registry.OnInstanceCancelled += HandleInstanceCancelled;
+    }
   }
 
-  void HandleMissileCancelled(CombatFeedbackReason reason) {
+  public override void Despawned(NetworkRunner runner, bool hasState) {
+    if (_registry != null) {
+      _registry.OnInstanceArrived   -= HandleInstanceArrived;
+      _registry.OnInstanceCancelled -= HandleInstanceCancelled;
+      _registry = null;
+    }
+  }
+
+  void HandleInstanceArrived(int index, ActiveSpellInstance instance) {
+    if (instance.CasterId != Object.Id) {
+      return;
+    }
+
+    var spell = SpellRegistry.Get(instance.SpellId);
+    if (!spell.IsValid) {
+      return;
+    }
+
+    if (!Runner.TryFindObject(instance.TargetId, out var targetObj)
+        || !targetObj.TryGetComponent(out Health targetHealth)) {
+      return;
+    }
+
+    targetHealth.DealDamageRpc(spell.Damage);
+    DispatchImpactVisual(instance.SpellId, instance.TargetId);
+  }
+
+  void HandleInstanceCancelled(int index, ActiveSpellInstance instance, CombatFeedbackReason reason) {
+    if (instance.CasterId != Object.Id) {
+      return;
+    }
+
     SetCombatFeedback(reason);
   }
 

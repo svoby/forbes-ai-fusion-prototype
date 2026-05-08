@@ -20,6 +20,8 @@ GameObject:
   - component: {fileID: 991001001020}
   - component: {fileID: 2864031344629190355}
   - component: {fileID: 991001001022}
+  - component: {fileID: 991001001024}
+  - component: {fileID: 991001001025}
   - component: {fileID: 991001001023}
   m_Layer: 0
   m_Name: TrainingDummy
@@ -121,6 +123,7 @@ MonoBehaviour:
   - {fileID: 991001001007}
   - {fileID: 991001001008}
   - {fileID: 991001001021}
+  - {fileID: 991001001024}
   - {fileID: 991001001023}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &991001001006
@@ -487,3 +490,30 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &991001001024
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 991001001001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d7632a385ac4a2a8142a96298f7b477, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ActiveSpellInstanceRegistry
+--- !u!114 &991001001025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 991001001001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6dbabf6141f4976bbc6187c723609d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ActiveSpellInstancePresenter
+  _projectileVisuals:
+  - SpellId: 1
+    Prefab: {fileID: 1000000, guid: 3df642fc75974560876e4f726f28920b, type: 3}

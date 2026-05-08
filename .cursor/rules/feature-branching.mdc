@@ -18,13 +18,11 @@ Branch name convention:
 - `chore/<task-name>` - for chores and refactors
 - `test/<task-name>` - for test-only changes
 
-## Commit policy — stage only, never commit
+## Commit policy — never commit; do not stage unless asked
 
-The agent **must never run `git commit`**. Instead:
+The agent **must never run `git commit`**. Do **not** run `git add` or otherwise stage changes unless the user explicitly asks.
 
-1. Stage all relevant files with `git add`.
-2. Write the intended commit message to `.git/COMMIT_EDITMSG`.
-3. Leave the working tree staged-but-uncommitted;
+Optionally, when wrapping up a task, write the intended commit message to `.git/COMMIT_EDITMSG` so the user can paste or adjust it in Source Control.
 
 Commit message prefix conventions (for `COMMIT_EDITMSG`):
 
@@ -36,4 +34,3 @@ Commit message prefix conventions (for `COMMIT_EDITMSG`):
 ## When work is done
 
 - Do **not** merge, push, or rebase from the agent session.
-- Remind the user that staged files are ready and they can commit from the Source Control panel.

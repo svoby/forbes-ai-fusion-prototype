@@ -17,9 +17,11 @@ public partial class NetworkCombatController {
     if (reason == CastCancelReason.Death) {
       bool hadCast = IsCasting;
       ClearCastState();
-      // Death clears both cast state and any in-flight pending missile: the
+      // Death clears both cast state and any in-flight active instances: the
       // projectile is abandoned and the target will not be damaged.
-      _missileSlot.Clear();
+      // TODO: Gameplay policy — caster death may later differ by spell type
+      // (e.g. a persistent AoE might survive the caster's death). Keep as-is for now.
+      _registry?.RemoveAllForCaster(Object.Id);
       if (hadCast) {
         SetCombatFeedback(CombatFeedbackReason.CastInterruptedByDeath);
         ForbesLog.Net($"Cast cancelled: {reason}", this);
@@ -87,14 +89,15 @@ public partial class NetworkCombatController {
 
     if (castTicks == 0) {
       // Instant spell: GCD and cooldown start immediately.
-      if (spell.TriggersGcd) {
+      if (spell.TriggersGcd)
+      {
         GcdEndTick = Runner.Tick + SecsToTicks(GcdSec);
+        
       }
       SetCooldownEndTick(spellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
       if (SpellTravelLogic.HasProjectile(spell)) {
-        _missileSlot.Schedule(spellId, targetId, transform.position);
-        ForbesLog.Net($"Instant cast (missile): {spell.Name} releaseTick={Runner.Tick}", this);
+        ScheduleProjectileInstance(spellId, targetId, spell.Name, "Instant cast");
       } else {
         targetHealth.DealDamageRpc(spell.Damage);
         DispatchImpactVisual(spellId, targetId);
@@ -133,8 +136,7 @@ public partial class NetworkCombatController {
     SetCooldownEndTick(CurrentSpellId, Runner.Tick + SecsToTicks(spell.CooldownSec));
 
     if (SpellTravelLogic.HasProjectile(spell)) {
-      _missileSlot.Schedule(CurrentSpellId, CastTarget, transform.position);
-      ForbesLog.Net($"Cast resolved (missile): {spell.Name} releaseTick={Runner.Tick}", this);
+      ScheduleProjectileInstance(CurrentSpellId, CastTarget, spell.Name, "Cast resolved");
     } else {
       targetHealth.DealDamageRpc(spell.Damage);
       DispatchImpactVisual(CurrentSpellId, CastTarget);
@@ -148,5 +150,26 @@ public partial class NetworkCombatController {
     CastTarget     = default;
     CastStartTick  = 0;
     CastEndTick    = 0;
+  }
+
+  // Constructs and registers a TargetedProjectile instance. Shared by instant and cast-time paths.
+  void ScheduleProjectileInstance(byte spellId, NetworkId targetId, string spellName, string logPrefix) {
+    var inst = new ActiveSpellInstance {
+      SpellId     = spellId,
+      Kind        = SpellInstanceKind.TargetedProjectile,
+      CasterId    = Object.Id,
+      TargetId    = targetId,
+      Origin      = transform.position,
+      ReleaseTick = Runner.Tick,
+    };
+    int entryIndex = _registry?.TryAdd(inst) ?? -1;
+    if (entryIndex < 0) {
+      ForbesLog.Warn(
+        _registry == null
+          ? $"Projectile instance dropped: no ActiveSpellInstanceRegistry on '{gameObject.name}'. spellId={spellId}"
+          : $"Projectile instance dropped: registry full. spellId={spellId}",
+        this);
+    }
+    ForbesLog.Net($"{logPrefix} (projectile): {spellName} releaseTick={Runner.Tick}", this);
   }
 }

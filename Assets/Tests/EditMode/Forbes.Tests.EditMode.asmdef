@@ -3,6 +3,7 @@
     "rootNamespace": "Forbes.Tests.EditMode",
     "references": [
         "Forbes.Runtime",
+        "UnityEditor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Fusion.Unity",
