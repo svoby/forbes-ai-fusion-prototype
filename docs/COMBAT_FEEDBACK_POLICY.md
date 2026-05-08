@@ -124,7 +124,7 @@ in the Inspector when the component is added.
 - **Not a combat log.** There is no event history, no event queue, no per-frame dispatch.
 - **Not a gameplay signal.** Nothing driven by `CombatHitReceived` may affect HP, targeting,
   or cooldowns.
-- **Not a projectile system.** Spell instances, the `ActiveSpellInstanceRegistry` model, and projectile non-goals are in [architecture.md](architecture.md) (Spell system).
+- **Not a projectile system.** Spell instances and projectile non-goals are in [architecture.md](architecture.md) (Spell system).
 - **Not a full spell feedback system.** Per-spell cosmetic differences (e.g. fire vs. frost
   hit color) should read from the existing `RpcOnSpellImpact` path in
   `NetworkCombatController`, not from the health event.
