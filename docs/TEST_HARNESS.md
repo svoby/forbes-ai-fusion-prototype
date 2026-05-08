@@ -67,4 +67,4 @@ Outputs:
 
 ## More detail
 
-See `AGENTS.md` for the definition of done and test obligations per task. See `docs/PROJECTILE_POLICY.md` for the testing policy specific to the missile/projectile layer.
+See `AGENTS.md` for the definition of done and test obligations per task.

@@ -124,22 +124,7 @@ in the Inspector when the component is added.
 - **Not a combat log.** There is no event history, no event queue, no per-frame dispatch.
 - **Not a gameplay signal.** Nothing driven by `CombatHitReceived` may affect HP, targeting,
   or cooldowns.
-- **Not a projectile system.** Projectile policy is covered in [PROJECTILE_POLICY.md](PROJECTILE_POLICY.md).
+- **Not a projectile system.** Projectile non-goals and the `ActiveSpellInstanceRegistry` model are described in `docs/architecture.md` (Spell system section).
 - **Not a full spell feedback system.** Per-spell cosmetic differences (e.g. fire vs. frost
   hit color) should read from the existing `RpcOnSpellImpact` path in
   `NetworkCombatController`, not from the health event.
-
-## Future extensions
-
-To add hit sounds, screen shake, or additional visual variants, add new `MonoBehaviour`
-observers that subscribe to `Health.CombatHitReceived`:
-
-```csharp
-_health.CombatHitReceived += damage => PlayHitSound(damage);
-```
-
-Do not add new `[Networked]` fields to `Health` for purely visual variations.
-Use `LastHitDamage` for local interpolation and cosmetic logic.
-
-To add per-spell damage number coloring or icons, read from the `RpcOnSpellImpact`
-callback in `NetworkCombatController`; do not extend the `Health` hit event.

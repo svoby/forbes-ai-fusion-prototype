@@ -134,5 +134,12 @@ NetworkCombatController.FixedUpdateNetwork  (spells, GCD)
 `NetworkCombatController` owns networked cooldown ticks; for projectile spells it calls `ActiveSpellInstanceRegistry.TryAdd` on resolve and subscribes to `OnInstanceArrived` to dispatch `Health.DealDamageRpc`.
 `ActiveSpellInstanceRegistry` owns all spell instance state (up to 16 concurrent instances per caster) and runs per-tick homing logic at `[DefaultExecutionOrder(-200)]`, before `NetworkCombatController` processes new inputs. Replicated `ActiveSpellInstance` entries allow late-joining clients to reconstruct in-flight projectile visuals.
 
+**Projectile design non-goals** (do not introduce these approaches):
+
+- No hitscan/instant-travel bullets — spell damage is not resolved at cast time via a raycast.
+- No collider/trigger-volume impact detection — missiles do not use physics for hit detection.
+- No `Runner.Spawn` projectile `NetworkObject`s — missiles are virtual state entries in `ActiveSpellInstanceRegistry`, not spawned scene objects.
+- Cosmetic visuals (`ActiveSpellInstancePresenter`) must never participate in damage resolution or authoritative state changes.
+
 ---
 
