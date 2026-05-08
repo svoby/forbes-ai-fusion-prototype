@@ -21,8 +21,9 @@ A playable host+client room with third-person movement, tab-targeting, spell com
 
 ```
 Assets/Scripts/
-  Combat/          CastCancelReason, CombatFailReason, CombatFeedbackReason,
-                   CombatValidator, CosmeticProjectileView, NetworkCombatController,
+  Combat/          ActiveSpellInstance, ActiveSpellInstancePresenter, ActiveSpellInstanceRegistry,
+                   CastCancelReason, CombatFailReason, CombatFeedbackReason,
+                   CombatValidator, NetworkCombatController,
                    SpellImpactView, SpellRegistry, SpellTravelLogic, SpellVisualColors,
                    Targetable, TargetHighlight, TargetingController
   Core/            CheckerboardFloor, ForbesLog, GameplayInput, IInputSource
@@ -48,7 +49,7 @@ Assets/Scripts/
 - `NetworkMobBrainLogicTests`
 - `CastBarLayoutDefaultsTests`, `CastBarHudRegressionTests`
 - `HealthDefaultsTests`, `TargetHealthBarLogicTests`
-- `CosmeticProjectileViewColliderTests`
+- `ActiveSpellInstanceRegistryTests`, `CombatPrefabProjectilePipelineTests`
 - `FloatingCombatTextLogicTests`
 
 **PlayMode** (`Forbes.Tests.PlayMode`) — Fusion `GameMode.Single` smokes:

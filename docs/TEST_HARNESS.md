@@ -67,4 +67,4 @@ Outputs:
 
 ## More detail
 
-See `AGENTS.md` for the definition of done and test obligations per task.
+See `AGENTS.md` for the definition of done and test obligations per task. For the missile/projectile layer (`ActiveSpellInstanceRegistry`), see `docs/architecture.md` (Spell system) and tests: `SpellTravelLogicTests`, `ActiveSpellInstanceRegistryTests`, `NetworkCombatProjectileTravelSmokeTests`.

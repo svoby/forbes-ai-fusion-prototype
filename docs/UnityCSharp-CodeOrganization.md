@@ -29,7 +29,7 @@ Assets/Scripts/
   Networking/        # Fusion glue: spawner, callbacks na runneru (tenké)
   Player/            # hráč: movement, health, camera, HitImpactView (CombatHitReceived → UI)
   Combat/            # targeting, validation, spell registry, missile logic,
-                     # CosmeticProjectileView / SpellImpactView (kosmetika bez autority)
+                     # ActiveSpellInstancePresenter / SpellImpactView (kosmetika bez autority)
   Mobs/              # mob AI (NetworkMobBrain + čistá logika NetworkMobBrainLogic)
   UI/                # HUD + FloatingCombatTextCanvas / Item / Logic (screen-space dmg text)
   Training/          # editor / dummy cíle (volitelné)
