@@ -11,7 +11,8 @@ using UnityEngine.UI;
 /// <see cref="NetworkCombatController"/>. No gameplay logic.
 /// </para>
 /// <para>
-/// Built and wired by <see cref="RuntimeHudBootstrap.EnsureForRunner"/> at runtime, and by
+/// Built and wired by <see cref="RuntimeHudBootstrap"/> when the HUD attaches to a runner
+/// (entry point: <see cref="FusionHudToggle"/>), and by
 /// <c>ForbesFusionSharedSceneSetup.EnsureHudCanvas</c> in the Editor.
 /// </para>
 /// </summary>
@@ -68,11 +69,14 @@ public class CombatFeedbackBannerView : MonoBehaviour {
   /// <summary>
   /// Reasons not shown as the centered banner:
   /// caster-death is not a cast "error" in the WoW sense;
-  /// NewSpell interruption is silent from the player's perspective.
+  /// NewSpell interruption is silent from the player's perspective;
+  /// movement/jump cancels match <see cref="CombatWarningText.ForReason"/> (no banner text).
   /// </summary>
   internal static bool ShouldShowCombatFeedbackInBanner(CombatFeedbackReason reason) {
     return reason != CombatFeedbackReason.None
            && reason != CombatFeedbackReason.CasterDead
+           && reason != CombatFeedbackReason.CastInterruptedByMovement
+           && reason != CombatFeedbackReason.CastInterruptedByJump
            && reason != CombatFeedbackReason.CastInterruptedByNewSpell;
   }
 
