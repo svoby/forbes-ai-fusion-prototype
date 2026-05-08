@@ -137,7 +137,7 @@ namespace Forbes.Tests.PlayMode {
       brain.MinLegDistance = 0f;
       brain.IdleTicksMin   = 1;
       brain.IdleTicksMax   = 1;
-      brain.AggroRadius    = 30f;
+      brain.AggroRadius    = 15f;
       brain.LeashRadius    = 40f;
 
       // If caster mode accidentally falls through to melee, this will make the

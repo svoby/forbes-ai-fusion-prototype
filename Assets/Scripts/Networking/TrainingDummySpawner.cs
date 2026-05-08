@@ -158,7 +158,7 @@ public class TrainingDummySpawner : MonoBehaviour {
     if (spawnedCaster.TryGetComponent(out NetworkMobBrain brain)) {
       brain.CombatMode = NetworkMobBrainCombatMode.Caster;
       brain.CasterSpellId = 1;
-      brain.AggroRadius = 30f;
+      brain.AggroRadius = 15f;
       brain.LeashRadius = 40f;
     }
 
