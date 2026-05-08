@@ -9,18 +9,21 @@ current sources of truth and how to pick the smallest useful context bundle for 
 
 | Document | When to read |
 |---|---|
-| `docs/PROJECTILE_POLICY.md` | Combat, spells, targeted missiles, projectile visuals, missile manager discussions |
+| `docs/architecture.md` | Broad system orientation; spell system and projectile non-goals; prefer more specific docs for concrete coding tasks |
+| `docs/COMBAT_FEEDBACK_POLICY.md` | Combat feedback pipeline, floating damage text, hit event fields, collider rule for cosmetic objects |
 | `docs/TEST_HARNESS.md` | Running EditMode/PlayMode tests; understanding test commands and results |
-| `docs/architecture.md` | Broad system orientation; prefer more specific docs for concrete coding tasks |
 
 ---
 
 ## Common context bundles
 
 ### Combat / missiles
-- `docs/PROJECTILE_POLICY.md`
+- `docs/architecture.md` (Spell system section + projectile non-goals)
+- `docs/COMBAT_FEEDBACK_POLICY.md`
 - `docs/TEST_HARNESS.md`
 - `Assets/Scripts/Combat/NetworkCombatController.cs`
+- `Assets/Scripts/Combat/ActiveSpellInstanceRegistry.cs`
+- `Assets/Scripts/Combat/ActiveSpellInstance.cs`
 - `Assets/Scripts/Combat/SpellTravelLogic.cs`
 - `Assets/Scripts/Combat/SpellRegistry.cs`
 - `Assets/Scripts/Combat/CombatValidator.cs`
@@ -73,3 +76,4 @@ The following documents existed in `docs/` at various points and were removed as
 - `docs/CODE_CLEANUP_AUDIT.md` — one-time audit; findings resolved.
 - `docs/FusionSharedTutorial-Plan.md` — implementation plan; feature complete.
 - `docs/combat-travel-checkpoint.md` — mid-feature checkpoint; superseded.
+- `docs/PROJECTILE_POLICY.md` — described the old `PlayerMissileSlot` single-slot model; superseded by `ActiveSpellInstanceRegistry`. Durable rules (collider rule, projectile non-goals) are now in `docs/COMBAT_FEEDBACK_POLICY.md` and `docs/architecture.md`.

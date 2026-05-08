@@ -90,14 +90,14 @@ not used for any gameplay decision and a single display frame with a stale value
 No cosmetic object or client-side code calls `DealDamageRpc`. The event therefore fires
 if and only if damage was genuinely applied by State Authority.
 
-## Collider rule (same as PROJECTILE_POLICY.md §4a)
+## Collider rule (cosmetic visuals)
 
 Cosmetic visual objects **must never have an active physics collider**.
 `GameObject.CreatePrimitive` always attaches a collider. `Destroy(collider)` is deferred to
 end-of-frame; the collider remains live for one FixedUpdate step and can deflect
 `CharacterController.Move()` on other objects.
 
-**Required pattern** (used in `SpellImpactView`, `CosmeticProjectileView`):
+**Required pattern** (used in `SpellImpactView`, `ActiveSpellInstancePresenter`):
 
 ```csharp
 if (go.TryGetComponent<Collider>(out var col)) {
@@ -124,7 +124,7 @@ in the Inspector when the component is added.
 - **Not a combat log.** There is no event history, no event queue, no per-frame dispatch.
 - **Not a gameplay signal.** Nothing driven by `CombatHitReceived` may affect HP, targeting,
   or cooldowns.
-- **Not a projectile system.** Projectile policy is covered in [PROJECTILE_POLICY.md](PROJECTILE_POLICY.md).
+- **Not a projectile system.** Spell instances and projectile non-goals are in [architecture.md](architecture.md) (Spell system).
 - **Not a full spell feedback system.** Per-spell cosmetic differences (e.g. fire vs. frost
   hit color) should read from the existing `RpcOnSpellImpact` path in
   `NetworkCombatController`, not from the health event.
