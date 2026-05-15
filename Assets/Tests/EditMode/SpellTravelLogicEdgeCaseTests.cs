@@ -106,20 +106,38 @@ namespace Forbes.Tests.EditMode {
     }
 
     [Test]
-    public void HasMissileArrived_WhenDistanceEqualsStep_ReturnsTrue() {
-      // Distance == step: the check uses strict < with a tiny tolerance (1e-5),
-      // so a distance that equals exactly step falls just inside the threshold
-      // at the tolerance boundary. Use a value clearly ≤ step to stay deterministic.
+    public void HasMissileArrived_WhenDistanceWithinStep_ReturnsTrue() {
+      // Strictly inside one step along X (implementation: distance < step * (1 + 1e-5)).
       float speed = 20f;
       float dt    = 1f / 60f;
       float step  = speed * dt;
 
       var target  = new Vector3(10f, 0f, 0f);
-      // Place missile at 0.99 × step away — inside the threshold.
       var missile = target - new Vector3(0.99f * step, 0f, 0f);
 
+      float distance = Vector3.Distance(missile, target);
+      Assert.Less(distance, step, "Setup must keep distance strictly below one step.");
+
       Assert.IsTrue(SpellTravelLogic.HasMissileArrived(missile, target, speed, dt),
-        "Missile within step distance must be considered arrived.");
+        "Missile strictly within one step of target must register as arrived.");
+    }
+
+    [Test]
+    public void HasMissileArrived_WhenDistanceEqualsStep_ReturnsTrue() {
+      // Boundary: d == step still satisfies d < step * (1 + 1e-5) in SpellTravelLogic.
+      float speed = 20f;
+      float dt    = 1f / 60f;
+      float step  = speed * dt;
+
+      var target  = new Vector3(10f, 0f, 0f);
+      var missile = target - new Vector3(step, 0f, 0f);
+
+      float distance = Vector3.Distance(missile, target);
+      Assert.AreEqual(step, distance, 1e-5f,
+        "Setup: missile is exactly one simulation step from target along X.");
+
+      Assert.IsTrue(SpellTravelLogic.HasMissileArrived(missile, target, speed, dt),
+        "At d == step, d < step*(1+1e-5) must hold so the arrival gate returns true.");
     }
   }
 }
