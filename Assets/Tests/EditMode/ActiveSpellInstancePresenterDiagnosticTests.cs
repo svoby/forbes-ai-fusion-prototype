@@ -1,4 +1,5 @@
 using System.Reflection;
+using Fusion;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
