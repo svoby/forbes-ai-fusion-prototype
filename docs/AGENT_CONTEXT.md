@@ -12,6 +12,7 @@ current sources of truth and how to pick the smallest useful context bundle for 
 | `docs/architecture.md` | Broad system orientation; spell system and projectile non-goals; prefer more specific docs for concrete coding tasks |
 | `docs/COMBAT_FEEDBACK_POLICY.md` | Combat feedback pipeline, floating damage text, hit event fields, collider rule for cosmetic objects |
 | `docs/TEST_HARNESS.md` | Running EditMode/PlayMode tests; understanding test commands and results |
+| `docs/PR_POST_OPEN_AGENT_LOOP.md` | After a PR is opened: parent ↔ CI/review subagent loop until merge-ready (no agent merge) |
 
 ---
 

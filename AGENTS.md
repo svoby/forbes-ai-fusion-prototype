@@ -167,6 +167,25 @@ After opening the PR, fetch conversation and review comments with the available 
 tooling. Address any requested changes, push a fixup commit, and confirm the PR is up to
 date before handing back to the user.
 
+### 9 — Post-PR babysit loop (optional; merge still human-only)
+
+When the user wants a PR driven to **merge-ready** (green required checks, review threads
+handled) without merging:
+
+1. Treat the open PR as the running contract (same allowed-file discipline as the issue).
+2. **Delegate** focused work to subagents / child tasks where the environment supports it:
+   one **CI triage** pass per failing required check, then one **code review** pass on the
+   current diff and open review comments.
+3. **Parent agent** implements scoped fixups, runs local verification when C# / gameplay
+   changed (`docs/TEST_HARNESS.md`), commits, pushes, and re-polls GitHub until the chosen
+   stop condition is met.
+4. **Stopping condition:** at minimum, required checks green and no unresolved change requests
+   that fall within scope. If branch protection requires a human (or specific) **approval**,
+   poll `gh pr view --json reviewDecision` (or equivalent) but **do not** merge or bypass
+   org rules — hand off for Approve + Merge.
+
+Full checklist, roles, and Cursor hook notes: `docs/PR_POST_OPEN_AGENT_LOOP.md`.
+
 ### GitHub tooling / Windows notes
 
 - PR creation requires a token with `repo` write scope; a 403 means the token needs updating.
