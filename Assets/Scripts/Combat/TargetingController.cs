@@ -77,8 +77,6 @@ public class TargetingController : MonoBehaviour {
   // ---- Per-frame logic ----
 
   void Update() {
-    EnsureCamera();
-
     ClearCurrentTargetIfDead();
 
     if (SuppressLocalSelectionInputInTests) {
@@ -99,13 +97,41 @@ public class TargetingController : MonoBehaviour {
       SetTarget(null);
     }
 
-    // LMB release without drag: raycast select.
+    // LMB release without drag: orbit camera drag must be evaluated AFTER EnsureCamera() caches ThirdPersonOrbitCamera.
     if (mouse != null && mouse.leftButton.wasReleasedThisFrame) {
-      bool dragged = _camera != null && _camera.IsLmbDragging;
-      if (!dragged) {
-        TrySelectFromScreenRay();
-      }
+      ProcessLmbReleasedSelection();
     }
+  }
+
+  /// <summary>
+  /// Dedicated pipeline for LMB target selection PR #20 regression (<see cref="EnsureCamera"/> before <see cref="ThirdPersonOrbitCamera.IsLmbDragging"/> gate).
+  /// </summary>
+  void ProcessLmbReleasedSelection() {
+    if (!ProceedWithOrbitAwareLmbSelection()) {
+      return;
+    }
+
+    TrySelectFromScreenRay();
+  }
+
+  /// <summary>
+  /// Automated tests: mirrors <see cref="ProcessLmbReleasedSelection"/> with an explicit screen ray instead of querying <see cref="Mouse"/>.
+  /// </summary>
+  internal void ProcessLmbReleasedSelectionForTests(in Ray selectionRayFromScreenCamera) {
+    if (!ProceedWithOrbitAwareLmbSelection()) {
+      return;
+    }
+
+    TrySelectFromRay(in selectionRayFromScreenCamera);
+  }
+
+  /// <summary>
+  /// Returns true when LMB selection should raycast (<see cref="EnsureCamera"/> has run and orbit drag did not swallow the release).
+  /// </summary>
+  bool ProceedWithOrbitAwareLmbSelection() {
+    EnsureCamera();
+    bool dragged = _camera != null && _camera.IsLmbDragging;
+    return !dragged;
   }
 
   // ---- Tab cycle ----
@@ -176,9 +202,12 @@ public class TargetingController : MonoBehaviour {
       return;
     }
 
-    EnsureRunner();
-
     var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
+    TrySelectFromRay(in ray);
+  }
+
+  void TrySelectFromRay(in Ray ray) {
+    EnsureRunner();
 
     // Fusion spawns objects into its own PhysicsScene (see TargetingAcquisitionLogic).
     Targetable selectable = TargetingAcquisitionLogic.TryPickSelectableAlongRay(

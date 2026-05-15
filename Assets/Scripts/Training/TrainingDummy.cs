@@ -22,8 +22,7 @@ public class TrainingDummy : MonoBehaviour {
     }
 
     // Prefab-first: keep the trigger capsule on a child proxy so CharacterController rooting stays PhysX-stable.
-    if (transform.Find("ClickTargetingProxy") == null &&
-        gameObject.transform.GetComponentsInChildren<Collider>(true).Length == 0) {
+    if (transform.Find("ClickTargetingProxy") == null) {
       var proxy = new GameObject("ClickTargetingProxy");
       proxy.transform.SetParent(transform, worldPositionStays: false);
       proxy.transform.localPosition = Vector3.zero;
