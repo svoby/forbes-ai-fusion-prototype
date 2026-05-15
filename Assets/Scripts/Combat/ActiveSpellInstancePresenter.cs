@@ -171,15 +171,22 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
     if (prefab != null) {
       go      = Instantiate(prefab);
       go.name = ProjectileVisualName;
-      foreach (var col in go.GetComponentsInChildren<Collider>()) {
-        Destroy(col);
-      }
+      DisableAndDestroyCollidersInChildren(go);
     } else {
       go = CreatePrimitiveSphereVisual();
     }
 
     go.SetActive(false);
     return go;
+  }
+
+  // Disables every collider in the hierarchy synchronously before the deferred Destroy,
+  // so the visual never participates in a physics step after creation.
+  internal static void DisableAndDestroyCollidersInChildren(GameObject go) {
+    foreach (var col in go.GetComponentsInChildren<Collider>()) {
+      col.enabled = false;
+      Destroy(col);
+    }
   }
 
   GameObject FindVisualPrefab(byte spellId) {
@@ -197,9 +204,7 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
     sphere.name = ProjectileVisualName;
     sphere.transform.localScale = Vector3.one * VisualDiameter;
 
-    if (sphere.TryGetComponent<Collider>(out var col)) {
-      Destroy(col);
-    }
+    DisableAndDestroyCollidersInChildren(sphere);
 
     sphere.GetComponent<Renderer>().material = SpellVisualColors.NewFireballOrbMaterial();
     return sphere;
