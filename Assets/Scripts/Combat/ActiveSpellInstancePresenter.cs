@@ -57,11 +57,12 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
     if (_registry == null) return;
 
     if (_runner == null) {
-      if (_runnerWarningLogged) return;
       _runner = FindFirstObjectByType<NetworkRunner>();
       if (_runner == null) {
-        _runnerWarningLogged = true;
-        Debug.LogWarning("[ActiveSpellInstancePresenter] No NetworkRunner found in scene; projectile visuals are suppressed.", this);
+        if (!_runnerWarningLogged) {
+          _runnerWarningLogged = true;
+          Debug.LogWarning("[ActiveSpellInstancePresenter] No NetworkRunner found in scene; projectile visuals are suppressed.", this);
+        }
         return;
       }
     }
