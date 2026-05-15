@@ -18,6 +18,8 @@ The `Targetable` instance the local `TargetingController` has selected right now
 
 Press **Tab** to cycle the current target through alive `Targetable` objects in the scene (deterministic order by `NetworkId.Raw`), skipping the local player. Implemented in `TargetingController.CycleTarget` with `TargetingAcquisitionLogic.IsTabTargetingCandidate`.
 
+**Review note:** the `TargetingController` class XML summary still mentions “closest-first” Tab cycling, but `CycleTarget` currently sorts candidates by `NetworkId.Raw` (not by distance). This glossary describes the **implementation**; align or update the XML separately if you change behavior.
+
 ## LMB targeting
 
 On **left mouse button release**, if the orbit camera did **not** treat the interaction as an orbit drag, the controller raycasts from the screen to try to hit a `Targetable` and selects it. A miss does not clear the current target (per controller behavior).
