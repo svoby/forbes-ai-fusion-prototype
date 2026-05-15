@@ -38,6 +38,7 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
 
   ActiveSpellInstanceRegistry _registry;
   NetworkRunner               _runner;
+  bool                        _runnerWarningLogged;
 
   // Both dictionaries keyed by InstanceId (not registry index).
   readonly Dictionary<int, GameObject> _activeVisuals   = new();
@@ -53,8 +54,16 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
   }
 
   void LateUpdate() {
-    if (_registry == null || _runner == null) {
-      return;
+    if (_registry == null) return;
+
+    if (_runner == null) {
+      if (_runnerWarningLogged) return;
+      _runner = FindFirstObjectByType<NetworkRunner>();
+      if (_runner == null) {
+        _runnerWarningLogged = true;
+        Debug.LogWarning("[ActiveSpellInstancePresenter] No NetworkRunner found in scene; projectile visuals are suppressed.", this);
+        return;
+      }
     }
 
     // Collect active InstanceIds currently in the registry.
