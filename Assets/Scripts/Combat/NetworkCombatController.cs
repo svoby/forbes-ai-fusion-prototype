@@ -110,6 +110,12 @@ public partial class NetworkCombatController : NetworkBehaviour {
       return;
     }
 
+    if (!Runner.TryFindObject(instance.CasterId, out var casterObj)
+        || !casterObj.TryGetComponent(out Health casterHp)
+        || casterHp.IsDead) {
+      return;
+    }
+
     if (!Runner.TryFindObject(instance.TargetId, out var targetObj)
         || !targetObj.TryGetComponent(out Health targetHealth)) {
       return;

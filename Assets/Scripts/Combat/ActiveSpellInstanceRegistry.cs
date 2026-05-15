@@ -137,6 +137,19 @@ public class ActiveSpellInstanceRegistry : NetworkBehaviour {
       return;
     }
 
+    // DefaultExecutionOrder (-200): this registry ticks before NetworkCombatController (-100), so caster
+    // death cancellation can land on the same simulation frame *after* we would resolve impact. Abort the
+    // missile here if the caster is already gone/dead instead of damaging the target.
+    if (!Runner.TryFindObject(inst.CasterId, out var casterObj)
+        || casterObj == null
+        || (casterObj.TryGetComponent(out Health casterHealth) && casterHealth.IsDead)) {
+      ForbesLog.Net($"Spell instance index={i} spellId={inst.SpellId}: caster gone/dead -> CasterDead", this);
+      var cancelled = inst;
+      Complete(i);
+      OnInstanceCancelled?.Invoke(i, cancelled, CombatFeedbackReason.CasterDead);
+      return;
+    }
+
     if (!Runner.TryFindObject(inst.TargetId, out var targetObj)
         || targetObj == null
         || !targetObj.TryGetComponent(out Health impactHealth)) {

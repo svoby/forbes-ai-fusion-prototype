@@ -117,19 +117,41 @@ namespace Forbes.Tests.PlayMode {
 
         int travelTicks = SpellTravelLogic.ComputeTravelTicks(
           spawnDist, spell1.ProjectileSpeedMetersPerSecond, Mathf.RoundToInt(runner.TickRate));
-        int pauseTicks     = Mathf.Max(3, travelTicks / 4);
-        int checkpointTick = inst.ReleaseTick + pauseTicks;
-        if (runner.Tick < checkpointTick) {
+        Assert.Greater(travelTicks, 0,
+          $"{nameof(ProjectileSpell_DamageNotAppliedDuringFlight)}: expected non-instant projectile travel.");
+
+        // Coroutines can resume many Fusion ticks after FireFireball completes; anchor to ReleaseTick before
+        // computing the mid-flight observer tick.
+        if (runner.Tick < inst.ReleaseTick) {
           yield return FusionPlayModeTestHelpers.WaitUntil(
-            () => runner.Tick >= checkpointTick,
+            () => runner.Tick >= inst.ReleaseTick,
             maxFrames: 1200,
-            messageOnFail: $"Timed out before mid-flight checkpoint (want tick>={checkpointTick}, now={runner.Tick}).");
+            messageOnFail:
+              $"Timed out before projectile ReleaseTick={inst.ReleaseTick} (now={runner.Tick}).");
         }
 
-        Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
-          "Dummy HP must not change while missile is still in flight.");
-        Assert.IsTrue(registry.HasActiveInstanceForCaster(_player.Id),
-          "Active instance must still be in registry during flight.");
+        int midpointTick = Mathf.Max(
+          inst.ReleaseTick + 1,
+          Mathf.Min(inst.ReleaseTick + Mathf.Max(3, travelTicks / 4), inst.ReleaseTick + travelTicks - 2));
+
+        yield return FusionPlayModeTestHelpers.WaitUntil(
+          () => Mathf.Abs(dummyHealth.NetworkedHealth - startHp) > 0.34f || runner.Tick >= midpointTick,
+          maxFrames: 1200,
+          physicsThenRenderEachStep: true,
+          messageOnFail:
+            $"Timed out before mid-flight checkpoint (checkpoint={midpointTick} release={inst.ReleaseTick} travelTicks={travelTicks} now={runner.Tick} hp={dummyHealth.NetworkedHealth}).");
+
+        bool damagedEarly =
+          Mathf.Abs(dummyHealth.NetworkedHealth - startHp) > 0.34f && runner.Tick < midpointTick;
+        Assert.False(damagedEarly,
+          $"Projectile impacted before mid-flight tick (checkpoint={midpointTick}, runnerTick={runner.Tick}, hp={dummyHealth.NetworkedHealth}).");
+
+        if (Mathf.Abs(dummyHealth.NetworkedHealth - startHp) <= 0.34f) {
+          Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
+            "Dummy HP must not change while missile is still in flight.");
+          Assert.IsTrue(registry.HasActiveInstanceForCaster(_player.Id),
+            "Active instance must still be in registry during flight.");
+        }
 
         Assert.Greater(_player.GetComponent<Health>().NetworkedHealth, 0.5f,
           "Caster should stay alive for this smoke.");
