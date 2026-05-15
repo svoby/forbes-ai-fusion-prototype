@@ -1,0 +1,94 @@
+name: Auto-implement GitHub Issue
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to implement (for manual test)"
+        required: true
+        default: "1"
+      issue_title:
+        description: "Issue title"
+        required: false
+        default: "Test run"
+      issue_body:
+        description: "Issue body"
+        required: false
+        default: "This is a manual test run."
+
+jobs:
+  implement:
+    name: "Implement issue #${{ github.event.issue.number || github.event.inputs.issue_number }}"
+    # Runs on your Windows machine — must have Unity installed and the runner service running.
+    # Setup once: GitHub → Settings → Actions → Runners → New self-hosted runner → Windows.
+    runs-on: [self-hosted, Windows]
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+      ISSUE_TITLE:  ${{ github.event.issue.title || github.event.inputs.issue_title }}
+      ISSUE_BODY:   ${{ github.event.issue.body || github.event.inputs.issue_body }}
+      CURSOR_MODEL: "composer-2"
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Create worktree for this issue
+        shell: pwsh
+        run: |
+          $issueNum = $env:ISSUE_NUMBER
+          $slug     = ($env:ISSUE_TITLE -replace '[^a-zA-Z0-9]+', '-').ToLower().Trim('-')
+          if ($slug.Length -gt 30) { $slug = $slug.Substring(0, 30).TrimEnd('-') }
+          $branch   = "issue-$issueNum-$slug"
+          $wtPath   = "C:\unity\worktrees\issue-$issueNum"
+
+          # Remove stale worktree from a previous run if any.
+          if (Test-Path $wtPath) {
+            git worktree remove --force $wtPath 2>$null
+            Remove-Item -Recurse -Force $wtPath -ErrorAction SilentlyContinue
+          }
+
+          git worktree add $wtPath -b $branch
+          Write-Host "Worktree created at $wtPath on branch $branch"
+
+          # Pass values forward to later steps via GITHUB_ENV.
+          "WORKTREE_PATH=$wtPath"   | Out-File $env:GITHUB_ENV -Append
+          "ISSUE_BRANCH=$branch"    | Out-File $env:GITHUB_ENV -Append
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Cursor SDK
+        shell: pwsh
+        run: npm install @cursor/sdk
+        working-directory: ${{ github.workspace }}
+
+      - name: Launch Cursor agent in worktree
+        shell: pwsh
+        env:
+          CURSOR_API_KEY:  ${{ secrets.CURSOR_API_KEY }}
+          WORKTREE_PATH:   ${{ env.WORKTREE_PATH }}
+          ISSUE_BRANCH:    ${{ env.ISSUE_BRANCH }}
+        run: node .github/scripts/implement-issue.mjs
+        working-directory: ${{ github.workspace }}
+
+      - name: Remove worktree on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          if ($env:WORKTREE_PATH -and (Test-Path $env:WORKTREE_PATH)) {
+            git worktree remove --force $env:WORKTREE_PATH 2>$null
+            Remove-Item -Recurse -Force $env:WORKTREE_PATH -ErrorAction SilentlyContinue
+            Write-Host "Worktree cleaned up after failure."
+          }
