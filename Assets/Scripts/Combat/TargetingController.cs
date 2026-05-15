@@ -77,7 +77,6 @@ public class TargetingController : MonoBehaviour {
   // ---- Per-frame logic ----
 
   void Update() {
-
     ClearCurrentTargetIfDead();
 
     if (SuppressLocalSelectionInputInTests) {
@@ -98,13 +97,41 @@ public class TargetingController : MonoBehaviour {
       SetTarget(null);
     }
 
-    // LMB release without drag: raycast select.
+    // LMB release without drag: orbit camera drag must be evaluated AFTER EnsureCamera() caches ThirdPersonOrbitCamera.
     if (mouse != null && mouse.leftButton.wasReleasedThisFrame) {
-      bool dragged = _camera != null && _camera.IsLmbDragging;
-      if (!dragged) {
-        TrySelectFromScreenRay();
-      }
+      ProcessLmbReleasedSelection();
     }
+  }
+
+  /// <summary>
+  /// Dedicated pipeline for LMB target selection PR #20 regression (<see cref="EnsureCamera"/> before <see cref="ThirdPersonOrbitCamera.IsLmbDragging"/> gate).
+  /// </summary>
+  void ProcessLmbReleasedSelection() {
+    if (!ProceedWithOrbitAwareLmbSelection()) {
+      return;
+    }
+
+    TrySelectFromScreenRay();
+  }
+
+  /// <summary>
+  /// Automated tests: mirrors <see cref="ProcessLmbReleasedSelection"/> with an explicit screen ray instead of querying <see cref="Mouse"/>.
+  /// </summary>
+  internal void ProcessLmbReleasedSelectionForTests(in Ray selectionRayFromScreenCamera) {
+    if (!ProceedWithOrbitAwareLmbSelection()) {
+      return;
+    }
+
+    TrySelectFromRay(in selectionRayFromScreenCamera);
+  }
+
+  /// <summary>
+  /// Returns true when LMB selection should raycast (<see cref="EnsureCamera"/> has run and orbit drag did not swallow the release).
+  /// </summary>
+  bool ProceedWithOrbitAwareLmbSelection() {
+    EnsureCamera();
+    bool dragged = _camera != null && _camera.IsLmbDragging;
+    return !dragged;
   }
 
   // ---- Tab cycle ----
@@ -117,13 +144,16 @@ public class TargetingController : MonoBehaviour {
 
     foreach (var t in allTargetables) {
       var pm = t.GetComponent<PlayerMovement>();
-      if (pm != null && pm.HasInputAuthority) {
-        ForbesLog.Targeting($"  Skipping '{t.name}' (local player).");
-        continue;
-      }
+      bool skipLocalPlayer = pm != null && pm.HasInputAuthority;
+      bool deadTarget      = t.TryGetComponent(out Health hDead) && hDead.IsDead;
+      if (!TargetingAcquisitionLogic.IsTabTargetingCandidate(skipLocalPlayer, deadTarget)) {
+        if (skipLocalPlayer) {
+          ForbesLog.Targeting($"  Skipping '{t.name}' (local player).");
+        }
+        else {
+          ForbesLog.Targeting($"  Skipping '{t.name}' (dead).");
+        }
 
-      if (t.TryGetComponent(out Health h) && h.IsDead) {
-        ForbesLog.Targeting($"  Skipping '{t.name}' (dead).");
         continue;
       }
 
@@ -172,33 +202,25 @@ public class TargetingController : MonoBehaviour {
       return;
     }
 
+    var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
+    TrySelectFromRay(in ray);
+  }
+
+  void TrySelectFromRay(in Ray ray) {
     EnsureRunner();
 
-    var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
-
-    // Fusion spawns objects into its own PhysicsScene (separate from the Unity default scene).
-    // Use runner.GetPhysicsScene() so Fusion-spawned objects (player, dummy) are included.
-    // Fall back to default Physics if no runner is available (e.g. floor tiles).
-    bool hitSomething = false;
-    RaycastHit hitInfo = default;
-
-    if (_runner != null && _runner.IsRunning) {
-      var fusionScene = _runner.GetPhysicsScene();
-      hitSomething = fusionScene.Raycast(ray.origin, ray.direction, out hitInfo, _maxRaycastDistance);
-
-      if (!hitSomething) {
-        // Also check default scene for non-networked objects (floor, etc.)
-        hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
-      }
-    } else {
-      hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
-    }
+    // Fusion spawns objects into its own PhysicsScene (see TargetingAcquisitionLogic).
+    Targetable selectable = TargetingAcquisitionLogic.TryPickSelectableAlongRay(
+      in ray,
+      _maxRaycastDistance,
+      _runner,
+      out bool hitSomething,
+      out RaycastHit hitInfo);
 
     if (hitSomething) {
       Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
-      var hit = hitInfo.collider.GetComponentInParent<Targetable>();
-      if (hit != null) {
-        SetTarget(hit);
+      if (selectable != null) {
+        SetTarget(selectable);
       }
     } else {
       Debug.DrawRay(ray.origin, ray.direction * _maxRaycastDistance, Color.red, 1f);

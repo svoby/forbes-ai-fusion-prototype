@@ -21,12 +21,18 @@ public class TrainingDummy : MonoBehaviour {
       }
     }
 
-    // Ensure a physics collider exists so click-targeting raycasts can hit this object.
-    if (GetComponentInChildren<Collider>() == null) {
-      var col = gameObject.AddComponent<CapsuleCollider>();
-      col.height = 2f;
-      col.radius = 0.4f;
-      col.center = new Vector3(0f, 1f, 0f);
+    // Prefab-first: keep the trigger capsule on a child proxy so CharacterController rooting stays PhysX-stable.
+    if (transform.Find("ClickTargetingProxy") == null) {
+      var proxy = new GameObject("ClickTargetingProxy");
+      proxy.transform.SetParent(transform, worldPositionStays: false);
+      proxy.transform.localPosition = Vector3.zero;
+      proxy.transform.localRotation = Quaternion.identity;
+
+      var col = proxy.AddComponent<CapsuleCollider>();
+      col.isTrigger = true;
+      col.height   = 2f;
+      col.radius   = 0.4f;
+      col.center   = new Vector3(0f, 1f, 0f);
     }
 
     if (GetComponent<Targetable>() == null) {

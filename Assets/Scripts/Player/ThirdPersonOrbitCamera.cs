@@ -58,6 +58,9 @@ public class ThirdPersonOrbitCamera : MonoBehaviour {
   /// <summary>True once the LMB has been dragged past the pixel threshold; resets on release.</summary>
   public bool IsLmbDragging { get; private set; }
 
+  /// <summary>For automated tests validating <see cref="TargetingController"/> LMB click vs orbit-drag gating (no hardware mouse deltas required).</summary>
+  internal void SetIsLmbDraggingForTests(bool value) => IsLmbDragging = value;
+
   /// <summary>True once the RMB has moved past the drag threshold this press (mirrors LMB; cursor locks on RMB press regardless).</summary>
   bool IsRmbDragging { get; set; }
 
