@@ -245,19 +245,28 @@ that adds complexity without current value; acceptable for a prototype.
 
 ## 4. Recommended next safe slice
 
-**Slice: Replace the hardcoded three-slot cooldown array with a fixed-size indexed
-`NetworkArray<int>` keyed by spell slot (0-based), matching `SpellRegistry.All.Length`.**
+**Slice: Replace the hardcoded three-slot cooldown fields with a fixed-capacity
+`NetworkArray<int>` keyed by 0-based spell slot, using a named compile-time capacity
+constant.**
 
 Rationale:
 - R2 is the highest concrete risk: the switch/match cooldown dispatch is the most likely to
   cause a silent production bug when the spell table grows.
 - The change is contained to `NetworkCombatController.cs` (remove three `[Networked]` fields,
-  add one `[Networked, Capacity(N)] NetworkArray<int>`), `NetworkCombatController.Cooldowns.cs`
-  (replace switch with index lookup), and the relevant EditMode tick-math tests.
+  add one `[Networked, Capacity(MaxSpellCooldownSlots)] NetworkArray<int>`),
+  `NetworkCombatController.Cooldowns.cs` (replace switch with index lookup), and the relevant
+  EditMode tick-math tests.
 - No new concepts, no authority model changes, no new public API beyond what already exists.
 - The slice is non-overlapping with any other named feature (mob AI, visual polish, new spells).
 - It makes the cooldown capacity constraint visible and compile-time verifiable rather than
   silent.
+
+**Capacity note:** Fusion's `[Networked, Capacity(N)]` attribute requires a compile-time
+constant — it drives Fusion's codegen and cannot accept a runtime expression such as
+`SpellRegistry.All.Length`. The implementation should introduce a named `const int
+MaxSpellCooldownSlots` (e.g. `8` — large enough to cover the current 3-spell table with
+headroom) and document the invariant that `MaxSpellCooldownSlots >= SpellRegistry.All.Length`.
+This keeps the Fusion attribute valid while making the capacity limit explicit and auditable.
 
 This slice should be filed as a separate follow-up issue.
 
@@ -266,16 +275,20 @@ This slice should be filed as a separate follow-up issue.
 ## 5. Acceptance criteria for the next slice
 
 1. `NetworkCombatController` declares no individual `CooldownNEndTick` fields; all per-spell
-   cooldowns are stored in a single `[Networked, Capacity(SpellRegistry.All.Length)]
-   NetworkArray<int>` (or equivalent bounded array type).
-2. `GetCooldownEndTick(byte spellId)` and `SetCooldownEndTick(byte spellId, int tick)` accept
-   any valid 1-based spell ID and correctly index the array without a switch statement.
-3. An out-of-range spell ID (e.g. `id = 0` or `id > capacity`) returns `0` / is a no-op,
-   with a logged warning.
-4. All existing EditMode tick-math tests (`NetworkCombatSecsToTicksTests.cs`,
+   cooldowns are stored in a `[Networked, Capacity(MaxSpellCooldownSlots)] NetworkArray<int>`
+   where `MaxSpellCooldownSlots` is a named compile-time constant (not a runtime expression
+   derived from `SpellRegistry.All.Length`).
+2. A co-located assertion or documentation comment confirms `MaxSpellCooldownSlots >=
+   SpellRegistry.All.Length`; a violation must be detectable at author time (assertion, comment,
+   or test), not silently at runtime.
+3. `GetCooldownEndTick(byte spellId)` and `SetCooldownEndTick(byte spellId, int tick)` map
+   valid 1-based spell IDs to 0-based array slots without a switch statement.
+4. An out-of-range spell ID (e.g. `id = 0` or `id > MaxSpellCooldownSlots`) returns `0` / is a
+   no-op, with a logged warning.
+5. All existing EditMode tick-math tests (`NetworkCombatSecsToTicksTests.cs`,
    `CombatValidatorPureTests.cs`) remain green.
-5. All existing PlayMode combat smoke tests (`NetworkCombatProjectileTravelSmokeTests`,
+6. All existing PlayMode combat smoke tests (`NetworkCombatProjectileTravelSmokeTests`,
    `CombatFeedbackSmokeTests`) remain green.
-6. No spell tuning constants (`Damage`, `Range`, `CastTimeSec`, `CooldownSec`) are changed.
-7. No new public API surface beyond what is needed for the refactor.
-8. The diff is limited to `NetworkCombatController*.cs` and any directly affected test files.
+7. No spell tuning constants (`Damage`, `Range`, `CastTimeSec`, `CooldownSec`) are changed.
+8. No new public API surface beyond what is needed for the refactor.
+9. The diff is limited to `NetworkCombatController*.cs` and any directly affected test files.
