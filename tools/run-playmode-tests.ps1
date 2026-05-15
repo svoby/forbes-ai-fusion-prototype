@@ -21,6 +21,23 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Normalize-ProcessPathEnvironment {
+  $vars = [System.Environment]::GetEnvironmentVariables("Process")
+  $pathKeys = @($vars.Keys | Where-Object { $_ -ieq "Path" })
+
+  if ($pathKeys.Count -le 1) {
+    return
+  }
+
+  $pathValue = [string]$vars["Path"]
+  if (-not $pathValue) {
+    $pathValue = [string]$vars["PATH"]
+  }
+
+  [System.Environment]::SetEnvironmentVariable("PATH", $null, "Process")
+  [System.Environment]::SetEnvironmentVariable("Path", $pathValue, "Process")
+}
+
 $testResultsDir = Join-Path $ProjectPath "TestResults"
 if (-not (Test-Path $testResultsDir)) {
   New-Item -ItemType Directory -Path $testResultsDir | Out-Null
@@ -32,6 +49,14 @@ if (-not $ResultsFile) {
 
 if (-not $LogFile) {
   $LogFile = Join-Path $testResultsDir "unity-playmode.log"
+}
+
+if (-not [System.IO.Path]::IsPathRooted($ResultsFile)) {
+  $ResultsFile = Join-Path $ProjectPath $ResultsFile
+}
+
+if (-not [System.IO.Path]::IsPathRooted($LogFile)) {
+  $LogFile = Join-Path $ProjectPath $LogFile
 }
 
 if (-not $UnityPath) {
@@ -54,20 +79,53 @@ Write-Host "Results XML: $ResultsFile"
 Write-Host "Log:         $LogFile"
 Write-Host "Assemblies:  $AssemblyNames"
 
-$argsUnity = @(
-  "-batchmode", "-nographics", "-quit",
-  "-projectPath", $ProjectPath,
-  "-runTests",
-  "-testPlatform", "playmode",
-  "-assemblyNames", $AssemblyNames,
-  "-testResults", $ResultsFile,
-  "-logFile", $LogFile
-)
+Normalize-ProcessPathEnvironment
+$maxAttempts = 2
+$exitCode = 0
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+  if (Test-Path $ResultsFile) {
+    Remove-Item $ResultsFile -Force
+  }
 
-$p = Start-Process -FilePath $UnityPath -ArgumentList $argsUnity -Wait -PassThru -NoNewWindow
+  $argsUnity = @(
+    "-batchmode", "-nographics",
+    "-projectPath", $ProjectPath,
+    "-runTests",
+    "-testPlatform", "PlayMode",
+    "-assemblyNames", $AssemblyNames,
+    "-testResults", $ResultsFile,
+    "-logFile", $LogFile
+  )
 
-if ($p.ExitCode -ne 0) {
-  Write-Error "Unity PlayMode tests failed with exit code $($p.ExitCode). See $LogFile and $ResultsFile."
+  if ($attempt -gt 1) {
+    Write-Warning "Unity did not write PlayMode results on attempt $($attempt - 1); retrying once."
+  }
+
+  $p = Start-Process -FilePath $UnityPath -ArgumentList $argsUnity -Wait -PassThru -NoNewWindow
+  $exitCode = $p.ExitCode
+
+  if ($exitCode -ne 0) {
+    Write-Error "Unity PlayMode tests failed with exit code $exitCode. See $LogFile and $ResultsFile."
+  }
+
+  if (Test-Path $ResultsFile) {
+    break
+  }
+}
+
+if (-not (Test-Path $ResultsFile)) {
+  Write-Error "Unity PlayMode tests did not write a results file. See $LogFile."
+}
+
+[xml]$resultsXml = Get-Content $ResultsFile
+$testRun = $resultsXml.SelectSingleNode("/test-run")
+if (-not $testRun) {
+  Write-Error "Unity PlayMode tests wrote an unreadable results file: $ResultsFile."
+}
+
+$failed = [int]$testRun.failed
+if ($testRun.result -ne "Passed" -or $failed -gt 0) {
+  Write-Error "Unity PlayMode tests failed: result=$($testRun.result), failed=$failed. See $ResultsFile and $LogFile."
 }
 
 Write-Host "OK - results: $ResultsFile"

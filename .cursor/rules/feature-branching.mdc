@@ -5,22 +5,34 @@ alwaysApply: true
 
 # Git workflow
 
-## Branch policy — do NOT switch branches automatically
+## Branch policy
 
-The agent **must never** create, checkout, or switch branches on its own.
-Work on whatever branch is currently active. If a branch change is needed, ask the user explicitly.
+`AGENTS.md` is the source of truth for agent-agnostic git workflow. This Cursor rule
+mirrors that policy for Cursor sessions.
 
-But at the very beginning of the session, the agent should create a new branch for the current task.
+For any task that may edit files (feature, bug fix, refactor, documentation, test, or
+debugging), work on a task branch before the first edit. Creating that task branch is
+an expected part of starting coding work and does not need a separate user request.
+
+If the current branch is `master` or `main`, create or switch to a task branch before
+editing. If local changes already exist on `master`/`main`, stop and report them before
+creating the branch unless the user has explicitly asked to move the current work onto
+a branch.
 
 Branch name convention:
-- `feat/<task-name>` - for new features
-- `fix/<task-name>` - for bug fixes
-- `chore/<task-name>` - for chores and refactors
-- `test/<task-name>` - for test-only changes
+- `feat/<task-name>` - for new features.
+- `fix/<task-name>` - for bug fixes.
+- `chore/<task-name>` - for tooling, documentation, and refactors.
+- `test/<task-name>` - for test-only changes.
+- For GitHub issue work, use the issue-specified branch name; if the issue does not
+  specify one, use `issue-N-<short-slug>`.
+
+Do not create extra branches mid-task, switch branches, merge, rebase, or resolve branch
+conflicts unless the user explicitly asks or `AGENTS.md` GitHub Issue Workflow requires it.
 
 ## Commit policy — never commit; do not stage unless asked
 
-The agent **must never run `git commit`**. Do **not** run `git add` or otherwise stage changes unless the user explicitly asks.
+The agent **must never run `git commit`**. Do **not** run `git add` or otherwise stage changes unless the user explicitly asks or `AGENTS.md` GitHub Issue Workflow requires it.
 
 Optionally, when wrapping up a task, write the intended commit message to `.git/COMMIT_EDITMSG` so the user can paste or adjust it in Source Control.
 

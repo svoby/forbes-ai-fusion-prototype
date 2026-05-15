@@ -15,7 +15,7 @@ rules may add workflow details, but they should not contradict this guide.
 - `docs/AGENT_CONTEXT.md` — task-specific context bundles and current source-of-truth docs.
 - `docs/architecture.md` — current architecture, feature map, and script responsibilities.
 - `docs/TEST_HARNESS.md` — how EditMode and PlayMode tests work.
-- `.cursor/rules/` — Cursor-specific enforcement rules that mirror or refine this guide.
+- `.cursor/rules/` — Cursor-specific adapters that must mirror this guide, not redefine it.
 
 Do not treat old plans, checkpoints, or removed historical docs as current guidance.
 
@@ -36,6 +36,43 @@ Do not treat old plans, checkpoints, or removed historical docs as current guida
 4. For behavior changes, add or update focused tests.
 5. Validate host + one client when behavior is networked.
 6. Report short manual verification notes and any tests that could not be run.
+
+## Git Workflow
+
+These rules are agent-agnostic. Codex, Cursor, Claude, and other coding agents must
+follow the same branch and commit semantics even when their tool names differ.
+
+### Branch policy
+
+For any task that may edit files (feature, bug fix, refactor, documentation, test, or
+debugging), work on a task branch before the first edit. Creating that task branch is
+an expected part of starting coding work and does not need a separate user request.
+
+If the current branch is `master` or `main`, create or switch to a task branch before
+editing. If local changes already exist on `master`/`main`, stop and report them before
+creating the branch unless the user has explicitly asked to move the current work onto
+a branch.
+
+Branch name convention:
+
+- `feat/<task-name>` for new features.
+- `fix/<task-name>` for bug fixes.
+- `chore/<task-name>` for tooling, documentation, and refactors.
+- `test/<task-name>` for test-only changes.
+- For GitHub issue work, use the issue-specified branch name; if the issue does not
+  specify one, use `issue-N-<short-slug>`.
+
+Do not create extra branches mid-task, switch branches, merge, rebase, or resolve branch
+conflicts unless the user explicitly asks or the GitHub Issue Workflow below requires it.
+
+### Commit and staging policy
+
+Do not run `git add`, stage files, commit, push, or open a PR unless the user explicitly
+asks, or unless the task is running under the GitHub Issue Workflow below. When committing
+is requested, include only files that belong to the task. Humans remain merge owners.
+
+Optionally, when wrapping up non-issue work, write the intended commit message to
+`.git/COMMIT_EDITMSG` for human review instead of committing.
 
 ## GitHub Issue Workflow
 
@@ -167,14 +204,14 @@ For agents that run tests in batchmode, close the Editor before starting (see `d
 
 ## Git Safety
 
-- Work on the current branch by default.
-- Do not create, checkout, switch, merge, rebase, push, or commit unless the user explicitly asks.
-- If a branch change seems needed, ask first and explain why.
-- Do not run `git add` or otherwise stage changes unless the user explicitly asks. When the user asks you to commit, include only files that belong to the requested task.
-- Never merge feature branches into `main`/`master` unless the user explicitly requests that operation.
+- Branch before editing, as defined in Git Workflow.
+- Do not stage, commit, push, merge, rebase, or open PRs unless explicitly requested or
+  required by GitHub Issue Workflow.
+- Never merge feature branches into `main`/`master` unless the user explicitly requests
+  that operation.
 
-These rules allow Codex and Cursor to operate in the same repository without surprise branch
-changes or unrelated commits.
+These rules allow Codex, Cursor, and other agents to operate in the same repository
+without surprise commits, unrelated pushes, or work accidentally landing on `master`.
 
 ## Definition Of Done
 

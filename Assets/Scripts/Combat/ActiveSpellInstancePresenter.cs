@@ -54,6 +54,9 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
   }
 
   void LateUpdate() {
+    if (_registry == null) {
+      _registry = GetComponent<ActiveSpellInstanceRegistry>();
+    }
     if (_registry == null) return;
 
     if (_runner == null) {
@@ -65,6 +68,10 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
         }
         return;
       }
+    }
+
+    if (_registry.Object == null || !_registry.Object.IsValid) {
+      return;
     }
 
     // Collect active InstanceIds currently in the registry.
@@ -195,7 +202,9 @@ public class ActiveSpellInstancePresenter : MonoBehaviour {
   internal static void DisableAndDestroyCollidersInChildren(GameObject go) {
     foreach (var col in go.GetComponentsInChildren<Collider>()) {
       col.enabled = false;
-      Destroy(col);
+      if (Application.isPlaying) {
+        Destroy(col);
+      }
     }
   }
 
