@@ -39,13 +39,37 @@ Do not treat old plans, checkpoints, or removed historical docs as current guida
 
 ## GitHub Issue Workflow
 
-When the user points to a GitHub issue as the task contract, use the `user-github` MCP
-(`mcps/user-github/tools/`) for all GitHub API operations. Always read the tool's JSON
-schema before calling it.
+When the user points to a GitHub issue as the task contract, use the GitHub and git
+tooling available in the current agent environment. If running in Cursor, use the
+configured GitHub MCP/tools. If running in Codex, use Codex's available GitHub/git
+tooling. Tool names are adapters only; preserve these workflow semantics regardless of
+the specific tool surface.
+
+### Minimal launcher prompt
+
+The intended human prompt is:
+
+```text
+Implement GitHub issue #N.
+```
+
+The human should not need to repeat required context files, branch name, PR title, or
+acceptance criteria if they are already in the issue.
+
+Agents must respond to this prompt by reading `AGENTS.md`, fetching the issue, and treating
+the issue body as the task contract.
+
+### Precedence
+
+- `AGENTS.md` defines repository safety and workflow rules.
+- The GitHub issue is the task contract.
+- The issue's Required context section lists files the agent must read before editing.
+- Tool-specific commands are adapters only, not source of truth.
 
 ### 1 — Fetch and verify
 
-Fetch the issue with `issue_read` / `get`. **Stop and report** (do not improvise) if it is:
+Fetch and read the issue before editing. Verify it against current `master` and the rules in
+this file. **Stop and report** (do not improvise) if it is:
 
 - stale — references closed PRs, superseded branches, or removed docs as source of truth;
 - incomplete — missing required files, acceptance criteria, or scope definition;
@@ -80,26 +104,38 @@ Write the commit message to `.git/COMMIT_EDITMSG` for review, then commit and pu
 
 ### 7 — Open the PR
 
-Use `create_pull_request` via the `user-github` MCP:
+Open the PR with the available GitHub tooling:
 
 - **Title:** exactly as the issue specifies.
-- **Body:** include the summary the issue requires and `Closes #N`.
+- **Body:** include the PR body requirements below.
 - **Base:** `master` unless the issue specifies otherwise.
-- **Changed files:** verify with `get_files` or `git diff --name-only` that only
-  issue-authorized files are in the PR before opening it.
+- **Changed files:** verify with available PR/file listing tools or `git diff --name-only`
+  that only issue-authorized files are in the PR before opening it.
+- **Merge:** never merge the PR. Humans remain merge owners.
+
+### PR body requirements
+
+Every agent PR must include:
+
+- Summary
+- Changed files
+- Context read
+- Verification performed, or explicit explanation if not run
+- Known risks / follow-ups
+- `Closes #N`
 
 ### 8 — Address review comments
 
-After opening the PR, fetch comments with `pull_request_read` / `get_comments` and
-`get_review_comments`. Address any requested changes, push a fixup commit, and confirm
-the PR is up to date before handing back to the user.
+After opening the PR, fetch conversation and review comments with the available GitHub
+tooling. Address any requested changes, push a fixup commit, and confirm the PR is up to
+date before handing back to the user.
 
-### GitHub MCP / Windows notes
+### GitHub tooling / Windows notes
 
 - PR creation requires a token with `repo` write scope; a 403 means the token needs updating.
 - The shell is PowerShell — bash heredocs (`<<'EOF'`) do not work. Pass multi-line PR bodies
-  directly to the MCP tool, or write to a temp file (`.git/pr-body.md`) for `gh --body-file`.
-- `gh` CLI may not be installed; prefer the MCP for all GitHub operations.
+  directly to the GitHub tool, or write to a temp file (`.git/pr-body.md`) for `gh --body-file`.
+- `gh` CLI may not be installed; prefer the configured GitHub integration when one is available.
 
 ## Cursor Worktrees — Parallel Issue Agents
 
@@ -113,8 +149,8 @@ interfering with each other. Each agent operates in an isolated Git checkout on 
 - **Non-overlapping file sets.** Parallel issues must have non-overlapping sets of allowed files.
   An issue that touches `AGENTS.md` and an issue that touches `Assets/Scripts/` are safe to
   run in parallel; two issues that both list `AGENTS.md` as an allowed file are not.
-- **Check for conflicts before editing.** At the start of each session, list open PRs
-  (`list_pull_requests` via the `user-github` MCP). Stop and report if any open PR already
+- **Check for conflicts before editing.** At the start of each session, list open PRs with
+  the available GitHub tooling. Stop and report if any open PR already
   modifies a file in this issue's allowed set.
 - **Stay within scope.** Agents must not edit files outside the issue's explicitly authorized
   file list, even when they seem obviously related.
