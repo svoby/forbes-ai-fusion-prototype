@@ -2,7 +2,7 @@ using Fusion;
 using UnityEngine;
 
 /// <summary>
-/// Cosmetic-only spell impact flash — plays a short-lived sphere burst at the
+/// Cosmetic-only spell impact flash: plays a short-lived prefab burst at the
 /// target's center mass when a spell successfully deals damage.
 /// <para>
 /// Called from <see cref="NetworkCombatController.RpcOnSpellImpact"/> which is
@@ -12,18 +12,19 @@ using UnityEngine;
 /// <see cref="NetworkBehaviour"/>.
 /// </para>
 /// <para>
-/// The flash is intentionally minimal (primitive sphere, no pooling) so it is
-/// easy to replace later with a real VFX prefab or particle system: swap the
-/// body of <see cref="SpawnFlash"/> and keep the rest unchanged.
+/// The flash is intentionally minimal and prefab-driven so it can be replaced
+/// later with a real VFX prefab or particle system without changing gameplay.
 /// </para>
 /// </summary>
 [RequireComponent(typeof(NetworkCombatController))]
 public class SpellImpactView : MonoBehaviour {
-  const float FlashDuration  = 0.35f;
-  const float FlashDiameter  = 0.8f;
+  const float FlashDuration    = 0.35f;
   const float CenterMassOffset = 1.0f;
 
+  [SerializeField] GameObject _impactPrefab;
+
   NetworkCombatController _ncc;
+  bool                    _missingImpactPrefabWarningLogged;
 
   void Awake() {
     _ncc = GetComponent<NetworkCombatController>();
@@ -48,8 +49,6 @@ public class SpellImpactView : MonoBehaviour {
     SpawnFlash(impactPos);
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-
   static Vector3 ComputeCenterMass(Transform target) {
     if (target.TryGetComponent<Collider>(out var col) && col.enabled) {
       return col.bounds.center;
@@ -57,22 +56,18 @@ public class SpellImpactView : MonoBehaviour {
     return target.position + Vector3.up * CenterMassOffset;
   }
 
-  static void SpawnFlash(Vector3 worldPos) {
-    var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-    sphere.name = "SpellImpactFlash";
-    sphere.transform.position   = worldPos;
-    sphere.transform.localScale = Vector3.one * FlashDiameter;
-
-    if (sphere.TryGetComponent<Collider>(out var col)) {
-      // Disable immediately (synchronous) so the collider never participates in
-      // physics — Destroy() is deferred and would leave it live for one FixedUpdate,
-      // deflecting nearby CharacterControllers.
-      col.enabled = false;
-      Destroy(col);
+  void SpawnFlash(Vector3 worldPos) {
+    if (_impactPrefab == null) {
+      if (!_missingImpactPrefabWarningLogged) {
+        _missingImpactPrefabWarningLogged = true;
+        Debug.LogWarning("[SpellImpactView] Impact prefab missing; spell impact visual skipped.", this);
+      }
+      return;
     }
 
-    sphere.GetComponent<Renderer>().material = SpellVisualColors.NewFireballOrbMaterial();
-
-    Destroy(sphere, FlashDuration);
+    var instance = Instantiate(_impactPrefab, worldPos, Quaternion.identity);
+    instance.name = "SpellImpactFlash";
+    ActiveSpellInstancePresenter.DisableAndDestroyCollidersInChildren(instance);
+    Destroy(instance, FlashDuration);
   }
 }
