@@ -101,6 +101,34 @@ the PR is up to date before handing back to the user.
   directly to the MCP tool, or write to a temp file (`.git/pr-body.md`) for `gh --body-file`.
 - `gh` CLI may not be installed; prefer the MCP for all GitHub operations.
 
+## Cursor Worktrees — Parallel Issue Agents
+
+Cursor Worktrees let multiple agents work on the same repository at the same time without
+interfering with each other. Each agent operates in an isolated Git checkout on its own branch.
+
+### Rules for parallel-agent work
+
+- **One issue = one branch = one worktree = one PR.** Never share a branch or worktree across
+  issues.
+- **Non-overlapping file sets.** Parallel issues must have non-overlapping sets of allowed files.
+  An issue that touches `AGENTS.md` and an issue that touches `Assets/Scripts/` are safe to
+  run in parallel; two issues that both list `AGENTS.md` as an allowed file are not.
+- **Check for conflicts before editing.** At the start of each session, list open PRs
+  (`list_pull_requests` via the `user-github` MCP). Stop and report if any open PR already
+  modifies a file in this issue's allowed set.
+- **Stay within scope.** Agents must not edit files outside the issue's explicitly authorized
+  file list, even when they seem obviously related.
+- **No guessing on conflicts.** If `master` changes while a PR is open and the diff overlaps
+  with this issue's files, stop and report rather than resolving the conflict independently.
+  Re-check the diff and confirm the change is still correct before pushing a fixup.
+- **Humans merge.** Agents open PRs and address review comments; they do **not** merge PRs.
+  The merge owner is always a human reviewer.
+
+### Worktree setup for this repo
+
+This is a Unity project. No install step is needed for agents doing documentation or C# edits.
+For agents that run tests in batchmode, close the Editor before starting (see `docs/TEST_HARNESS.md`).
+
 ## Git Safety
 
 - Work on the current branch by default.
