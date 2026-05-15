@@ -51,8 +51,9 @@ namespace Forbes.Tests.PlayMode {
         yield return null;
         yield return null;
         // IEnumerator resumes after Update but before LateUpdate for a plain yield; TargetHighlight
-        // moves the ring in LateUpdate. Wait until the frame finishes so we compare against that pose.
-        yield return new WaitForEndOfFrame();
+        // moves the ring in LateUpdate. In the Editor a single WaitForEndOfFrame would also work, but
+        // batchmode CLI runs do not execute that yield instruction.
+        yield return null;
 
         // Plain target: no CharacterController / CapsuleCollider, so feet == pivot (see EditMode
         // TargetHighlightGetFeetPositionTests for collider cases).

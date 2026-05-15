@@ -109,17 +109,22 @@ namespace Forbes.Tests.PlayMode {
 
         yield return FireFireball();
 
-        // Wait well under the expected travel time so the missile is still in flight.
-        // Derived from spell data so the assertion survives speed tuning:
-        //   spawn positions are (-2,1,0) and (6,0,6) → dist ≈ 10.2 m
-        //   at 20 m/s / 60 Hz → ~31 ticks; we wait at most travelTicks/4.
-        var  spell1        = SpellRegistry.Get(1);
-        var  runner        = _session.Runner;
-        float spawnDist    = Vector3.Distance(new Vector3(-2f, 1f, 0f), new Vector3(6f, 0f, 6f));
-        int  travelTicks   = SpellTravelLogic.ComputeTravelTicks(
+        var inst       = registry.GetFirstActiveInstanceForCaster(_player.Id);
+        var runner     = _session.Runner;
+        float spawnDist = Vector3.Distance(inst.Origin, _dummy.transform.position);
+
+        var spell1 = SpellRegistry.Get(1);
+
+        int travelTicks = SpellTravelLogic.ComputeTravelTicks(
           spawnDist, spell1.ProjectileSpeedMetersPerSecond, Mathf.RoundToInt(runner.TickRate));
-        int  inFlightFrames = Mathf.Max(3, travelTicks / 4);
-        yield return FusionPlayModeTestHelpers.WaitFrames(inFlightFrames);
+        int pauseTicks     = Mathf.Max(3, travelTicks / 4);
+        int checkpointTick = inst.ReleaseTick + pauseTicks;
+        if (runner.Tick < checkpointTick) {
+          yield return FusionPlayModeTestHelpers.WaitUntil(
+            () => runner.Tick >= checkpointTick,
+            maxFrames: 1200,
+            messageOnFail: $"Timed out before mid-flight checkpoint (want tick>={checkpointTick}, now={runner.Tick}).");
+        }
 
         Assert.AreEqual(startHp, dummyHealth.NetworkedHealth, 0.35f,
           "Dummy HP must not change while missile is still in flight.");

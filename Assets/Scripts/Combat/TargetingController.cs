@@ -77,6 +77,7 @@ public class TargetingController : MonoBehaviour {
   // ---- Per-frame logic ----
 
   void Update() {
+    EnsureCamera();
 
     ClearCurrentTargetIfDead();
 
@@ -117,13 +118,16 @@ public class TargetingController : MonoBehaviour {
 
     foreach (var t in allTargetables) {
       var pm = t.GetComponent<PlayerMovement>();
-      if (pm != null && pm.HasInputAuthority) {
-        ForbesLog.Targeting($"  Skipping '{t.name}' (local player).");
-        continue;
-      }
+      bool skipLocalPlayer = pm != null && pm.HasInputAuthority;
+      bool deadTarget      = t.TryGetComponent(out Health hDead) && hDead.IsDead;
+      if (!TargetingAcquisitionLogic.IsTabTargetingCandidate(skipLocalPlayer, deadTarget)) {
+        if (skipLocalPlayer) {
+          ForbesLog.Targeting($"  Skipping '{t.name}' (local player).");
+        }
+        else {
+          ForbesLog.Targeting($"  Skipping '{t.name}' (dead).");
+        }
 
-      if (t.TryGetComponent(out Health h) && h.IsDead) {
-        ForbesLog.Targeting($"  Skipping '{t.name}' (dead).");
         continue;
       }
 
@@ -176,29 +180,18 @@ public class TargetingController : MonoBehaviour {
 
     var ray = cam.ScreenPointToRay(mouse.position.ReadValue());
 
-    // Fusion spawns objects into its own PhysicsScene (separate from the Unity default scene).
-    // Use runner.GetPhysicsScene() so Fusion-spawned objects (player, dummy) are included.
-    // Fall back to default Physics if no runner is available (e.g. floor tiles).
-    bool hitSomething = false;
-    RaycastHit hitInfo = default;
-
-    if (_runner != null && _runner.IsRunning) {
-      var fusionScene = _runner.GetPhysicsScene();
-      hitSomething = fusionScene.Raycast(ray.origin, ray.direction, out hitInfo, _maxRaycastDistance);
-
-      if (!hitSomething) {
-        // Also check default scene for non-networked objects (floor, etc.)
-        hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
-      }
-    } else {
-      hitSomething = Physics.Raycast(ray, out hitInfo, _maxRaycastDistance);
-    }
+    // Fusion spawns objects into its own PhysicsScene (see TargetingAcquisitionLogic).
+    Targetable selectable = TargetingAcquisitionLogic.TryPickSelectableAlongRay(
+      in ray,
+      _maxRaycastDistance,
+      _runner,
+      out bool hitSomething,
+      out RaycastHit hitInfo);
 
     if (hitSomething) {
       Debug.DrawRay(ray.origin, ray.direction * hitInfo.distance, Color.green, 1f);
-      var hit = hitInfo.collider.GetComponentInParent<Targetable>();
-      if (hit != null) {
-        SetTarget(hit);
+      if (selectable != null) {
+        SetTarget(selectable);
       }
     } else {
       Debug.DrawRay(ray.origin, ray.direction * _maxRaycastDistance, Color.red, 1f);
