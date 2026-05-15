@@ -45,4 +45,5 @@ Commit message prefix conventions (for `COMMIT_EDITMSG`):
 
 ## When work is done
 
-- Do **not** merge, push, or rebase from the agent session.
+- Do **not** push, rebase, or open a PR unless the user explicitly asks or `AGENTS.md` GitHub Issue Workflow requires it.
+- Never merge feature branches into `main`/`master` unless the user explicitly requests that operation.
