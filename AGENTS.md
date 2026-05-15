@@ -37,6 +37,70 @@ Do not treat old plans, checkpoints, or removed historical docs as current guida
 5. Validate host + one client when behavior is networked.
 6. Report short manual verification notes and any tests that could not be run.
 
+## GitHub Issue Workflow
+
+When the user points to a GitHub issue as the task contract, use the `user-github` MCP
+(`mcps/user-github/tools/`) for all GitHub API operations. Always read the tool's JSON
+schema before calling it.
+
+### 1 — Fetch and verify
+
+Fetch the issue with `issue_read` / `get`. **Stop and report** (do not improvise) if it is:
+
+- stale — references closed PRs, superseded branches, or removed docs as source of truth;
+- incomplete — missing required files, acceptance criteria, or scope definition;
+- contradictory with local architecture or rules in this file;
+- out of scope — would require changes the issue does not explicitly authorize.
+
+### 2 — Branch
+
+Create the branch named exactly as the issue specifies. If the issue does not name a branch,
+use `issue-N-<short-slug>`.
+
+### 3 — Read context first
+
+Read every file listed in the issue's required context bundle before touching any files.
+Do not read more than the issue requires unless a file is directly needed to complete the work.
+
+### 4 — Implement only what the issue authorizes
+
+Do not add features, refactors, visual polish, or cleanups outside the stated scope, even
+when they seem obviously related. File a follow-up issue instead.
+
+### 5 — Verify the diff before committing
+
+Run `git status` / `git diff` and confirm that only the files the issue explicitly allows
+are changed. Stop if unexpected files appear.
+
+### 6 — Commit and push
+
+Committing, pushing, and opening a PR are all expected parts of the issue workflow when the
+user opens an issue as the task contract — they do not need a separate explicit ask.
+Write the commit message to `.git/COMMIT_EDITMSG` for review, then commit and push.
+
+### 7 — Open the PR
+
+Use `create_pull_request` via the `user-github` MCP:
+
+- **Title:** exactly as the issue specifies.
+- **Body:** include the summary the issue requires and `Closes #N`.
+- **Base:** `master` unless the issue specifies otherwise.
+- **Changed files:** verify with `get_files` or `git diff --name-only` that only
+  issue-authorized files are in the PR before opening it.
+
+### 8 — Address review comments
+
+After opening the PR, fetch comments with `pull_request_read` / `get_comments` and
+`get_review_comments`. Address any requested changes, push a fixup commit, and confirm
+the PR is up to date before handing back to the user.
+
+### GitHub MCP / Windows notes
+
+- PR creation requires a token with `repo` write scope; a 403 means the token needs updating.
+- The shell is PowerShell — bash heredocs (`<<'EOF'`) do not work. Pass multi-line PR bodies
+  directly to the MCP tool, or write to a temp file (`.git/pr-body.md`) for `gh --body-file`.
+- `gh` CLI may not be installed; prefer the MCP for all GitHub operations.
+
 ## Git Safety
 
 - Work on the current branch by default.
