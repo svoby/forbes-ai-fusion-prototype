@@ -116,7 +116,7 @@ When in doubt, **ask the user** which branch should receive the merge or PR targ
 
 ## 7. Merge (prefer PR; local merge optional)
 
-**Preferred (review trail):** open a PR on the hosting provider, get review, merge via UI (or `gh pr merge` if that is the team workflow).
+**Preferred (review trail):** open a PR on the hosting provider (GitHub MCP or web UI), get review, merge via the GitHub UI.
 
 **Local fast-forward / merge** (only if the user wants it locally):
 
