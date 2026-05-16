@@ -181,17 +181,20 @@ handled) without merging:
    stop condition is met.
 4. **Stopping condition:** at minimum, required checks green and no unresolved change requests
    that fall within scope. If branch protection requires a human (or specific) **approval**,
-   poll `gh pr view --json reviewDecision` (or equivalent) but **do not** merge or bypass
-   org rules — hand off for Approve + Merge.
+   poll review/CI state via **GitHub MCP** (`pull_request_read`: `get_check_runs`, `get_reviews`)
+   but **do not** merge or bypass org rules — hand off for Approve + Merge.
 
 Full checklist, roles, and Cursor hook notes: `docs/PR_POST_OPEN_AGENT_LOOP.md`.
 
-### GitHub tooling / Windows notes
+### GitHub tooling (MCP only)
 
+- Use **Cursor GitHub MCP** (`user-github`) for issues, PRs, reviews, and CI status. Do **not**
+  require or document the `gh` CLI for agents in this repository. Tool names and loop steps:
+  `docs/PR_POST_OPEN_AGENT_LOOP.md`.
 - PR creation requires a token with `repo` write scope; a 403 means the token needs updating.
-- The shell is PowerShell — bash heredocs (`<<'EOF'`) do not work. Pass multi-line PR bodies
-  directly to the GitHub tool, or write to a temp file (`.git/pr-body.md`) for `gh --body-file`.
-- `gh` CLI may not be installed; prefer the configured GitHub integration when one is available.
+- Pass multi-line PR bodies as the `body` argument to `create_pull_request` (PowerShell has no
+  bash heredocs; a local `.git/pr-body.md` draft for the human is fine).
+- **Agents never merge** via MCP unless a human explicitly requests it.
 
 ## Cursor Worktrees — Parallel Issue Agents
 
